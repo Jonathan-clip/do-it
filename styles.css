@@ -247,3 +247,4 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .esel.set{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:600}
 .esel option{background:var(--card);color:var(--ink);font-weight:400}
 .okbtn{width:100%;margin-top:6px;padding:8px}
+.endday{white-space:nowrap}

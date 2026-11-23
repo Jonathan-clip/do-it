@@ -459,7 +459,7 @@ function askEnergyToast(force) { // recommended moments: morning, after a break,
 /* Work time and the hourly break: after ~50 minutes of work (timer + completed actions) suggest 10 minutes off */
 const Work = { skipId: '', pending: false };
 function addWork(m) {
-  const f = fo(TODAY()); f.work = (f.work || 0) + Math.max(0, m); Store.save();
+  const f = fo(TODAY()); f.work = (f.work || 0) + Math.max(0, m); f.workTotal = (f.workTotal || 0) + Math.max(0, m); Store.save();
   return Work.pending = f.work >= (f.workNext || 50);
 }
 function suggestBreak() {
@@ -539,7 +539,7 @@ function dayHistoryHTML() {
   const days = Object.keys(D().dayLog).filter(k => D().dayLog[k] && D().dayLog[k].start).sort().reverse().slice(0, 7);
   if (!days.length) return '<div class="empty">עדיין אין נתוני שעות</div>';
   const done = days.filter(k => D().dayLog[k].end), avg = done.length ? Math.round(done.reduce((s, k) => s + dayDurMin(D().dayLog[k]), 0) / done.length) : 0;
-  return days.map(k => { const L = D().dayLog[k]; return `<div class="card row"><div class="grow"><div class="t"><b>${shortDate(k)}</b></div><div class="meta"><span>התחלה ${L.start}</span><span>סיום ${L.end || '—'}</span>${L.end ? `<span>${fmtDur(dayDurMin(L))}</span>` : ''}</div></div></div>`; }).join('')
+  return days.map(k => { const L = D().dayLog[k]; return `<div class="card row"><div class="grow"><div class="t"><b>${shortDate(k)}</b></div><div class="meta"><span>התחלה ${L.start}</span><span>סיום ${L.end || '—'}</span>${L.end ? `<span>${fmtDur(dayDurMin(L))}</span>` : ''}${((D().focus[k] || {}).workTotal || 0) >= 1 ? `<span>עבודה בפועל ${fmtDur(Math.round(D().focus[k].workTotal))}</span>` : ''}</div></div></div>`; }).join('')
     + (avg ? `<div class="sub" style="margin-top:6px">ממוצע ימים שהסתיימו: ${fmtDur(avg)}</div>` : '');
 }
 
@@ -556,18 +556,28 @@ function nudgeAny(ids) { if (!$('#sheet').hidden) return; const t = (ids ? ids.m
 let reviewSnooze = false;
 function reviewSheet() {
   fo(TODAY()).reviewAsked = true; Store.save(); // shown once per day
-  const T = TODAY(), y = addDays(T, -1), ts = tasksOn(y), done = ts.filter(t => t.done).length, left = ts.filter(t => !t.done), L = D().dayLog[y] || {};
-  const planned = ts.reduce((s, t) => s + (t.mins || 0), 0), tips = [];
-  if (planned > DAY_CAP) tips.push(`תכננת ${planned} דקות, יותר מ-${DAY_CAP}. מחר אפשר לתכנן פחות.`);
+  const T = TODAY(), y = addDays(T, -1), ts = tasksOn(y), doneL = ts.filter(t => t.done), left = ts.filter(t => !t.done), done = doneL.length, L = D().dayLog[y] || {}, F = D().focus[y] || {};
+  const pct = ts.length ? Math.round(done / ts.length * 100) : 0, planned = ts.reduce((a, t) => a + (t.mins || 0), 0), doneMin = doneL.reduce((a, t) => a + (t.mins || 0), 0);
+  // earlier days, for comparison
+  const prev = [2, 3, 4, 5, 6, 7, 8].map(n => tasksOn(addDays(T, -n))).filter(x => x.length), avg = prev.length ? Math.round(prev.reduce((a, x) => a + x.filter(t => t.done).length / x.length * 100, 0) / prev.length) : null;
+  const mit = F.mitId ? findTask(F.mitId) : null, rl = D().rhythmLog[y] || {}, rItems = D().rhythm, rDone = rItems.filter(r => rl[r.id]).length, wt = Math.round(F.workTotal || 0);
+  const energyL = (ENERGY_MODES.find(m => m[0] === normEnergy(F.energy)) || [0, ''])[1], tips = [];
+  if (avg !== null && ts.length) tips.push(pct >= avg + 10 ? 'ביצעת יותר מהממוצע של הימים האחרונים (' + avg + '%). מה עזר לך אתמול?' : pct <= avg - 10 ? 'ביצעת פחות מהממוצע של הימים האחרונים (' + avg + '%). שווה לבדוק מה הפריע.' : 'קצב הביצוע דומה לממוצע של הימים האחרונים (' + avg + '%).');
+  if (planned > DAY_CAP) tips.push('תכננת ' + planned + ' דקות, יותר מ-' + DAY_CAP + '. מחר אפשר לתכנן פחות.');
   if (left.some(t => (t.energy || 0) >= 4)) tips.push('פעולות עתירות אנרגיה נשארו בלי ביצוע. כדאי לשבץ אותן בתחילת היום.');
   if (left.some(t => (t.defers || 0) >= 2)) tips.push('יש פעולות שנדחות שוב ושוב. שווה לכתוב אותן מחדש או לפצל.');
+  if (rItems.length && rDone < rItems.length) tips.push('לא כל ההפסקות שהגדרת נעשו (' + rDone + '/' + rItems.length + '). הפסקות עוזרות לשמור על קצב.');
   if (L.start && L.end && dayDurMin(L) > 600) tips.push('היום היה ארוך מאוד (' + fmtDur(dayDurMin(L)) + '). כדאי לקבוע שעת סיום.');
+  if (L.start && !L.end) tips.push('לא סימנת סיום יום, ולכן משך היום לא נספר. כדאי ללחוץ "סיום יום" בסוף היום.');
   if (ts.length && done === ts.length) tips.push('עמדת בכל הפעולות. שים לב מה עזר לך, ושמור על זה.');
   else if (!tips.length && left.length) tips.push('נסה לתכנן פחות פעולות, ובחר מראש את החשובה ביותר.');
+  const list = (arr, icon) => arr.slice(0, 8).map(t => '<div class="sub" style="margin:2px 0">' + icon + ' ' + esc(t.title) + (t.mins ? ' · ' + t.mins + ' ד׳' : '') + ((t.defers || 0) >= 2 ? ' · נדחתה ' + t.defers + ' פעמים' : '') + '</div>').join('') + (arr.length > 8 ? '<div class="sub">ועוד ' + (arr.length - 8) + '…</div>' : '');
   sheet(`<h1>סיכום אתמול ☀️</h1>
-   <p class="sub">${done}/${ts.length} פעולות בוצעו${L.start ? ` · התחלת ב-${L.start}${L.end ? ' וסיימת ב-' + L.end : ''}` : ''}</p>
-   ${left.length ? `<div class="sub">לא בוצעו: ${left.slice(0, 4).map(t => esc(t.title)).join(' · ')}${left.length > 4 ? '…' : ''}</div>` : ''}
-   ${tips.length ? `<div class="clarity">${tips.map(x => `<div class="ok">💡 ${esc(x)}</div>`).join('')}</div>` : ''}
+   <div class="meta" style="margin:4px 0 8px"><span>✅ ${done}/${ts.length} פעולות (${pct}%)</span>${doneMin ? '<span>⏱ ' + doneMin + ' ד׳ הושלמו</span>' : ''}${wt ? '<span>💼 עבודה בפועל ' + fmtDur(wt) + '</span>' : ''}${L.start ? '<span>🕗 ' + L.start + (L.end ? '–' + L.end + ' (' + fmtDur(dayDurMin(L)) + ')' : ' (בלי סיום)') + '</span>' : ''}${rItems.length ? '<span>☕ ' + rDone + '/' + rItems.length + ' הפסקות</span>' : ''}${energyL ? '<span>' + energyL + '</span>' : ''}</div>
+   ${mit ? '<div class="sub">⭐ הפעולה החשובה: <b>' + esc(mit.title) + '</b> ' + (mit.done ? '✓ בוצעה' : '✗ לא בוצעה') + '</div>' : ''}
+   ${doneL.length ? '<h2 style="margin:12px 0 4px">הספקת</h2>' + list(doneL, '✅') : ''}
+   ${left.length ? '<h2 style="margin:12px 0 4px">לא הספקת</h2>' + list(left, '⏳') : ''}
+   ${tips.length ? '<h2 style="margin:12px 0 4px">ניתוח</h2><div class="clarity">' + tips.map(x => '<div class="ok">💡 ' + esc(x) + '</div>').join('') + '</div>' : ''}
    <form id="f"><label>עמדת במשימות של אתמול?</label>
    <div class="opt" id="metOpts">${[['yes', '✅ כן'], ['part', '🟡 חלקית'], ['no', '❌ לא']].map(([v, l]) => `<button type="button" onclick="const f=this.closest('form');f.met.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div><input type="hidden" name="met" value="">
    <label>מה הייתי משפר?</label><textarea name="improve" rows="3" placeholder="דבר אחד קטן לשפר היום"></textarea>
@@ -578,7 +588,7 @@ function askMorning() {
   if (!$('#sheet').hidden || !$('#run').hidden) return;
   const T = TODAY(), y = addDays(T, -1);
   if (!visualSnooze && !D().visual[T] && !workedToday() && !(D().focus[T] || {}).visualAsked && new Date().getHours() < 14) return visualOffer();
-  if (!reviewSnooze && !D().review[y] && !(D().focus[T] || {}).reviewAsked && tasksOn(y).length) return reviewSheet();
+  if (!reviewSnooze && !D().review[y] && !(D().focus[T] || {}).reviewAsked && (tasksOn(y).length || ((D().focus[y] || {}).workTotal || 0) > 0)) return reviewSheet();
   askFocus();
 }
 /* ---------- Morning guided visualization: shown paragraph by paragraph, optional auto-advance and read-aloud ---------- */
@@ -793,8 +803,8 @@ const views = {
     const hAct = hs.filter(h => !habitDone(h, d)).length;
     return `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
       <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
-      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b></div><div class="bar"><div style="width:${pct}%"></div></div>
-       ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.start && est ? ' · ' : ''}${est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
+      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 סיום יום</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
+       ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
       ${visTop ? visualCard(d) : ''}
       ${rhythmStrip(d, 'near')}
       ${rewardTop ? rewardCard(d) : ''}
@@ -1685,7 +1695,7 @@ const A = {
   dayStart: () => { D().dayLog[TODAY()] = { start: nowHM(), end: '' }; Store.save(); render(); },
   dayEnd: () => {
     const T = TODAY(), L = (D().dayLog[T] = D().dayLog[T] || { start: nowHM(), end: '' }); L.end = nowHM(); Store.save(); render();
-    const ts = tasksOn(T); toast(`<span>🌙 סיימת את היום. משך ${fmtDur(dayDurMin(L))}, ${ts.filter(t => t.done).length}/${ts.length} פעולות בוצעו.</span><button data-act="toastClose" aria-label="סגור">✕</button>`, 8000); celebrate();
+    const ts = tasksOn(T); const wt = Math.round((D().focus[T] || {}).workTotal || 0); toast(`<span>🌙 סיימת את היום. משך ${fmtDur(dayDurMin(L))}${wt ? `, מתוכו עבודה בפועל ${fmtDur(wt)}` : ''}, ${ts.filter(t => t.done).length}/${ts.length} פעולות בוצעו.</span><button data-act="toastClose" aria-label="סגור">✕</button>`, 8000); celebrate();
   },
   dayReopen: () => { const L = D().dayLog[TODAY()]; if (L) { L.end = ''; Store.save(); render(); } },
   dayEdit: () => dayEditSheet(),
