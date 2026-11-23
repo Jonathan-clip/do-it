@@ -1,5 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
+const APP_VERSION = '2026-11-23.7'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -965,6 +966,8 @@ const views = {
       ${item('goals', '🎯', 'יעדים ותגמולים', `${activeG} פעילים${wait ? ` · 🎁 ${wait} ממתינים` : ''}`)}
       ${item('vision', '🌟', 'חזון', `${D().visions.length} פריטים`)}
       ${item('lists', '📝', 'רשימות', `${D().lists.length} רשימות`)}
+      <h2>גרסה</h2>
+      <div class="card row"><div class="grow"><div class="t">גרסה ${APP_VERSION}</div><div class="sub">אם נראה שהאפליקציה לא מעודכנת, לחץ כדי לנקות את המטמון ולטעון מחדש</div></div><button class="iconbtn" data-act="refreshApp">🔄 רענון</button></div>
       <h2>חשבון</h2>
       <div class="card row" data-act="account"><span style="font-size:26px">☁️</span><div class="grow"><div class="t"><b>כניסה וסנכרון</b></div><div class="meta">${Cloud.user ? esc(Cloud.user.email) : 'לא מחובר'}</div></div>${chev('l')}</div>`;
   },
@@ -1661,6 +1664,7 @@ const A = {
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
   noiseOff: () => toggleNoise(),
+  refreshApp: async () => { try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); for (const k of await caches.keys()) await caches.delete(k); } catch (e) {} location.href = location.pathname + '?' + (DEMO ? 'demo&' : '') + 'r=' + Date.now(); },
   clearOk: () => { const f = $('#f'); if (!f) return; f.dataset.ok = '1'; $('#clHint').innerHTML = '<div class="ok">✓ אישרת את הניסוח. אפשר לשמור.</div>'; },
   useSuggest: e => { const f = $('#f'); if (!f || !f.title) return; f.title.value = e.s; f.title.dispatchEvent(new Event('input')); f.title.focus(); },
   setEnergyTo: v => { $('#toast').hidden = true; const f = fo(TODAY()); f.energy = v; f.energyAt = new Date().toISOString(); Store.save(); render(); if (v) energyHelp(v); },
