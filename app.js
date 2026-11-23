@@ -303,7 +303,7 @@ function runRender() {
     ${Run.ended ? `<div class="sub" style="text-align:center">${Run.brk ? 'ההפסקה נגמרה' : 'הזמן נגמר. איך הלך?'}</div>` : ''}
     <div class="grid2">
       ${Run.ended ? (Run.brk ? '<button class="btn" data-act="runNext">חזרה לעבודה</button>' : '<button class="btn" data-act="runDone">✓ סיימתי</button><button class="btn ghost" data-act="runMore">עוד 5 דקות</button>' + (Run.pomo ? '<button class="btn ghost" data-act="runBreakMin" data-m="5" data-l="🍅 הפסקת פומודורו">☕ הפסקה 5 דקות</button>' : ''))
-        : `<button class="btn" data-act="runToggle">${Run.running ? '⏸ השהה' : '▶ התחל'}</button>${Run.brk ? '<button class="btn ghost" data-act="runNext">דלג</button>' + (Run.rhythmId ? '<button class="btn ghost" data-act="rhythmDoneRun">✓ ' + ((D().rhythm.find(x => x.id === Run.rhythmId) || {}).kind === 'rest' ? 'כבר נחתי' : 'כבר אכלתי') + '</button>' : '') : '<button class="btn ghost" data-act="runDone">✓ סיימתי</button>'}`}
+        : `<button class="btn" data-act="runToggle">${Run.running ? '⏸ השהה' : '◀ התחל'}</button>${Run.brk ? '<button class="btn ghost" data-act="runNext">דלג</button>' + (Run.rhythmId ? '<button class="btn ghost" data-act="rhythmDoneRun">✓ ' + ((D().rhythm.find(x => x.id === Run.rhythmId) || {}).kind === 'rest' ? 'כבר נחתי' : 'כבר אכלתי') + '</button>' : '') : '<button class="btn ghost" data-act="runDone">✓ סיימתי</button>'}`}
       ${Run.brk ? '' : '<button class="btn ghost" data-act="stuck">🤝 נתקעתי</button>'}
     </div></div>`;
   const si = $('#runStep'); if (si) si.oninput = () => { t.first = si.value; Store.save(); };
@@ -372,13 +372,13 @@ function energyHelp(v) {
   const b = (act, label, extra = '') => `<button class="btn ghost" data-act="${act}" ${extra}>${label}</button>`;
   const M = {
     high: ['⚡ אנרגיה גבוהה', ['זה הזמן לדבר הקשה והחשוב, לפני שהאנרגיה יורדת.', 'בלוק אחד של 25 דקות בלי הפרעות, ואז הפסקה.'],
-      [mit && !mit.done ? b('runStart', '▶ להתחיל את הפעולה החשובה', `data-id="${mit.id}"`) : '', first ? b('runStart', '▶ להתחיל: ' + esc(first.title), `data-id="${first.id}"`) : '']],
+      [mit && !mit.done ? b('runStart', '◀ להתחיל את הפעולה החשובה', `data-id="${mit.id}"`) : '', first ? b('runStart', '◀ להתחיל: ' + esc(first.title), `data-id="${first.id}"`) : '']],
     midlow: ['🙂 אנרגיה בינונית או נמוכה', ['לא מכריחים. מתחילים בקל ובקצר, וצוברים תנופה.', 'סידרתי את היום כך שהפעולות הקלות קודם.', 'שלוש פעולות להיום מספיקות.'],
       [easy ? b('runStart', '🍃 פעולה קלה: ' + esc(easy.title), `data-id="${easy.id}"`) : '']],
-    tired: ['😴 עייפות', ['עייפות היא מידע, לא כישלון.', 'עשר דקות הפסקה: מים, תנועה קלה או אוויר צח.', 'אחר כך פעולה קלה אחת של 5 דקות. אם עדיין קשה, זה סימן שצריך מנוחה ארוכה יותר.'],
-      [b('runBreakMin', '☕ הפסקה של 10 דקות', 'data-m="10" data-l="🛋 מתרעננים"'), easy ? b('runStart', '🍃 פעולה קלה: ' + esc(easy.title), `data-id="${easy.id}"`) : '']],
+    tired: ['😴 עייפות', ['עייפות היא מידע, לא כישלון.', 'בחר אחד מהשלושה:'],
+      [b('brainlessList', '⚡ עבור לביצוע פעולות brainless'), b('runBreakMin', '💪 בצע פושאפס', 'data-m="2" data-l="💪 פושאפס"'), b('runBreakMin', '🛋 לך תנוח לחצי שעה', 'data-m="30" data-l="🛋 מנוחה של חצי שעה"')]],
     flood: ['🌊 הצפה', ['עוצרים הכל לדקה. נשימה איטית: שאיפה 4, נשיפה 6.', 'פורקים הכל לדף, בלי לארגן (הכפתור 💭).', 'מציגים רק פעולה אחת. השאר מחכות.'],
-      [b('runBreakMin', '🫁 דקה של נשימה', 'data-m="1" data-l="🫁 נושמים לאט"'), b('capture', '💭 לפרוק הכל לדף'), easy ? b('runStart', '▶ פעולה אחת: ' + esc(easy.title), `data-id="${easy.id}"`) : '']],
+      [b('runBreakMin', '🫁 דקה של נשימה', 'data-m="1" data-l="🫁 נושמים לאט"'), b('capture', '💭 לפרוק הכל לדף'), easy ? b('runStart', '◀ פעולה אחת: ' + esc(easy.title), `data-id="${easy.id}"`) : '']],
     judge: ['🪞 שיפוטיות', ['"' + REMINDERS[1] + '"', 'הקול הפנימי הזה לא מדד של האמת. משווים רק לעצמך של אתמול.', 'כתוב הצלחה אחת קטנה, ואז שתי דקות בלבד על פעולה קלה, בלי חובה לסיים.'],
       [b('goTab', '🏆 לכתוב הצלחה קטנה', 'data-t="journal"'), easy ? b('run2', '⏱ שתי דקות על: ' + esc(easy.title), `data-id="${easy.id}"`) : '']]
   }[v];
@@ -396,16 +396,16 @@ function victimHelp() {
     <input id="vResp" placeholder="מה החלק שבאחריותי כאן?" autocomplete="off"><button class="btn ghost" data-act="victimSave" data-k="r" style="margin-top:6px">✍ לשמור ביומן</button></div>
    <div class="card"><div class="t"><b>3. להתמקד בפתרונות</b></div><div class="sub">מהו הצעד הבא שאני יכול לעשות?</div>
     <input id="vStep" placeholder="צעד קטן וברור" autocomplete="off"><button class="btn ghost" data-act="victimStep" style="margin-top:6px">➕ להוסיף להיום ולהתחיל</button></div>
-   <div class="card"><div class="t"><b>4. לעבור לפעולה</b></div>${t ? `<button class="btn" data-act="runStart" data-id="${t.id}" style="margin-top:6px">▶ להתחיל: ${esc(t.title)}</button>` : '<div class="sub">אין פעולה פתוחה להיום</div>'}</div>
+   <div class="card"><div class="t"><b>4. לעבור לפעולה</b></div>${t ? `<button class="btn" data-act="runStart" data-id="${t.id}" style="margin-top:6px">◀ להתחיל: ${esc(t.title)}</button>` : '<div class="sub">אין פעולה פתוחה להיום</div>'}</div>
    <div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
 }
 /* Lack of focus: seven methods to choose from */
 const FOCUS_METHODS = [
   ['body', '🤸 הפעלת הגוף', 'לקום, להתמתח או לעשות כמה קפיצות פיסוק כדי להחזיר אנרגיה.', '⏱ שתי דקות תנועה'],
   ['reset', '🔹 איפוס משימה', 'לפרק את העבודה לצעדים זעירים ולהתחיל מהקל ביותר.', '🔹 לפרק לצעד קטן'],
-  ['pomo', '🍅 חלוקת זמן', 'שיטת הפומודורו: 25 דקות עבודה ו-5 דקות הפסקה.', '▶ להתחיל 25 דקות'],
+  ['pomo', '🍅 חלוקת זמן', 'שיטת הפומודורו: 25 דקות עבודה ו-5 דקות הפסקה.', '◀ להתחיל 25 דקות'],
   ['env', '🚪 החלפת סביבה', 'לעבור למקום אחר או לשנות את הסביבה הקרובה.', '⏱ עשר דקות במקום אחר'],
-  ['noise', '🎧 גירוי רקע', 'מוזיקה אינסטרומנטלית או רעש רקע כדי לעזור בריכוז.', '▶ רעש רקע'],
+  ['noise', '🎧 גירוי רקע', 'מוזיקה אינסטרומנטלית או רעש רקע כדי לעזור בריכוז.', '◀ רעש רקע'],
   ['account', '📣 טריגר אחריותיות', 'לספר למישהו מה המטרה שלך, או להגדיר טיימר קצר כדי להישאר במסלול.', ''],
   ['touch', '🖍 מעורבות מישושית', 'צעצוע פידג׳ט, כדור לחץ או שרבוט תוך כדי חשיבה.', '']
 ];
@@ -487,7 +487,7 @@ function rhythmStrip(d, mode) {
   const near = r => !log[r.id] && Math.abs(toMin(r.time) - nowM) <= 30;
   const row = r => {
     const done = !!log[r.id], due = !done && r.time <= now;
-    return `<div class="card row rh ${done ? 'done' : ''} ${due ? 'due' : ''}"><button class="check ${done ? 'on' : ''}" data-act="rhythmDone" data-id="${r.id}" aria-label="סמן">${done ? '✓' : ''}</button><div class="grow"><div class="t">${r.kind === 'meal' ? '🍽' : '😌'} ${esc(r.label)}</div><div class="meta"><span>${r.time}</span><span>${r.mins} ד׳</span>${due ? '<span style="color:var(--accent)">הגיע הזמן</span>' : ''}</div></div>${done ? '' : `<button class="iconbtn" data-act="rhythmStart" data-id="${r.id}">▶ הפסקה</button>`}</div>`;
+    return `<div class="card row rh ${done ? 'done' : ''} ${due ? 'due' : ''}"><button class="check ${done ? 'on' : ''}" data-act="rhythmDone" data-id="${r.id}" aria-label="סמן">${done ? '✓' : ''}</button><div class="grow"><div class="t">${r.kind === 'meal' ? '🍽' : '😌'} ${esc(r.label)}</div><div class="meta"><span>${r.time}</span><span>${r.mins} ד׳</span>${due ? '<span style="color:var(--accent)">הגיע הזמן</span>' : ''}</div></div>${done ? '' : `<button class="iconbtn" data-act="rhythmStart" data-id="${r.id}">◀ הפסקה</button>`}</div>`;
   };
   if (mode === 'near') return items.filter(near).map(row).join('');
   const rows = items.filter(r => !near(r)).map(row).join('');
@@ -502,7 +502,7 @@ function tick() {
     if (!$('#toast').hidden || !$('#sheet').hidden || !$('#run').hidden) return;
     const now = toMin(nowHM()), log = D().rhythmLog[T] || {}, f = D().focus[T] || {};
     const r = rhythmSorted().find(x => !log[x.id] && toMin(x.time) <= now && now < toMin(x.time) + 180 && !tick.shown[T + x.id]);
-    if (r) { tick.shown[T + r.id] = 1; toast(`<span>${r.kind === 'meal' ? '🍽' : '😌'} הגיע הזמן: <b>${esc(r.label)}</b> (${r.mins} ד׳)</span><button class="btn" data-act="rhythmStart" data-id="${r.id}">▶ התחל</button><button class="btn ghost" data-act="rhythmDone" data-id="${r.id}">✓ ${r.kind === 'rest' ? 'כבר נחתי' : 'כבר אכלתי'}</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000); return; }
+    if (r) { tick.shown[T + r.id] = 1; toast(`<span>${r.kind === 'meal' ? '🍽' : '😌'} הגיע הזמן: <b>${esc(r.label)}</b> (${r.mins} ד׳)</span><button class="btn" data-act="rhythmStart" data-id="${r.id}">◀ התחל</button><button class="btn ghost" data-act="rhythmDone" data-id="${r.id}">✓ ${r.kind === 'rest' ? 'כבר נחתי' : 'כבר אכלתי'}</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000); return; }
     if ((f.work || 0) >= (f.workNext || 50)) { suggestBreak(); return; }
     askEnergyToast();
   } finally { tickBusy = false; }
@@ -521,7 +521,7 @@ const dayDurMin = L => L && L.start && L.end ? Math.max(0, toMin(L.end) - toMin(
 function dayCard(d) {
   if (d !== TODAY()) return '';
   const L = D().dayLog[d] || {};
-  const btn = !L.start ? '<button class="iconbtn" data-act="dayStart">▶ התחל יום</button>' : !L.end ? '<button class="iconbtn" data-act="dayEnd">🌙 סיימתי יום</button>' : '<button class="iconbtn" data-act="dayReopen" aria-label="פתח מחדש">↺</button>';
+  const btn = !L.start ? '<button class="iconbtn" data-act="dayStart">◀ התחל יום</button>' : !L.end ? '<button class="iconbtn" data-act="dayEnd">🌙 סיימתי יום</button>' : '<button class="iconbtn" data-act="dayReopen" aria-label="פתח מחדש">↺</button>';
   return `<div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow" data-act="dayEdit"><div class="t">${L.start ? 'התחלת ב-' + L.start : 'היום עוד לא התחיל'}${L.end ? ' · סיימת ב-' + L.end : ''}</div>${L.start ? `<div class="meta"><span>${L.end ? 'משך היום' : 'עד עכשיו'}: ${fmtDur(dayDurMin(L))}</span></div>` : ''}</div>${btn}</div>`;
 }
 function dayEditSheet() {
@@ -605,7 +605,7 @@ function visRender() {
     <div class="visdots">${VISUALIZATION.map((_, k) => `<i class="${k <= Vis.i ? 'on' : ''}"></i>`).join('')}</div>
     <div class="vistext" key="${Vis.i}">${VISUALIZATION[Vis.i].split('\n').map(l => `<p>${esc(l)}</p>`).join('')}</div>
     <div class="opt" style="justify-content:center;margin:10px 0">
-      <button class="${Vis.auto ? 'on' : ''}" data-act="visAuto">${Vis.auto ? '⏸ אוטומטי' : '▶ אוטומטי'}</button>
+      <button class="${Vis.auto ? 'on' : ''}" data-act="visAuto">${Vis.auto ? '⏸ אוטומטי' : '◀ אוטומטי'}</button>
       ${canSpeak() ? `<button class="${Vis.speak ? 'on' : ''}" data-act="visSpeak">🔊 הקראה</button>` : ''}</div>
     <div class="grid2">${Vis.i > 0 ? '<button class="btn ghost" data-act="visPrev">הקודם</button>' : '<span></span>'}${last ? '<button class="btn" data-act="visDone">✓ סיימתי</button>' : '<button class="btn" data-act="visNext">הבא</button>'}</div></div>`;
   visSchedule(); visSay();
@@ -614,12 +614,12 @@ function visOpen() { clearInterval(Run.tick); closeSheet(); Vis.i = 0; Vis.auto 
 function visStop() { clearTimeout(Vis.timer); if (canSpeak()) speechSynthesis.cancel(); $('#run').hidden = true; document.body.classList.remove('running'); }
 function visualOffer() {
   sheet(`<h1>🧘 דמיון מודרך</h1><p class="sub">כמה דקות של דמיון לפני שמתחילים את היום. תקרא בקצב שלך, או תן לאפליקציה להתקדם לבד.</p>
-   <div class="actions"><button class="btn ghost" data-act="visLater">אחר כך</button><button class="btn" data-act="visStart">▶ להתחיל</button></div>`);
+   <div class="actions"><button class="btn ghost" data-act="visLater">אחר כך</button><button class="btn" data-act="visStart">◀ להתחיל</button></div>`);
 }
 function visualCard(d) {
   if (d !== TODAY()) return '';
   const done = !!D().visual[d];
-  return `<div class="card row ${done ? 'done' : ''}"><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>${done ? 'בוצע היום ✓' : 'עוד לא בוצע'}</span></div></div><button class="iconbtn" data-act="visStart">${done ? '↺ שוב' : '▶ להתחיל'}</button></div>`;
+  return `<div class="card row ${done ? 'done' : ''}"><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>${done ? 'בוצע היום ✓' : 'עוד לא בוצע'}</span></div></div><button class="iconbtn" data-act="visStart">${done ? '↺ שוב' : '◀ להתחיל'}</button></div>`;
 }
 /* ---------- Daily reward: you set the condition for each day; the reward comes from your own list ---------- */
 const REWARD_RULES = [['', 'בלי תנאי'], ['mit', 'הפעולה החשובה'], ['p50', 'לפחות 50% מהפעולות'], ['p70', 'לפחות 70% מהפעולות'], ['all', 'כל הפעולות']];
@@ -667,7 +667,7 @@ function focusCard(d) {
   if (!f.mit && !f.fun) return `<div class="card focus" data-act="focusEdit"><div class="t"><b>⭐ מה החשוב היום, ומה הפאן?</b></div><div class="sub">לחץ כדי לקבוע</div></div>`;
   return `<div class="card focus" data-act="focusEdit"><div class="frow"><span>⭐</span><div class="grow"><div class="sub">הפעולה החשובה של היום</div><div class="t">${f.mit ? esc(f.mit) : '—'}</div></div></div>
     <div class="frow"><span>🎉</span><div class="grow"><div class="sub">הפאן של היום</div><div class="t">${f.fun ? esc(f.fun) : '—'}</div></div></div>
-    ${f.mit && d === TODAY() && !(f.mitId && (D().tasks.find(x => x.id === f.mitId) || {}).done) ? `<button class="btn startnow" data-act="runStart" data-id="${f.mitId}">▶ התחל עכשיו</button>` : ''}</div>`;
+    ${f.mit && d === TODAY() && !(f.mitId && (D().tasks.find(x => x.id === f.mitId) || {}).done) ? `<button class="btn startnow" data-act="runStart" data-id="${f.mitId}">◀ התחל עכשיו</button>` : ''}</div>`;
 }
 let focusSnooze = false;
 function focusSheet(d) {
@@ -715,7 +715,7 @@ function taskRow(t, showDate) {
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${esc(t.title)}</div>
       <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${t.jobId ? jobChip(t) : projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
-    </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">▶</button>`}</div>${subsHtml}</div>`;
+    </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
   const on = habitDone(h, d), v = h.visionId ? visionName(h.visionId) : '';
@@ -1309,7 +1309,7 @@ function menuSheet(id) {
    <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${t.jobId ? jobChip(t) : projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
    ${t.notes ? `<p class="sub" style="white-space:pre-wrap">${esc(t.notes)}</p>` : ''}
    <div class="grid2">
-     ${t.done ? '' : `<button class="btn" data-act="runStart" data-id="${t.id}">▶ התחל עכשיו</button>`}
+     ${t.done ? '' : `<button class="btn" data-act="runStart" data-id="${t.id}">◀ התחל עכשיו</button>`}
      <button class="btn ghost" data-act="menuDone" data-id="${t.id}">${t.done ? '↺ בטל ביצוע' : '✓ בוצע'}</button>
      <button class="btn ghost" data-act="moveSheet" data-id="${t.id}">📆 העבר</button>
      <button class="btn ghost" data-act="editTask" data-id="${t.id}">✏️ ערוך</button>
@@ -1604,6 +1604,10 @@ const A = {
   breakLater: () => { const f = fo(TODAY()); f.workNext = (f.work || 0) + 15; Store.save(); $('#toast').hidden = true; },
   rhythmStart: e => { $('#toast').hidden = true; const r = D().rhythm.find(x => x.id === e.id); if (r) runOpen(null, true, r.mins, (r.kind === 'meal' ? '🍽 ' : '😌 ') + r.label, r.id); },
   rhythmDone: e => { $('#toast').hidden = true; const T = TODAY(), l = (D().rhythmLog[T] = D().rhythmLog[T] || {}); if (l[e.id]) delete l[e.id]; else l[e.id] = true; Store.save(); render(); },
+  brainlessList: () => {
+    const T = TODAY(), all = D().tasks.filter(t => !t.done && t.brainless), list = (all.filter(t => t.date === T).length ? all.filter(t => t.date === T) : all).slice(0, 12);
+    sheet(`<h1>⚡ פעולות brainless</h1>${list.length ? '<p class="sub">פעולות פשוטות שאפשר להעיף ברגע. בחר אחת להתחלה:</p><div class="grid2" style="grid-template-columns:1fr">' + list.map(t => '<button class="btn ghost" data-act="runStart" data-id="' + t.id + '">◀ ' + esc(t.title) + (t.mins ? ' · ' + t.mins + ' ד׳' : '') + '</button>').join('') + '</div>' : '<p class="sub">אין כרגע פעולות brainless פתוחות. אפשר לסמן פעולה כ-Brainless בעריכה שלה.</p>'}<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
+  },
   rhythmDoneRun: () => { const T = TODAY(); if (Run.rhythmId) { (D().rhythmLog[T] = D().rhythmLog[T] || {})[Run.rhythmId] = true; Store.save(); } runClose(); },
   rhythmDel: e => { D().rhythm = D().rhythm.filter(r => r.id !== e.id); Store.save(); render(); },
   dayStart: () => { D().dayLog[TODAY()] = { start: nowHM(), end: '' }; Store.save(); render(); },
