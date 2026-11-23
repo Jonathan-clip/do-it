@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Do It: אפליקציית ניהול אישי בעברית (תיאור ודמו)</title>
+<meta name="description" content="Do It היא אפליקציית ווב לניהול אישי בעברית: פרויקטים, משימות ופעולות, מצבי אנרגיה, טיימר, הפסקות, יומן ותגמולים. דף זה מתאר את כל המסכים בטקסט.">
+<link rel="stylesheet" href="styles.css">
+<style>body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;margin:0}
+.about{max-width:760px;margin:0 auto;padding:20px 16px 60px}.about h1{font-size:28px}.about h2.sec{font-size:20px;margin:34px 0 4px;color:var(--ink)}
+.phone{max-width:420px;border:1px solid var(--line);border-radius:18px;padding:14px;margin:10px 0;background:var(--bg);pointer-events:none}
+.phone .top{margin-bottom:8px}.feat{margin:10px 0}.feat b{color:var(--brand)}a{color:var(--brand)}.cta{display:inline-block;background:var(--brand);color:var(--brand-ink);padding:10px 18px;border-radius:12px;text-decoration:none;font-weight:600;margin:8px 0}</style>
+</head>
+<body>
+<main class="about">
+<h1>Do It: אפליקציית ניהול אישי</h1>
+<p>דף זה הוא תיאור סטטי של האפליקציה, שאפשר לקרוא בלי הרצת JavaScript. האפליקציה החיה היא אפליקציית דף יחיד שנבנית בדפדפן, ולכן כלים שלא מריצים JavaScript רואים רק מעטפת ריקה. כל המסכים מתועדים כאן, עם נתוני דמו בדויים.</p>
+<p><a class="cta" href="index.html?demo">פתיחת האפליקציה במצב דמו (נתונים בדויים)</a></p>
+<h2 class="sec">מה יש באפליקציה</h2>
+<div class="feat"><b>מבנה.</b> פרויקט › משימה › פעולה. פרויקט מכיל משימות (תוצאה שרוצים להשיג), וכל משימה מורכבת מפעולות קטנות. הפעולה היא יחידת הביצוע: יש לה תאריך, רמת אנרגיה (1 עד 5 כוכבים), משך של עד 15 דקות, בדיקת בהירות הניסוח, חזרתיות וטיימר. פעולה ארוכה מ-15 דקות מוצעת לפיצול לפעולות עם שמות ברורים.</div>
+<div class="feat"><b>מסך היום.</b> שלוש פעולות להיום (החשובה קודם, ואז לפי מצב האנרגיה) עם כפתור להצגת כולן. כרטיס &quot;הפעולה החשובה&quot; ו&quot;הפאן של היום&quot;, שעת התחלה וסיום של היום, דמיון מודרך בבוקר, תגמול יומי, מקצב היום (ארוחות ומנוחה), פתק יומי ושני משפטים מעצימים.</div>
+<div class="feat"><b>בקרוב.</b> לוח של שלושה ימים, שבוע, חודש וכל הימים, עם גרירת פעולות בין תאריכים. תמיכה מלאה בעברית מימין לשמאל.</div>
+<div class="feat"><b>התחל עכשיו.</b> מסך עבודה נקי עם פעולה אחת, הצעד הראשון וטיימר של 5, 15 או 25 דקות. כפתור &quot;נתקעתי&quot; מציע: לפרק לצעד קטן, שתי דקות בלבד, פעולה קלה יותר, או לחזור אחר כך. אחרי סיום מוצעת הפעולה הבאה או הפסקה.</div>
+<div class="feat"><b>מצבי אנרגיה ורגש.</b> שבעה מצבים: אנרגיה גבוהה, בינונית או נמוכה, עייפות, הצפה, שיפוטיות, חוסר ריכוז ואני קורבן. לכל מצב האפליקציה מציעה פתרון קונקרטי (למשל פומודורו, רעש רקע, דקת נשימה, ארבעה צעדים ליציאה ממצב קורבן), ומסדרת את הפעולות בהתאם.</div>
+<div class="feat"><b>הפסקות ומקצב.</b> ארוחות ומנוחה יומית שהמשתמש מגדיר, תזכורת להפסקה של 10 דקות אחרי כ-50 דקות עבודה, ומעקב שעות התחלה וסיום של היום.</div>
+<div class="feat"><b>ארגון יומי וסיכום בוקר.</b> תהליך &quot;ארגון&quot; שמתארך פעולות בלי תאריך ובודק את מחר, עם אפשרות להעביר ל&quot;מאגר&quot;. סיכום בוקר: עמדת בפעולות של אתמול ומה לשפר. פעולה שנדחתה יותר מפעמיים מקבלת הצעה לכתוב אותה מחדש.</div>
+<div class="feat"><b>הרגלים, יעדים ותגמולים.</b> הרגלים עם רצף, יעדים עם תגמול, ותגמול יומי עם תנאי שנקבע לכל יום ורשימת תגמולים אישית.</div>
+<div class="feat"><b>יומן.</b> מחשבות, תמונה של היום והצלחות.</div>
+<div class="feat"><b>טכנולוגיה.</b> אפליקציית ווב (PWA) ללא שרת, JavaScript נקי. נתונים נשמרים בטלפון, ובסנכרון אופציונלי לענן (Supabase) עם מיזוג לפי פריט. עובדת במובייל ובמחשב, כולל מצב כהה והדפסה.</div>
+<h2 class="sec">המסכים (צילום של הדמו כטקסט)</h2>
+<section id="today"><h2 class="sec">מסך היום</h2><p>הלב של האפליקציה: סרגל התקדמות, שעת התחלה וסיום, דמיון מודרך, הפעולה החשובה והפאן של היום, תגמול יומי, אנרגיה, הפסקות, והפעולות להיום (שלוש בכל פעם).</p><div class="phone"><div class="top"><div class="brand"><svg class="logo" width="36" height="36" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"></rect><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="390" cy="170" r="36" fill="#e8a33d"></circle></svg><div><h1>היום</h1><div class="sub">יום שני, 23 נובמבר 2026</div></div></div>
+      <div class="sw"><button class="iconbtn" title="סנכרון וחשבון">👤</button><button class="iconbtn" aria-label="היום הקודם"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="iconbtn">היום</button><button class="iconbtn" aria-label="היום הבא"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></div></div>
+      <div class="card"><div class="row"><b class="grow">1/8 הושלמו · נותרו 65 ד׳</b></div><div class="bar"><div style="width:13%"></div></div></div>
+      <div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow"><div class="t">התחלת ב-13:53</div><div class="meta"><span>עד עכשיו: 0 דק׳</span></div></div><button class="iconbtn">🌙 סיימתי יום</button></div>
+      <div class="card row "><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>עוד לא בוצע</span></div></div><button class="iconbtn">▶ להתחיל</button></div>
+      <div class="card focus"><div class="frow"><span>⭐</span><div class="grow"><div class="sub">הפעולה החשובה של היום</div><div class="t">לכתוב הצעת מחיר ללקוח חדש</div></div></div>
+    <div class="frow"><span>🎉</span><div class="grow"><div class="sub">הפאן של היום</div><div class="t">קפה עם חברה בערב</div></div></div>
+    <button class="btn startnow">▶ התחל עכשיו</button></div>
+      <div class="card focus"><div class="t"><b>🎁 תגמול יומי</b></div><div class="sub">לחץ כדי לקבוע תנאי לתגמול של היום</div></div>
+      <div class="remind" title="לחץ להחלפה">💬 האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.</div>
+      <div class="opt" style="margin-bottom:6px"><button>🖨 הדפס את כל פעולות היום</button><button>🖨 רק פתוחות/מסומנות</button><button>📋 הזנה מרוכזת</button></div>
+      <div class="ebar"><span class="sub">האנרגיה שלי עכשיו:</span><button class="">⚡ אנרגיה גבוהה</button><button class="on">🙂 בינונית או נמוכה</button><button class="">😴 עייפות</button><button class="">🌊 הצפה</button><button class="">🪞 שיפוטיות</button><button class="">🎯 חוסר ריכוז</button><button class="">🥀 אני קורבן</button></div>
+      <h2>מקצב היום</h2><div class="card row rh  due"><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">🍽 ארוחת צהריים</div><div class="meta"><span>13:00</span><span>30 ד׳</span><span style="color:var(--accent)">הגיע הזמן</span></div></div><button class="iconbtn">▶ הפסקה</button></div><div class="card row rh  "><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">😌 מנוחה קצרה</div><div class="meta"><span>16:00</span><span>20 ד׳</span></div></div><button class="iconbtn">▶ הפסקה</button></div>
+      <h2>פעולות</h2><div class="card row org "><button class="check " aria-label="ארגון"></button>
+    <div class="grow"><div class="t">🗂 ארגון</div><div class="meta"><span>0 ללא תאריך</span><span>0 באיחור</span><span>מחר: 1 משימות · 15 ד׳</span></div></div></div><div class="grp"><div class="card row p2 ">
+    <button class="check "></button>
+    <div class="grow">
+      <div class="t">לכתוב הצעת מחיר ללקוח חדש</div>
+      <div class="meta"><span style="color:var(--accent)">★★★★★</span><span>15 ד׳</span><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span><span class="chip">עסק קטן שמצליח</span></div>
+    </div></div></div><div class="grp"><div class="card row p0 ">
+    <button class="check "></button>
+    <div class="grow">
+      <div class="t">להכין רשימת קניות לשבת</div>
+      <div class="meta"><span style="color:var(--accent)">★</span><span>10 ד׳</span><span title="כל שבוע">🔁 כל שבוע</span></div>
+    </div></div></div><div class="grp"><div class="card row p0 ">
+    <button class="check "></button>
+    <div class="grow">
+      <div class="t">להתקשר לאינסטלטור ולקבוע ביקור</div>
+      <div class="meta"><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div>
+    </div></div></div><button class="btn ghost more3">הצג את כל הפעולות (1 נוספות)</button>
+      <h2>הרגלים</h2><div class="card row ">
+    <button class="check "></button>
+    <div class="grow"><div class="t">ללכת 15 דקות סביב הבלוק</div>
+    <div class="meta"><span class="chip">🔁 פעילות גופנית</span><span>🔥 3</span><span style="color:var(--accent)">★★★★</span><span>15 ד׳</span><span class="chip">בריאות ואנרגיה לאורך היום</span></div></div></div><div class="card row ">
+    <button class="check "></button>
+    <div class="grow"><div class="t">לקרוא 10 עמודים בספר</div>
+    <div class="meta"><span class="chip">🔁 קריאה</span><span>🔥 2</span><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div></div></div><div class="card row ">
+    <button class="check "></button>
+    <div class="grow"><div class="t">לכתוב 3 שורות על מה שהצליח היום</div>
+    <div class="meta"><span class="chip">🔁 סיכום יום</span><span>🔥 0</span><span style="color:var(--accent)">★</span><span>5 ד׳</span></div></div></div>
+      <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">הבוקר התחלתי עם הליכה, ההרגשה טובה.</textarea>
+      </div></section>
+<section id="today-all"><h2 class="sec">מסך היום עם כל הפעולות</h2><p>אחרי לחיצה על &quot;הצג את כל הפעולות&quot;.</p><div class="phone"><div class="top"><div class="brand"><svg class="logo" width="36" height="36" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"></rect><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="390" cy="170" r="36" fill="#e8a33d"></circle></svg><div><h1>היום</h1><div class="sub">יום שני, 23 נובמבר 2026</div></div></div>
+      <div class="sw"><button class="iconbtn" title="סנכרון וחשבון">👤</button><button class="iconbtn" aria-label="היום הקודם"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="iconbtn">היום</button><button class="iconbtn" aria-label="היום הבא"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></div></div>
+      <div class="card"><div class="row"><b class="grow">1/8 הושלמו · נותרו 65 ד׳</b></div><div class="bar"><div style="width:13%"></div></div></div>
+      <div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow"><div class="t">התחלת ב-13:53</div><div class="meta"><span>עד עכשיו: 0 דק׳</span></div></div><button class="iconbtn">🌙 סיימתי יום</button></div>
+      <div class="card row "><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>עוד לא בוצע</span></div></div><button class="iconbtn">▶ להתחיל</button></div>
+      <div class="card focus"><div class="frow"><span>⭐</span><div class="grow"><div class="sub">הפעולה החשובה של היום</div><div class="t">לכתוב הצעת מחיר ללקוח חדש</div></div></div>
+    <div class="frow"><span>🎉</span><div class="grow"><div class="sub">הפאן של היום</div><div class="t">קפה עם חברה בערב</div></div></div>
+    <button class="btn startnow">▶ התחל עכשיו</button></div>
+      <div class="card focus"><div class="t"><b>🎁 תגמול יומי</b></div><div class="sub">לחץ כדי לקבוע תנאי לתגמול של היום</div></div>
+      <div class="remind" title="לחץ להחלפה">💬 האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.</div>
+      <div class="opt" style="margin-bottom:6px"><button>🖨 הדפס את כל פעולות היום</button><button>🖨 רק פתוחות/מסומנות</button><button>📋 הזנה מרוכזת</button></div>
+      <div class="ebar"><span class="sub">האנרגיה שלי עכשיו:</span><button class="">⚡ אנרגיה גבוהה</button><button class="on">🙂 בינונית או נמוכה</button><button class="">😴 עייפות</button><button class="">🌊 הצפה</button><button class="">🪞 שיפוטיות</button><button class="">🎯 חוסר ריכוז</button><button class="">🥀 אני קורבן</button></div>
+      <h2>מקצב היום</h2><div class="card row rh  due"><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">🍽 ארוחת צהריים</div><div class="meta"><span>13:00</span><span>30 ד׳</span><span style="color:var(--accent)">הגיע הזמן</span></div></div><button class="iconbtn">▶ הפסקה</button></div><div class="card row rh  "><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">😌 מנוחה קצרה</div><div class="meta"><span>16:00</span><span>20 ד׳</span></div></div><button class="iconbtn">▶ הפסקה</button></div>
+      <h2>פעולות</h2><div class="card row org "><button class="check " aria-label="ארגון"></button>
+    <div class="grow"><div class="t">🗂 ארגון</div><div class="meta"><span>0 ללא תאריך</span><span>0 באיחור</span><span>מחר: 1 משימות · 15 ד׳</span></div></div></div><div class="grp"><div class="card row p0 done">
+    <button class="check on">✓</button>
+    <div class="grow">
+      <div class="t">לשלוח חשבונית ללקוח דנה</div>
+      <div class="meta"><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span><span style="color:var(--accent)">★</span><span>5 ד׳</span></div>
+    </div></div></div><div class="grp"><div class="card row p0 ">
+    <button class="check "></button>
+    <div class="grow">
+      <div class="t">להכין רשימת קניות לשבת</div>
+      <div class="meta"><span style="color:var(--accent)">★</span><span>10 ד׳</span><span title="כל שבוע">🔁 כל שבוע</span></div>
+    </div></div></div><div class="grp"><div class="card row p0 ">
+    <button class="check "></button>
+    <div class="grow">
+      <div class="t">להתקשר לאינסטלטור ולקבוע ביקור</div>
+      <div class="meta"><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div>
+    </div></div></div><div class="grp"><div class="card row p2 ">
+    <button class="check "></button>
+    <div class="grow">
+      <div class="t">לכתוב הצעת מחיר ללקוח חדש</div>
+      <div class="meta"><span style="color:var(--accent)">★★★★★</span><span>15 ד׳</span><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span><span class="chip">עסק קטן שמצליח</span></div>
+    </div></div></div>
+      <h2>הרגלים</h2><div class="card row ">
+    <button class="check "></button>
+    <div class="grow"><div class="t">ללכת 15 דקות סביב הבלוק</div>
+    <div class="meta"><span class="chip">🔁 פעילות גופנית</span><span>🔥 3</span><span style="color:var(--accent)">★★★★</span><span>15 ד׳</span><span class="chip">בריאות ואנרגיה לאורך היום</span></div></div></div><div class="card row ">
+    <button class="check "></button>
+    <div class="grow"><div class="t">לקרוא 10 עמודים בספר</div>
+    <div class="meta"><span class="chip">🔁 קריאה</span><span>🔥 2</span><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div></div></div><div class="card row ">
+    <button class="check "></button>
+    <div class="grow"><div class="t">לכתוב 3 שורות על מה שהצליח היום</div>
+    <div class="meta"><span class="chip">🔁 סיכום יום</span><span>🔥 0</span><span style="color:var(--accent)">★</span><span>5 ד׳</span></div></div></div>
+      <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">הבוקר התחלתי עם הליכה, ההרגשה טובה.</textarea>
+      </div></section>
+<section id="upcoming"><h2 class="sec">בקרוב: שלושה ימים</h2><p>לוח בסגנון Todoist עם גרירת פעולות לתאריך. יש גם תצוגה שבועית, חודשית וכל הימים.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 1;"><h1>בקרוב</h1><div class="sw"><button class="iconbtn">🖨 שבוע</button></div></div>
+      <div class="seg" style="--i: 2;"><button class="on">3 ימים</button><button class="">שבוע</button><button class="">חודש</button><button class="">כל הימים</button></div>
+      <div class="row" style="margin: 6px 0px 10px; --i: 3;"><button class="iconbtn" aria-label="הקודם"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><b class="grow" style="text-align:center">23/11 – 25/11</b><button class="iconbtn" aria-label="הבא"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="iconbtn">היום</button></div><div class="uboard three" id="uboard" style="--i: 4;"><section class="ucol" style="--c: 0;"><div class="uhead"><b>23/11 · היום</b><span class="sub">4</span></div><button class="uadd">＋ הוסף משימה</button><div class="ucard p0 done"><div class="urow">
+    <button class="check on">✓</button>
+    <div class="grow"><div class="t">לשלוח חשבונית ללקוח דנה</div>
+    <div class="meta"><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span><span style="color:var(--accent)">★</span><span>5 ד׳</span></div></div></div></div><div class="ucard p0 "><div class="urow">
+    <button class="check "></button>
+    <div class="grow"><div class="t">להכין רשימת קניות לשבת</div>
+    <div class="meta"><span style="color:var(--accent)">★</span><span>10 ד׳</span></div></div></div></div><div class="ucard p0 "><div class="urow">
+    <button class="check "></button>
+    <div class="grow"><div class="t">להתקשר לאינסטלטור ולקבוע ביקור</div>
+    <div class="meta"><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div></div></div></div><div class="ucard p2 "><div class="urow">
+    <button class="check "></button>
+    <div class="grow"><div class="t">לכתוב הצעת מחיר ללקוח חדש</div>
+    <div class="meta"><span style="color:var(--accent)">★★★★★</span><span>15 ד׳</span></div></div></div></div></section><section class="ucol" style="--c: 1;"><div class="uhead"><b>24/11 · מחר</b><span class="sub">1</span></div><button class="uadd">＋ הוסף משימה</button><div class="ucard p0 "><div class="urow">
+    <button class="check "></button>
+    <div class="grow"><div class="t">לבדוק עם המעצבת את דף הבית</div>
+    <div class="meta"><span style="color:var(--accent)">★★★</span><span>15 ד׳</span><span class="chip">🧩 להקים את דף הבית</span></div></div></div></div></section><section class="ucol" style="--c: 2;"><div class="uhead"><b>25/11 · יום רביעי</b><span class="sub">1</span></div><button class="uadd">＋ הוסף משימה</button><div class="ucard p0 "><div class="urow">
+    <button class="check "></button>
+    <div class="grow"><div class="t">לתאם ארוחת ערב משפחתית</div>
+    <div class="meta"><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div></div></div></div></section></div>
+      <div class="sub" style="margin-top: 6px; --i: 5;">גרור משימה (במגע: לחיצה ארוכה) כדי להעביר אותה ליום אחר.</div></div></section>
+<section id="upcoming-month"><h2 class="sec">בקרוב: תצוגה חודשית</h2><p>תצוגת חודש עם הפעולות בכל יום.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 1;"><h1>בקרוב</h1><div class="sw"><select id="upMonth" style="width:auto"><option value="2026-09">ספטמבר 2026</option><option value="2026-10">אוקטובר 2026</option><option value="2026-11" selected="">נובמבר 2026</option><option value="2026-12">דצמבר 2026</option><option value="2027-01">ינואר 2027</option><option value="2027-02">פברואר 2027</option><option value="2027-03">מרץ 2027</option><option value="2027-04">אפריל 2027</option><option value="2027-05">מאי 2027</option><option value="2027-06">יוני 2027</option><option value="2027-07">יולי 2027</option><option value="2027-08">אוגוסט 2027</option><option value="2027-09">ספטמבר 2027</option><option value="2027-10">אוקטובר 2027</option></select><button class="iconbtn">🖨 שבוע</button></div></div>
+      <div class="seg" style="--i: 2;"><button class="">3 ימים</button><button class="">שבוע</button><button class="on">חודש</button><button class="">כל הימים</button></div>
+      <div class="row" style="margin: 6px 0px 10px; --i: 3;"><button class="iconbtn" aria-label="הקודם"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><b class="grow" style="text-align:center">נובמבר 2026</b><button class="iconbtn" aria-label="הבא"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="iconbtn">היום</button></div><div class="mgrid" style="--i: 4;"><div class="mh">א</div><div class="mh">ב</div><div class="mh">ג</div><div class="mh">ד</div><div class="mh">ה</div><div class="mh">ו</div><div class="mh">ש</div><div class="mcell   "><span class="mnum">1</span></div><div class="mcell   "><span class="mnum">2</span></div><div class="mcell   "><span class="mnum">3</span></div><div class="mcell   "><span class="mnum">4</span></div><div class="mcell   "><span class="mnum">5</span></div><div class="mcell   "><span class="mnum">6</span></div><div class="mcell   "><span class="mnum">7</span></div><div class="mcell   "><span class="mnum">8</span></div><div class="mcell   "><span class="mnum">9</span></div><div class="mcell   "><span class="mnum">10</span></div><div class="mcell   "><span class="mnum">11</span></div><div class="mcell   "><span class="mnum">12</span></div><div class="mcell   "><span class="mnum">13</span></div><div class="mcell   "><span class="mnum">14</span></div><div class="mcell   "><span class="mnum">15</span></div><div class="mcell   "><span class="mnum">16</span></div><div class="mcell   "><span class="mnum">17</span></div><div class="mcell   "><span class="mnum">18</span></div><div class="mcell   "><span class="mnum">19</span></div><div class="mcell   "><span class="mnum">20</span></div><div class="mcell   "><span class="mnum">21</span></div><div class="mcell   "><span class="mnum">22</span><div class="ucard mini done"><span class="t">לבחור נושא אחד לפוסט</span></div><div class="ucard mini done"><span class="t">לבחור תמונת שער לאתר</span></div></div><div class="mcell  today sel"><span class="mnum">23</span><div class="ucard mini done"><span class="t">לשלוח חשבונית ללקוח דנה</span></div><div class="ucard mini "><span class="t">להכין רשימת קניות לשבת</span></div><div class="ucard mini "><span class="t">להתקשר לאינסטלטור ולקבוע ביקור</span></div><span class="mmore">+1</span></div><div class="mcell   "><span class="mnum">24</span><div class="ucard mini "><span class="t">לבדוק עם המעצבת את דף הבית</span></div></div><div class="mcell   "><span class="mnum">25</span><div class="ucard mini "><span class="t">לתאם ארוחת ערב משפחתית</span></div></div><div class="mcell   "><span class="mnum">26</span><div class="ucard mini "><span class="t">לכתוב טיוטה של 3 משפטים לפוסט</span></div></div><div class="mcell   "><span class="mnum">27</span><div class="ucard mini "><span class="t">להעלות את הפוסט ולשלוח קישור לדנה</span></div></div><div class="mcell   "><span class="mnum">28</span><div class="ucard mini "><span class="t">לסרוק ולארגן קבלות החודש</span></div></div><div class="mcell   "><span class="mnum">29</span></div><div class="mcell   "><span class="mnum">30</span></div><div class="mcell out  "><span class="mnum">1</span></div><div class="mcell out  "><span class="mnum">2</span></div><div class="mcell out  "><span class="mnum">3</span></div><div class="mcell out  "><span class="mnum">4</span></div><div class="mcell out  "><span class="mnum">5</span></div><div class="mcell out  "><span class="mnum">6</span></div><div class="mcell out  "><span class="mnum">7</span></div><div class="mcell out  "><span class="mnum">8</span></div><div class="mcell out  "><span class="mnum">9</span></div><div class="mcell out  "><span class="mnum">10</span></div><div class="mcell out  "><span class="mnum">11</span></div><div class="mcell out  "><span class="mnum">12</span></div></div><h2 style="--i: 5;">יום שני, 23 נובמבר 2026</h2>
+        <section class="ucol msel" style="--i: 6; --c: 0;"><button class="uadd">＋ הוסף משימה</button><div class="ucard p0 done"><div class="urow">
+    <button class="check on">✓</button>
+    <div class="grow"><div class="t">לשלוח חשבונית ללקוח דנה</div>
+    <div class="meta"><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span><span style="color:var(--accent)">★</span><span>5 ד׳</span></div></div></div></div><div class="ucard p0 "><div class="urow">
+    <button class="check "></button>
+    <div class="grow"><div class="t">להכין רשימת קניות לשבת</div>
+    <div class="meta"><span style="color:var(--accent)">★</span><span>10 ד׳</span></div></div></div></div><div class="ucard p0 "><div class="urow">
+    <button class="check "></button>
+    <div class="grow"><div class="t">להתקשר לאינסטלטור ולקבוע ביקור</div>
+    <div class="meta"><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div></div></div></div><div class="ucard p2 "><div class="urow">
+    <button class="check "></button>
+    <div class="grow"><div class="t">לכתוב הצעת מחיר ללקוח חדש</div>
+    <div class="meta"><span style="color:var(--accent)">★★★★★</span><span>15 ד׳</span></div></div></div></div></section>
+      <div class="sub" style="margin-top: 6px; --i: 7;">גרור משימה (במגע: לחיצה ארוכה) כדי להעביר אותה ליום אחר.</div></div></section>
+<section id="week"><h2 class="sec">חזון שבועי</h2><p>חזון לשבוע, תוצאות מרכזיות, ביצוע מול תכנון, מה עבד ומה לשפר.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 1;"><div class="brand"><svg class="logo" width="36" height="36" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"></rect><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="390" cy="170" r="36" fill="#e8a33d"></circle></svg><h1>חזון שבועי</h1></div><button class="iconbtn">🖨</button></div>
+      <div class="row" style="margin: 0px 0px 10px; --i: 2;"><button class="iconbtn" aria-label="שבוע קודם"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><b class="grow" style="text-align:center">22/11 – 28/11 · השבוע</b><button class="iconbtn" aria-label="שבוע הבא"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="iconbtn">היום</button></div>
+      <h2 style="--i: 3;">הכיוון שלי לשבוע</h2>
+      <textarea placeholder="מה הדבר החשוב ביותר שאני רוצה להשיג השבוע, ולמה?" style="--i: 4;">שבוע של התקדמות רגועה</textarea>
+      <h2 style="--i: 5;">תוצאות מפתח (0/2) · מומלץ 3</h2>
+      <div class="card row " style="--i: 6;"><button class="check "></button><div class="t grow">לשלוח הצעת מחיר אחת</div><button class="iconbtn" aria-label="מחק">✕</button></div><div class="card row " style="--i: 7;"><button class="check "></button><div class="t grow">ללכת ארבעה ימים</div><button class="iconbtn" aria-label="מחק">✕</button></div>
+      <form id="outForm" class="row" style="margin-top: 8px; --i: 8;"><input id="outText" placeholder="תוצאה מדידה, למשל: 3 לקוחות חדשים ענו להצעה" autocomplete="off"><button class="btn">הוסף</button></form>
+      <h2 style="--i: 9;">החזון הגדול שהשבוע משרת</h2>
+      <div class="opt" style="--i: 10;"><button class="on">בריאות ואנרגיה לאורך היום</button><button class="on">עסק קטן שמצליח</button><button class="">זמן איכות עם המשפחה</button></div>
+      <h2 style="--i: 10;">התקדמות השבוע</h2>
+      <div class="card" style="--i: 10;"><div class="row"><b class="grow">3/11 משימות · 27%</b><span class="sub">90 ד׳ נותרו</span></div><div class="bar"><div style="width:27%"></div></div>
+        <div class="row" style="margin-top:8px"><b class="grow">הרגלים: 2/6 · 33%</b></div><div class="bar"><div style="width:33%"></div></div>
+        <div class="wbar" style="margin-top:12px"><div class="wcol"><div class="wfill" style="height:50%"><div class="wdone" style="height:100%"></div></div><span class="">א</span><small>2</small></div><div class="wcol"><div class="wfill" style="height:100%"><div class="wdone" style="height:25%"></div></div><span class="wtoday">ב</span><small>4</small></div><div class="wcol"><div class="wfill" style="height:25%"><div class="wdone" style="height:0%"></div></div><span class="">ג</span><small>1</small></div><div class="wcol"><div class="wfill" style="height:25%"><div class="wdone" style="height:0%"></div></div><span class="">ד</span><small>1</small></div><div class="wcol"><div class="wfill" style="height:25%"><div class="wdone" style="height:0%"></div></div><span class="">ה</span><small>1</small></div><div class="wcol"><div class="wfill" style="height:25%"><div class="wdone" style="height:0%"></div></div><span class="">ו</span><small>1</small></div><div class="wcol"><div class="wfill" style="height:25%"><div class="wdone" style="height:0%"></div></div><span class="">ש</span><small>1</small></div></div></div>
+      <h2 style="--i: 10;">סיכום שבועי</h2>
+      <label style="--i: 10;">מה עבד השבוע?</label><textarea placeholder="מה הלך טוב ורוצה להמשיך" style="--i: 10;"></textarea>
+      <label style="--i: 10;">מה לשפר בשבוע הבא?</label><textarea placeholder="מה לשנות, לפשט או להפסיק" style="--i: 10;"></textarea></div></section>
+<section id="more"><h2 class="sec">תפריט עוד</h2><p>כל שאר האזורים באפליקציה.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 1;"><div class="brand"><svg class="logo" width="40" height="40" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"></rect><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="390" cy="170" r="36" fill="#e8a33d"></circle></svg><h1>Do It</h1></div></div>
+      <div class="card row" style="--i: 2;"><span style="font-size:26px">🎁</span><div class="grow"><div class="t"><b>תגמולים יומיים</b></div><div class="meta">3 תגמולים ברשימה</div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+      <div class="card row" style="--i: 3;"><span style="font-size:26px">🕒</span><div class="grow"><div class="t"><b>מקצב היום</b></div><div class="meta">2 הפסקות · שעות התחלה וסיום</div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+      <div class="card row" style="--i: 4;"><span style="font-size:26px">📓</span><div class="grow"><div class="t"><b>יומן</b></div><div class="meta">2 ימים עם רישום</div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+      <div class="card row" style="--i: 5;"><span style="font-size:26px">✅</span><div class="grow"><div class="t"><b>כל הפעולות</b></div><div class="meta">8 פתוחות</div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+      <div class="card row" style="--i: 6;"><span style="font-size:26px">📁</span><div class="grow"><div class="t"><b>פרויקטים</b></div><div class="meta">1 פעילים</div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+      <div class="card row" style="--i: 7;"><span style="font-size:26px">🔁</span><div class="grow"><div class="t"><b>הרגלים</b></div><div class="meta">3 הרגלים</div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+      <div class="card row" style="--i: 8;"><span style="font-size:26px">🎯</span><div class="grow"><div class="t"><b>יעדים ותגמולים</b></div><div class="meta">2 פעילים</div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+      <div class="card row" style="--i: 9;"><span style="font-size:26px">🌟</span><div class="grow"><div class="t"><b>חזון</b></div><div class="meta">3 פריטים</div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+      <div class="card row" style="--i: 10;"><span style="font-size:26px">📝</span><div class="grow"><div class="t"><b>רשימות</b></div><div class="meta">1 רשימות</div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+      <h2 style="--i: 10;">חשבון</h2>
+      <div class="card row" style="--i: 10;"><span style="font-size:26px">☁️</span><div class="grow"><div class="t"><b>כניסה וסנכרון</b></div><div class="meta">לא מחובר</div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div></div></section>
+<section id="projects"><h2 class="sec">פרויקטים</h2><p>פרויקט מכיל משימות, וכל משימה מורכבת מפעולות קטנות.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 2;"><h1>פרויקטים</h1></div>
+      <div class="card" style="--i: 3;"><div class="row"><div class="grow"><div class="t"><b>📁 השקת האתר החדש</b></div><div class="meta"><span>1 משימות · 1/2 פעולות</span><span>15 ד׳ נותרו</span></div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div class="bar"><div style="width:50%"></div></div></div>
+      <h2 style="--i: 4;">משימות ללא פרויקט</h2><div class="card" style="--i: 5;"><div class="row"><div class="grow"><div class="t"><b>🧩 לפרסם פוסט על הפרויקט</b></div><div class="meta"><span>1/3 פעולות</span><span>15 ד׳ נותרו</span></div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div class="bar"><div style="width:33%"></div></div></div>
+      <div class="opt" style="margin-top: 10px; --i: 6;"><button>＋ משימה ללא פרויקט</button></div>
+      </div></section>
+<section id="project"><h2 class="sec">דף פרויקט</h2><p>משימות הפרויקט, פעולות ישירות והתקדמות.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 1;"><div class="row"><button class="iconbtn" aria-label="חזרה"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><h1>השקת האתר החדש</h1></div><div class="sw"><button class="iconbtn" aria-label="שנה שם">✏️</button><button class="iconbtn" aria-label="מחק">🗑</button></div></div>
+         <div class="card" style="--i: 2;"><div class="row"><b class="grow">1/2 פעולות הושלמו</b><span class="sub">15 ד׳ נותרו</span></div><div class="bar"><div style="width:50%"></div></div></div>
+         <div class="opt" style="margin-bottom: 10px; --i: 3;"><button>＋ משימה</button><button>＋ פעולה</button><button>📋 הזנה מרוכזת</button><button>🔗 שייך פעולות קיימות</button></div>
+         <h2 style="--i: 4;">משימות (1)</h2><div class="card" style="--i: 5;"><div class="row"><div class="grow"><div class="t"><b>🧩 להקים את דף הבית</b></div><div class="meta"><span>1/2 פעולות</span><span>15 ד׳ נותרו</span></div></div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div class="bar"><div style="width:50%"></div></div></div>
+         <h2 style="--i: 6;">פעולות ישירות בפרויקט (0)</h2><div class="empty" style="--i: 7;">אין פעולות פתוחות. הוסף משימה ופרק אותה לפעולות</div>
+         </div></section>
+<section id="job"><h2 class="sec">דף משימה</h2><p>פעולות המשימה: הפעולה היא יחידת הביצוע (תאריך, אנרגיה, משך).</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 1;"><div class="row"><button class="iconbtn" aria-label="חזרה"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><h1>🧩 להקים את דף הבית</h1></div><div class="sw"><button class="iconbtn" aria-label="שנה שם">✏️</button><button class="iconbtn" aria-label="מחק">🗑</button></div></div>
+    <div class="sub" style="margin-bottom: 8px; --i: 2;">📁 השקת האתר החדש</div>
+    <div class="card" style="--i: 3;"><div class="row"><b class="grow">1/2 פעולות הושלמו</b><span class="sub">15 ד׳ נותרו</span></div><div class="bar"><div style="width:50%"></div></div></div>
+    <div class="opt" style="margin-bottom: 10px; --i: 4;"><button>＋ פעולה</button></div>
+    <h2 style="--i: 5;">פתוחות (1)</h2><div class="grp" style="--i: 6;"><div class="card row p0 ">
+    <button class="check "></button>
+    <div class="grow">
+      <div class="t">לבדוק עם המעצבת את דף הבית</div>
+      <div class="meta"><span>24/11</span><span style="color:var(--accent)">★★★</span><span>15 ד׳</span><span class="chip">🧩 להקים את דף הבית</span></div>
+    </div></div></div>
+    <h2 style="--i: 7;">הושלמו (1)</h2><div class="grp" style="--i: 8;"><div class="card row p0 done">
+    <button class="check on">✓</button>
+    <div class="grow">
+      <div class="t">לבחור תמונת שער לאתר</div>
+      <div class="meta"><span>22/11</span><span style="color:var(--accent)">★★</span><span>15 ד׳</span><span class="chip">🧩 להקים את דף הבית</span></div>
+    </div></div></div></div></section>
+<section id="journal"><h2 class="sec">יומן</h2><p>מחשבות, תמונה של היום והצלחות.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 2;"><div><h1>היומן שלי</h1><div class="sub">יום שני, 23 נובמבר 2026</div></div>
+      <div class="sw"><button class="iconbtn" aria-label="היום הקודם"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="iconbtn">היום</button><button class="iconbtn" aria-label="היום הבא" disabled=""><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></div></div>
+      <h2 style="--i: 3;">מחשבות</h2><textarea id="jnote" rows="6" placeholder="מה עבר עליך היום? מחשבות, רגשות, דברים לזכור..." style="--i: 4;">הבוקר התחלתי עם הליכה, ההרגשה טובה.</textarea>
+      <h2 style="--i: 5;">תמונה של היום</h2>
+      <button class="btn ghost" style="width: 100%; --i: 6;">📷 הוסף תמונה</button>
+      <input type="file" id="jphoto" accept="image/*" hidden="" style="--i: 7;">
+      <h2 style="--i: 8;">הצלחות 🏆</h2>
+      <div class="empty" style="--i: 9;">מה הלך טוב היום? גם דבר קטן נחשב</div>
+      <form id="winForm" class="row" style="margin-top: 10px; --i: 10;"><input id="winText" placeholder="הצלחה חדשה" autocomplete="off"><button class="btn">הוסף</button></form>
+      <h2 style="--i: 10;">ימים קודמים</h2><div class="card row" style="--i: 10;"><div class="grow"><div class="t"><b>יום ראשון, 22 נובמבר 2026</b></div><div class="meta"><span>🏆 2</span><span>יום עמוס אבל סגרתי את מה שחשוב.</span></div></div></div></div></section>
+<section id="rhythm"><h2 class="sec">מקצב היום</h2><p>ארוחות ומנוחה, והיסטוריית שעות התחלה וסיום.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 2;"><h1>מקצב היום</h1></div>
+     <p class="sub" style="--i: 3;">הפסקות אוכל ומנוחה שאתה קובע בעצמך. הן מופיעות ביום, ואינן פעולות ואינן נספרות בהתקדמות.</p>
+     <div class="card row" style="--i: 4;"><span style="font-size:22px">🍽</span><div class="grow"><div class="t"><b>ארוחת צהריים</b></div><div class="meta"><span>13:00</span><span>30 ד׳</span><span>ארוחה</span></div></div><button class="iconbtn" aria-label="מחק">✕</button></div><div class="card row" style="--i: 5;"><span style="font-size:22px">😌</span><div class="grow"><div class="t"><b>מנוחה קצרה</b></div><div class="meta"><span>16:00</span><span>20 ד׳</span><span>מנוחה יומית</span></div></div><button class="iconbtn" aria-label="מחק">✕</button></div>
+     
+     <h2 style="--i: 6;">הפסקה חדשה</h2>
+     <form id="rhForm" style="--i: 7;"><label>שם</label><input name="label" required="" placeholder="למשל: ארוחת צהריים" autocomplete="off">
+      <label>שעה</label><input type="time" name="time" required="" value="13:00">
+      <label>משך</label><select name="mins"><option value="10">10 דקות</option><option value="15">15 דקות</option><option value="20">20 דקות</option><option value="30" selected="">30 דקות</option><option value="45">45 דקות</option><option value="60">60 דקות</option></select>
+      <label>סוג</label><select name="kind"><option value="meal">ארוחה</option><option value="rest">מנוחה יומית</option></select>
+      <div class="actions"><button class="btn">הוסף</button></div></form>
+     <h2 style="--i: 8;">הפסקה בכל שעה</h2><p class="sub" style="--i: 9;">אחרי כ-50 דקות עבודה (לפי הטיימר ופעולות שסימנת כבוצעו) תופיע הצעה ל-10 דקות הפסקה, בלי חסימה. ההצעה מופיעה כשהאפליקציה פתוחה.</p>
+     <h2 style="--i: 10;">שעות ההתחלה והסיום שלי</h2><div class="card row" style="--i: 10;"><div class="grow"><div class="t"><b>23/11</b></div><div class="meta"><span>התחלה 13:53</span><span>סיום —</span></div></div></div><div class="card row" style="--i: 10;"><div class="grow"><div class="t"><b>22/11</b></div><div class="meta"><span>התחלה 08:10</span><span>סיום 18:40</span><span>10 שעות ו-30 דק׳</span></div></div></div><div class="card row" style="--i: 10;"><div class="grow"><div class="t"><b>21/11</b></div><div class="meta"><span>התחלה 08:30</span><span>סיום 17:55</span><span>9 שעות ו-25 דק׳</span></div></div></div><div class="sub" style="margin-top: 6px; --i: 10;">ממוצע ימים שהסתיימו: 9 שעות ו-58 דק׳</div></div></section>
+<section id="dayrewards"><h2 class="sec">תגמולים יומיים</h2><p>רשימת התגמולים שמהם בוחרים כשעומדים בתנאי היום.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 2;"><h1>תגמולים יומיים</h1></div><p class="sub" style="--i: 3;">רשימה של תגמולים קטנים. כשאתה עומד בתנאי של היום, תבחר אחד מהם או תגריל.</p>
+     <div class="card row" style="--i: 4;"><span style="font-size:22px">🎁</span><div class="t grow">קפה בבית קפה</div><button class="iconbtn" aria-label="מחק">✕</button></div><div class="card row" style="--i: 5;"><span style="font-size:22px">🎁</span><div class="t grow">פרק שוקולד</div><button class="iconbtn" aria-label="מחק">✕</button></div><div class="card row" style="--i: 6;"><span style="font-size:22px">🎁</span><div class="t grow">סרט בערב</div><button class="iconbtn" aria-label="מחק">✕</button></div>
+     <form id="rwForm" class="row" style="margin-top: 10px; --i: 7;"><input name="title" placeholder="תגמול חדש" required="" autocomplete="off"><button class="btn">הוסף</button></form></div></section>
+<section id="goals"><h2 class="sec">יעדים ותגמולים</h2><p>מעקב יעדים עם תגמול בהשגה.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 2;"><h1>יעדים ותגמולים</h1></div>
+      <div class="card" style="--i: 3;"><div class="row"><b class="grow">0 מתוך 2 יעדים הושגו</b><span class="sub">🎁 0 ממתינים</span></div>
+      <div class="bar"><div style="width:0%"></div></div></div>
+      <div class="seg" style="--i: 4;"><button class="on">פעילים (2)</button><button class="">הושגו (0)</button><button class="">עבר המועד (0)</button></div>
+      <div class="card" style="--i: 5;">
+   <div class="row"><div class="grow"><div class="t"><b>ללכת 20 ימים החודש</b></div>
+   <div class="meta"><span class="chip">בדרך</span><span>🔁 אוטומטי</span><span class="chip">בריאות ואנרגיה לאורך היום</span></div></div>
+   </div>
+   <div class="bar"><div style="width:20%"></div></div>
+   <div class="sub">4/20 ימים · 20%</div>
+   <div class="meta" style="margin-top:6px">🎁 ארוחה במסעדה</div>
+   </div><div class="card" style="--i: 6;">
+   <div class="row"><div class="grow"><div class="t"><b>לקרוא 300 עמודים</b></div>
+   <div class="meta"><span class="chip">בדרך</span><span>עוד 30 ימים</span></div></div>
+   <button class="iconbtn">+ התקדמות</button></div>
+   <div class="bar"><div style="width:47%"></div></div>
+   <div class="sub">140/300 עמודים · 47%</div>
+   <div class="meta" style="margin-top:6px">🎁 ספר חדש</div>
+   </div>
+      <h2 style="--i: 7;">תגמולים</h2>
+      
+      
+      <div class="empty" style="--i: 8;">תגמול מתווסף לכל יעד, והוא נפתח כשמשיגים אותו</div>
+      </div></section>
+<section id="habits"><h2 class="sec">הרגלים</h2><p>הרגלים עם רצף, והפיכה למשימה חוזרת.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 2;"><h1>הרגלים</h1><button class="iconbtn">📋 הזנה מרוכזת</button></div>
+      <div class="card" style="--i: 3;"><div class="row"><div class="grow"><div class="t"><b>פעילות גופנית</b></div><div class="sub">המשימה: ללכת 15 דקות סביב הבלוק · 15 ד׳ ★★★★</div>
+        <div class="meta"><span>🔥 3 ימים</span><span>כל יום</span><span class="chip">בריאות ואנרגיה לאורך היום</span></div></div></div>
+        <div class="dots" style="margin-top:8px;justify-content:flex-start"><button class="dot7 " style="">17</button><button class="dot7 on" style="">18</button><button class="dot7 " style="">19</button><button class="dot7 on" style="">20</button><button class="dot7 on" style="">21</button><button class="dot7 on" style="">22</button><button class="dot7 " style="">23</button></div></div><div class="card" style="--i: 4;"><div class="row"><div class="grow"><div class="t"><b>קריאה</b></div><div class="sub">המשימה: לקרוא 10 עמודים בספר · 10 ד׳ ★★</div>
+        <div class="meta"><span>🔥 2 ימים</span><span>א ב ג ד ה</span></div></div></div>
+        <div class="dots" style="margin-top:8px;justify-content:flex-start"><button class="dot7 " style="">17</button><button class="dot7 " style="">18</button><button class="dot7 on" style="">19</button><button class="dot7 " style="opacity:.35">20</button><button class="dot7 " style="opacity:.35">21</button><button class="dot7 on" style="">22</button><button class="dot7 " style="">23</button></div></div><div class="card" style="--i: 5;"><div class="row"><div class="grow"><div class="t"><b>סיכום יום</b></div><div class="sub">המשימה: לכתוב 3 שורות על מה שהצליח היום · 5 ד׳ ★</div>
+        <div class="meta"><span>🔥 0 ימים</span><span>כל יום</span></div></div></div>
+        <div class="dots" style="margin-top:8px;justify-content:flex-start"><button class="dot7 " style="">17</button><button class="dot7 " style="">18</button><button class="dot7 " style="">19</button><button class="dot7 " style="">20</button><button class="dot7 " style="">21</button><button class="dot7 " style="">22</button><button class="dot7 " style="">23</button></div></div>
+      </div></section>
+<section id="vision"><h2 class="sec">חזון</h2><p>תחומי חיים וחזון.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 2;"><h1>החזון שלי</h1></div>
+      <div class="card vis" style="--i: 3;"><div class="t"><b>בריאות ואנרגיה לאורך היום</b></div>
+        <div class="sub" style="white-space:pre-wrap;margin-top:4px">להרגיש חזק ורגוע, עם שגרת תנועה קבועה.</div>
+        <div class="meta"><span>✅ 0/0 משימות</span><span>🔁 1 הרגלים</span><span>🎯 1 יעדים</span><span class="chip">בריאות</span></div></div><div class="card vis" style="--i: 4;"><div class="t"><b>עסק קטן שמצליח</b></div>
+        <div class="sub" style="white-space:pre-wrap;margin-top:4px">לקוחות מרוצים והכנסה יציבה בלי לחץ.</div>
+        <div class="meta"><span>✅ 1/3 משימות</span><span>🔁 0 הרגלים</span><span>🎯 0 יעדים</span><span class="chip">קריירה</span></div></div><div class="card vis" style="--i: 5;"><div class="t"><b>זמן איכות עם המשפחה</b></div>
+        <div class="sub" style="white-space:pre-wrap;margin-top:4px">ערבים בלי מסכים וטיול חודשי.</div>
+        <div class="meta"><span>✅ 0/1 משימות</span><span>🔁 0 הרגלים</span><span>🎯 0 יעדים</span><span class="chip">משפחה</span></div></div>
+      </div></section>
+<section id="lists"><h2 class="sec">רשימות</h2><p>רשימות חופשיות.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 2;"><h1>רשימות</h1></div>
+      <div class="card row" style="--i: 3;"><div class="grow"><div class="t"><b>קניות לשבת</b></div><div class="meta">1/3 פריטים</div></div><span class="sub"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></span></div>
+      </div></section>
+</main>
+</body>
+</html>
