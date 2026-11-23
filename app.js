@@ -2,7 +2,7 @@
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
-const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
+const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
 const TS_KEY = DEMO ? 'doit-demo-updated-v1' : 'doit-updated-v1';
 const SYNC_KEY = DEMO ? 'doit-demo-synced-v1' : 'doit-synced-v1';
 // v2 structure: a task that had subtasks becomes a "job" (task) and each subtask an action; every other old task is already an action.
@@ -20,7 +20,7 @@ function migrate(d) {
   });
   d.tasks = keep; d.v = 2; return d;
 }
-const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual'];
+const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm', 'dayRewards'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual'];
 const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return h + ':' + str.length; };
 function itemHashes(d) { // one entry per collection item / per dated entry, so changes and deletions can be tracked
   const o = {};
@@ -148,7 +148,7 @@ function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in lo
   }; im.src = r.result; };
   r.readAsDataURL(file);
 }
-const MORE_TABS = ['journal', 'rhythm', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
+const MORE_TABS = ['journal', 'rhythm', 'dayrewards', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
 const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
 // Weekly vision data lives in D().weeks[<Sunday date>]; created lazily on first edit.
 const weekData = ws => (D().weeks[ws] = D().weeks[ws] || { vision: '', outcomes: [], visionIds: [], worked: '', improve: '' });
@@ -464,6 +464,7 @@ function suggestBreak() {
 function afterDone(t) {
   let due;
   if (Work.skipId === t.id) { due = Work.pending; Work.skipId = ''; } else due = addWork(t.mins || 5);
+  if (rewardNotify()) return;
   if (due) suggestBreak(); else showNext(t.id);
 }
 function finishBreak() {
@@ -610,6 +611,41 @@ function visualCard(d) {
   const done = !!D().visual[d];
   return `<div class="card row ${done ? 'done' : ''}"><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>${done ? 'בוצע היום ✓' : 'עוד לא בוצע'}</span></div></div><button class="iconbtn" data-act="visStart">${done ? '↺ שוב' : '▶ להתחיל'}</button></div>`;
 }
+/* ---------- Daily reward: you set the condition for each day; the reward comes from your own list ---------- */
+const REWARD_RULES = [['', 'בלי תנאי'], ['mit', 'הפעולה החשובה'], ['p50', 'לפחות 50% מהפעולות'], ['p70', 'לפחות 70% מהפעולות'], ['all', 'כל הפעולות']];
+function rewardState(d) {
+  const f = D().focus[d] || {}, rule = f.rewardRule || '', ts = tasksOn(d), done = ts.filter(t => t.done).length, mit = f.mitId ? findTask(f.mitId) : null;
+  let achieved = false, text = '';
+  if (rule === 'mit') { achieved = !!(mit && mit.done); text = mit ? 'הפעולה החשובה עוד לא בוצעה' : 'עוד לא נבחרה פעולה חשובה להיום'; }
+  else if (rule === 'all') { achieved = ts.length > 0 && done === ts.length; text = `${done}/${ts.length} פעולות בוצעו`; }
+  else if (rule) { const p = +rule.slice(1); achieved = ts.length > 0 && done / ts.length * 100 >= p; text = `${done}/${ts.length} פעולות בוצעו, צריך ${p}%`; }
+  return { rule, achieved, text, picked: f.rewardPicked || '', claimed: !!f.rewardClaimed };
+}
+function rewardCard(d) {
+  if (d !== TODAY()) return '';
+  const s = rewardState(d);
+  if (!s.rule) return '<div class="card focus" data-act="focusEdit"><div class="t"><b>🎁 תגמול יומי</b></div><div class="sub">לחץ כדי לקבוע תנאי לתגמול של היום</div></div>';
+  const label = REWARD_RULES.find(r => r[0] === s.rule)[1];
+  const body = s.claimed ? `<div class="t">מימשת: ${esc(s.picked)} ✓</div>`
+    : s.achieved ? (s.picked ? `<div class="t">התגמול שלך: ${esc(s.picked)}</div><button class="btn startnow" data-act="rewardClaim">✓ מימשתי</button>` : '<button class="btn startnow" data-act="rewardOpen">🎉 עמדת! לבחור תגמול</button>')
+    : `<div class="t">${esc(s.text)}</div>`;
+  return `<div class="card focus"><div class="frow"><span>🎁</span><div class="grow"><div class="sub">תגמול יומי · תנאי: ${esc(label)}</div>${body}</div></div></div>`;
+}
+function rewardSheet() {
+  const L = D().dayRewards;
+  sheet(`<h1>🎉 עמדת בתנאי של היום!</h1>${L.length
+    ? `<p class="sub">בחר תגמול, או תן לי להגריל:</p><div class="grid2" style="grid-template-columns:1fr">${L.map(r => `<button class="btn ghost" data-act="rewardPick" data-id="${r.id}">🎁 ${esc(r.title)}</button>`).join('')}<button class="btn" data-act="rewardRandom">🎲 הגרל לי</button></div>`
+    : '<p class="sub">עדיין אין רשימת תגמולים. הוסף כמה תגמולים קטנים.</p><div class="actions"><button class="btn" data-act="rewardManage">להוספת תגמולים</button></div>'}
+   <div class="actions"><button class="btn ghost" data-act="close">אחר כך</button></div>`);
+}
+function rewardNotify() { // first time today's condition is met: celebrate once
+  const T = TODAY(), s = rewardState(T), f = fo(T);
+  if (!s.rule || !s.achieved || f.rewardNotified) return false;
+  f.rewardNotified = true; Store.save(); celebrate();
+  toast('<span>🎉 עמדת בתנאי התגמול של היום!</span><button class="btn" data-act="rewardOpen">🎁 לבחור תגמול</button><button data-act="toastClose" aria-label="סגור">✕</button>', 15000);
+  return true;
+}
+const setReward = title => { fo(TODAY()).rewardPicked = title; Store.save(); closeSheet(); render(); };
 /* ---------- Personal reminders: two sentences shown on the daily screen and while working ---------- */
 const REMINDERS = ['להרגיש את הכאב של הצמיחה, לצאת מאזור הנוחות.', 'האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.'];
 const remIndex = () => { const n = Math.floor(parse(TODAY()).getTime() / 864e5) + (state.remShift || 0); return ((n % REMINDERS.length) + REMINDERS.length) % REMINDERS.length; };
@@ -636,13 +672,14 @@ function focusSheet(d) {
    ${open.length ? '<div class="opt" style="margin-top:6px">' + open.map(t => '<button type="button" data-act="focusPick" data-id="' + t.id + '">' + esc(t.title) + '</button>').join('') + '</div>' : ''}
    <label>🎉 מה הפאן של היום? (משהו שמשמח אותך לקראתו)</label>
    <input name="fun" value="${esc(f.fun)}" autocomplete="off" placeholder="למשל: קפה עם חברה, סרט בערב, הליכה בשקיעה">
+   <label>🎁 מתי היום ייחשב כעמידה, ויזכה בתגמול?</label><select name="rewardRule">${REWARD_RULES.map(([v, l]) => `<option value="${v}" ${((D().focus[d] || {}).rewardRule || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
    <label>🔋 איך האנרגיה שלך עכשיו?</label><div class="opt" id="enOpts">${ENERGY_MODES.map(([v, l]) => `<button type="button" class="${f.energy === v ? 'on' : ''}" onclick="const f=this.closest('form');f.energy.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div><input type="hidden" name="energy" value="${f.energy}">
    <div class="actions"><button type="button" class="btn ghost" data-act="focusLater">אחר כך</button><button class="btn">שמור</button></div>
   </form>`);
   $('#f').mit.addEventListener('input', () => { $('#f').mitId.value = ''; });
   $('#f').onsubmit = e => {
     e.preventDefault(); const fd = new FormData(e.target);
-    Object.assign(fo(d), { mit: fd.get('mit').trim(), mitId: fd.get('mitId') || '', fun: fd.get('fun').trim(), energy: fd.get('energy') || '', energyAt: new Date().toISOString() });
+    Object.assign(fo(d), { mit: fd.get('mit').trim(), mitId: fd.get('mitId') || '', fun: fd.get('fun').trim(), energy: fd.get('energy') || '', rewardRule: fd.get('rewardRule') || '', energyAt: new Date().toISOString() });
     Store.save(); closeSheet(); render();
   };
 }
@@ -704,6 +741,7 @@ const views = {
       ${dayCard(d)}
       ${visualCard(d)}
       ${focusCard(d)}
+      ${rewardCard(d)}
       <div class="remind" data-act="nextReminder" title="לחץ להחלפה">💬 ${esc(reminder())}</div>
       <div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל פעולות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>
       ${energyBar(d)}
@@ -849,6 +887,7 @@ const views = {
     const wait = D().goals.filter(g => g.reward && !g.claimed && goalState(g).achieved).length;
     const item = (t, icon, title, sub) => `<div class="card row" data-act="goTab" data-t="${t}"><span style="font-size:26px">${icon}</span><div class="grow"><div class="t"><b>${title}</b></div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
     return `<div class="top"><div class="brand">${logoMark(40)}<h1>Do It</h1></div></div>
+      ${item('dayrewards', '🎁', 'תגמולים יומיים', `${D().dayRewards.length} תגמולים ברשימה`)}
       ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
       ${item('journal', '📓', 'יומן', `${journalDays().length} ימים עם רישום`)}
       ${item('tasks', '✅', 'כל הפעולות', `${D().tasks.filter(t => !t.done).length} פתוחות`)}
@@ -892,6 +931,12 @@ const views = {
       <div class="actions"><button class="btn">הוסף</button></div></form>
      <h2>הפסקה בכל שעה</h2><p class="sub">אחרי כ-50 דקות עבודה (לפי הטיימר ופעולות שסימנת כבוצעו) תופיע הצעה ל-10 דקות הפסקה, בלי חסימה. ההצעה מופיעה כשהאפליקציה פתוחה.</p>
      <h2>שעות ההתחלה והסיום שלי</h2>${dayHistoryHTML()}`;
+  },
+  dayrewards() {
+    const L = D().dayRewards;
+    return `<div class="top"><h1>תגמולים יומיים</h1></div><p class="sub">רשימה של תגמולים קטנים. כשאתה עומד בתנאי של היום, תבחר אחד מהם או תגריל.</p>
+     ${L.map(r => `<div class="card row"><span style="font-size:22px">🎁</span><div class="t grow">${esc(r.title)}</div><button class="iconbtn" data-act="rewardDel" data-id="${r.id}" aria-label="מחק">✕</button></div>`).join('') || '<div class="empty">עדיין אין תגמולים. הוסף קפה, פרק שוקולד, סרט בערב...</div>'}
+     <form id="rwForm" class="row" style="margin-top:10px"><input name="title" placeholder="תגמול חדש" required autocomplete="off"><button class="btn">הוסף</button></form>`;
   },
   goals() {
     const F = state.goalFilter, all = D().goals.map(g => ({ g, s: goalState(g) }));
@@ -954,6 +999,8 @@ function render() {
   };
   const rf = $('#rhForm');
   if (rf) rf.onsubmit = e => { e.preventDefault(); const f = new FormData(rf); D().rhythm.push({ id: uid(), label: f.get('label').trim(), time: f.get('time'), mins: +f.get('mins'), kind: f.get('kind') }); Store.save(); render(); };
+  const rw = $('#rwForm');
+  if (rw) rw.onsubmit = e => { e.preventDefault(); const t = new FormData(rw).get('title').trim(); if (!t) return; D().dayRewards.push({ id: uid(), title: t }); Store.save(); render(); };
   const wf = $('#winForm');
   if (wf) wf.onsubmit = e => {
     e.preventDefault(); const txt = $('#winText').value.trim(); if (!txt) return;
@@ -1527,6 +1574,12 @@ const A = {
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
   noiseOff: () => toggleNoise(),
+  rewardOpen: () => { $('#toast').hidden = true; rewardSheet(); },
+  rewardManage: () => { closeSheet(); state.tab = 'dayrewards'; render(); },
+  rewardPick: e => { const r = D().dayRewards.find(x => x.id === e.id); if (r) setReward(r.title); },
+  rewardRandom: () => { const L = D().dayRewards; if (L.length) setReward(L[Math.floor(Math.random() * L.length)].title); },
+  rewardClaim: () => { fo(TODAY()).rewardClaimed = true; Store.save(); render(); celebrate(); },
+  rewardDel: e => { D().dayRewards = D().dayRewards.filter(r => r.id !== e.id); Store.save(); render(); },
   victimSave: e => {
     const T = TODAY(), el = $(e.k === 'q' ? '#vThought' : '#vResp'), v = el.value.trim(); if (!v) return el.focus();
     const line = (e.k === 'q' ? '🥀 מחשבה ששאלתי עליה "האם זה באמת נכון?": ' : '🤝 האחריות שלי: ') + v;
@@ -1806,6 +1859,7 @@ function seedDemo() {
     { id: v3, title: 'זמן איכות עם המשפחה', desc: 'ערבים בלי מסכים וטיול חודשי.', area: 'משפחה' }
   ];
   d.v = 2;
+  d.dayRewards = [{ id: id(), title: 'קפה בבית קפה' }, { id: id(), title: 'פרק שוקולד' }, { id: id(), title: 'סרט בערב' }];
   d.rhythm = [{ id: id(), label: 'ארוחת צהריים', time: '13:00', mins: 30, kind: 'meal' }, { id: id(), label: 'מנוחה קצרה', time: '16:00', mins: 20, kind: 'rest' }];
   d.dayLog[ago(1)] = { start: '08:10', end: '18:40' }; d.dayLog[ago(2)] = { start: '08:30', end: '17:55' };
   d.projects = [{ id: p1, title: 'השקת האתר החדש', createdAt: ago(5) }];
