@@ -449,9 +449,9 @@ let lastEnergyAsk = 0;
 function askEnergyToast(force) { // recommended moments: morning, after a break, every ~3 hours while the app is open
   const T = TODAY(), f = D().focus[T] || {}, h = new Date().getHours();
   if (!force && (h < 7 || h >= 22)) return;
-  if (!force && ((f.energyAt && Date.now() - new Date(f.energyAt).getTime() < 3 * 36e5) || Date.now() - lastEnergyAsk < 3 * 36e5)) return;
+  if (!force && ((f.energyAt && Date.now() - new Date(f.energyAt).getTime() < 3 * 36e5) || (f.energyAsk && Date.now() - new Date(f.energyAsk).getTime() < 3 * 36e5) || Date.now() - lastEnergyAsk < 3 * 36e5)) return;
   if (!$('#toast').hidden || !$('#sheet').hidden || !$('#run').hidden) return;
-  lastEnergyAsk = Date.now();
+  lastEnergyAsk = Date.now(); fo(T).energyAsk = new Date().toISOString(); Store.save();
   toast(`<span>מה מצב האנרגיה שלך עכשיו?</span><div class="opt etoast">${ENERGY_MODES.map(([v, l]) => `<button data-act="setEnergy" data-v="${v}">${l}</button>`).join('')}</div><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000);
 }
 
@@ -554,6 +554,7 @@ function nudgeAny(ids) { if (!$('#sheet').hidden) return; const t = (ids ? ids.m
 /* Morning review: did you keep yesterday's actions, and what to improve */
 let reviewSnooze = false;
 function reviewSheet() {
+  fo(TODAY()).reviewAsked = true; Store.save(); // shown once per day
   const T = TODAY(), y = addDays(T, -1), ts = tasksOn(y), done = ts.filter(t => t.done).length, left = ts.filter(t => !t.done), L = D().dayLog[y] || {};
   const planned = ts.reduce((s, t) => s + (t.mins || 0), 0), tips = [];
   if (planned > DAY_CAP) tips.push(`תכננת ${planned} דקות, יותר מ-${DAY_CAP}. מחר אפשר לתכנן פחות.`);
@@ -575,8 +576,8 @@ function reviewSheet() {
 function askMorning() {
   if (!$('#sheet').hidden || !$('#run').hidden) return;
   const T = TODAY(), y = addDays(T, -1);
-  if (!visualSnooze && !D().visual[T] && new Date().getHours() < 14) return visualOffer();
-  if (!reviewSnooze && !D().review[y] && tasksOn(y).length) return reviewSheet();
+  if (!visualSnooze && !D().visual[T] && !workedToday() && !(D().focus[T] || {}).visualAsked && new Date().getHours() < 14) return visualOffer();
+  if (!reviewSnooze && !D().review[y] && !(D().focus[T] || {}).reviewAsked && tasksOn(y).length) return reviewSheet();
   askFocus();
 }
 /* ---------- Morning guided visualization: shown paragraph by paragraph, optional auto-advance and read-aloud ---------- */
@@ -617,12 +618,15 @@ function visRender() {
 function visOpen() { clearInterval(Run.tick); closeSheet(); Vis.i = 0; Vis.auto = false; $('#run').hidden = false; document.body.classList.add('running'); visRender(); }
 function visStop() { clearTimeout(Vis.timer); if (canSpeak()) speechSynthesis.cancel(); $('#run').hidden = true; document.body.classList.remove('running'); }
 function visualOffer() {
+  fo(TODAY()).visualAsked = true; Store.save(); // offered once a day; the card on the Today screen stays
   sheet(`<h1>🧘 דמיון מודרך</h1><p class="sub">כמה דקות של דמיון לפני שמתחילים את היום. תקרא בקצב שלך, או תן לאפליקציה להתקדם לבד.</p>
    <div class="actions"><button class="btn ghost" data-act="visLater">אחר כך</button><button class="btn" data-act="visStart">◀ להתחיל</button></div>`);
 }
+const workedToday = () => { const T = TODAY(); return tasksOn(T).some(t => t.done) || ((D().focus[T] || {}).work || 0) > 0; }; // started working: the morning visualization no longer matters today
 function visualCard(d) {
   if (d !== TODAY()) return '';
   const done = !!D().visual[d];
+  if (!done && workedToday()) return '';
   return `<div class="card row ${done ? 'done' : ''}"><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>${done ? 'בוצע היום ✓' : 'עוד לא בוצע'}</span></div></div><button class="iconbtn" data-act="visStart">${done ? '↺ שוב' : '◀ להתחיל'}</button></div>`;
 }
 /* ---------- Daily reward: you set the condition for each day; the reward comes from your own list ---------- */
@@ -688,7 +692,7 @@ function focusSheet(d) {
    <input name="fun" value="${esc(f.fun)}" autocomplete="off" placeholder="למשל: קפה עם חברה, סרט בערב, הליכה בשקיעה">
    <label>🎁 מתי היום ייחשב כעמידה, ויזכה בתגמול?</label><select name="rewardRule">${REWARD_RULES.map(([v, l]) => `<option value="${v}" ${((D().focus[d] || {}).rewardRule || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
    <label>🔋 איך האנרגיה שלך עכשיו?</label><div class="opt" id="enOpts">${ENERGY_MODES.map(([v, l]) => `<button type="button" class="${f.energy === v ? 'on' : ''}" onclick="const f=this.closest('form');f.energy.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div><input type="hidden" name="energy" value="${f.energy}">
-   <div class="actions"><button type="button" class="btn ghost" data-act="focusLater">אחר כך</button><button class="btn">שמור</button></div>
+   <div class="actions"><button type="button" class="btn ghost" data-act="focusLater">אין צורך</button><button class="btn">שמור</button></div>
   </form>`);
   $('#f').mit.addEventListener('input', () => { $('#f').mitId.value = ''; });
   $('#f').onsubmit = e => {
@@ -698,9 +702,10 @@ function focusSheet(d) {
   };
 }
 function askFocus() { // start-of-day prompt: only for today, only if something is missing, never over another open sheet
-  const f = focusOn(TODAY());
-  if (focusSnooze || (f.mit && f.fun && f.energy) || !$('#sheet').hidden) return;
-  focusSheet(TODAY());
+  const T = TODAY(), f = focusOn(T), raw = D().focus[T] || {};
+  if (focusSnooze || raw.askedAt || (f.mit && f.fun) || !$('#sheet').hidden) return; // asked once per day, never again after it was shown or filled
+  fo(T).askedAt = new Date().toISOString(); Store.save();
+  focusSheet(T);
 }
 /* ---------- Repeating tasks: finishing one creates the next occurrence ---------- */
 const REPEATS = [['', 'לא חוזרת'], ['d1', 'כל יום'], ['d2', 'כל יומיים'], ['d3', 'כל 3 ימים'], ['w1', 'כל שבוע'], ['w2', 'כל שבועיים'], ['m1', 'כל חודש']];
@@ -991,6 +996,14 @@ const views = {
 };
 
 function render() {
+  // A background re-render (sync status, timers) must not wipe what the user is typing: remember the changed fields of the current screen
+  const typed = {}; let focusKey = null, caret = null;
+  document.querySelectorAll('#view input, #view select, #view textarea').forEach(el => {
+    const k = el.name || el.id; if (!k || ['hidden', 'checkbox', 'file', 'radio'].includes(el.type)) return;
+    const changed = el.tagName === 'SELECT' ? [...el.options].findIndex(o => o.defaultSelected) !== el.selectedIndex : (el.value !== '' && el.value !== el.defaultValue);
+    if (changed) typed[k] = el.value;
+    if (el === document.activeElement) { focusKey = k; try { caret = el.selectionStart; } catch (e) {} }
+  });
   const board = $('#uboard'), boardScroll = board ? board.scrollLeft : null; // keep the board's horizontal position across re-renders
   document.body.classList.toggle('wide', state.tab === 'upcoming');
   $('#view').innerHTML = views[state.tab]();
@@ -1001,6 +1014,12 @@ function render() {
   // Entrance animation (FitMe-style soft rise, staggered) only when the screen changes, not on every re-render.
   const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.openList || '') + (state.openProject || '') + (state.openJob || '');
   const enter = state.viewKey !== key; state.viewKey = key;
+  if (!enter) { // same screen: put back what was typed, and the cursor
+    document.querySelectorAll('#view input, #view select, #view textarea').forEach(el => {
+      const k = el.name || el.id; if (k && k in typed) el.value = typed[k];
+      if (k && k === focusKey) { el.focus(); try { if (caret !== null) el.setSelectionRange(caret, caret); } catch (e) {} }
+    });
+  }
   view.classList.toggle('enter', enter);
   if (enter) {
     [...view.children].forEach((el, i) => el.style.setProperty('--i', Math.min(i, 10)));
@@ -1016,17 +1035,17 @@ function render() {
   if (of) of.onsubmit = e => {
     e.preventDefault(); const txt = $('#outText').value.trim(); if (!txt) return;
     weekData(state.weekStart).outcomes.push({ id: uid(), text: txt, done: false });
-    Store.save(); render(); $('#outText').focus();
+    e.target.reset(); Store.save(); render(); $('#outText').focus();
   };
   const rf = $('#rhForm');
-  if (rf) rf.onsubmit = e => { e.preventDefault(); const f = new FormData(rf); D().rhythm.push({ id: uid(), label: f.get('label').trim(), time: f.get('time'), mins: +f.get('mins'), kind: f.get('kind') }); Store.save(); render(); };
+  if (rf) rf.onsubmit = e => { e.preventDefault(); const f = new FormData(rf); D().rhythm.push({ id: uid(), label: f.get('label').trim(), time: f.get('time'), mins: +f.get('mins'), kind: f.get('kind') }); rf.reset(); Store.save(); render(); };
   const rw = $('#rwForm');
-  if (rw) rw.onsubmit = e => { e.preventDefault(); const t = new FormData(rw).get('title').trim(); if (!t) return; D().dayRewards.push({ id: uid(), title: t }); Store.save(); render(); };
+  if (rw) rw.onsubmit = e => { e.preventDefault(); const t = new FormData(rw).get('title').trim(); if (!t) return; D().dayRewards.push({ id: uid(), title: t }); rw.reset(); Store.save(); render(); };
   const wf = $('#winForm');
   if (wf) wf.onsubmit = e => {
     e.preventDefault(); const txt = $('#winText').value.trim(); if (!txt) return;
     jSet(state.jDate).wins.push({ id: uid(), text: txt });
-    Store.save(); render(); celebrate(); $('#winText').focus();
+    e.target.reset(); Store.save(); render(); celebrate(); $('#winText').focus();
   };
   const ph = $('#jphoto');
   if (ph) ph.onchange = () => { const file = ph.files[0]; if (file) shrinkPhoto(file, url => { jSet(state.jDate).photo = url; Store.save(); render(); }); };
@@ -1036,7 +1055,7 @@ function render() {
     const txt = $('#itemText').value.trim(); if (!txt) return;
     const l = D().lists.find(x => x.id === state.openList);
     l.items.push({ id: uid(), text: txt, done: false });
-    Store.save(); render(); $('#itemText').focus();
+    e.target.reset(); Store.save(); render(); $('#itemText').focus();
   };
 }
 
