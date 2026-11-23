@@ -1,7 +1,7 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
 const KEY = 'doit-data-v1';
-const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], notes: {}, org: {} });
+const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], weeks: {}, notes: {}, org: {} });
 const TS_KEY = 'doit-updated-v1';
 const Store = {
   data: empty(),
@@ -69,18 +69,34 @@ const weekStart = s => addDays(s, -parse(s).getDay());
 const visionName = id => (D().visions.find(v => v.id === id) || {}).title;
 
 // Secondary sections live behind the "עוד" tab to keep the main navigation simple.
-const MORE_TABS = ['habits', 'goals', 'vision', 'lists'];
-const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', openList: null, goalFilter: 'active' };
+const MORE_TABS = ['tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
+const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', openList: null, openProject: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
+// Weekly vision data lives in D().weeks[<Sunday date>]; created lazily on first edit.
+const weekData = ws => (D().weeks[ws] = D().weeks[ws] || { vision: '', outcomes: [], visionIds: [], worked: '', improve: '' });
 
 /* ---------- Domain ---------- */
 // High-energy tasks always come first in the day; then by priority.
 const tasksOn = d => D().tasks.filter(t => t.date === d).sort((a, b) => (b.energy || 0) - (a.energy || 0) || b.priority - a.priority);
 const stars = n => '★'.repeat(n || 0);
+const logoMark = (s = 32) => `<svg class="logo" width="${s}" height="${s}" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"/><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/><circle cx="390" cy="170" r="36" fill="#e8a33d"/></svg>`;
+/* Projects: a project groups several tasks (task.projectId). Deleting a project keeps its tasks. */
+const projectName = id => (D().projects.find(p => p.id === id) || {}).title;
+const projectChip = t => t.projectId && projectName(t.projectId) ? `<span class="chip" style="background:#e6ecf7;color:#2f4b8a">📁 ${esc(projectName(t.projectId))}</span>` : '';
+const projectOpts = sel => `<option value="">ללא פרויקט</option>${D().projects.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}<option value="__new__">＋ פרויקט חדש...</option>`;
+function newProject() {
+  const title = (prompt('שם הפרויקט החדש') || '').trim();
+  if (!title) return null;
+  const p = { id: uid(), title, createdAt: TODAY() }; D().projects.push(p); Store.save(); return p;
+}
+const projState = p => {
+  const ts = D().tasks.filter(t => t.projectId === p.id), done = ts.filter(t => t.done).length;
+  return { ts, done, total: ts.length, pct: ts.length ? Math.round(done / ts.length * 100) : 0, mins: ts.filter(t => !t.done).reduce((s, t) => s + (t.mins || 0), 0) };
+};
 // Chevron icons drawn as SVG (text arrows rendered inconsistently). In RTL "previous/back" points right, "next" points left.
 const chev = dir => `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="${dir === 'r' ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const subProg = t => (t.subs && t.subs.length) ? `${t.subs.filter(s => s.done).length}/${t.subs.length}` : '';
 const overdue = () => D().tasks.filter(t => !t.done && t.date && t.date < TODAY());
-const habitsOn = d => D().habits.filter(h => h.days.includes(parse(d).getDay()));
+const habitsOn = d => D().habits.filter(h => h.days.includes(parse(d).getDay())).sort((a, b) => (b.energy || 0) - (a.energy || 0));
 const habitDone = (h, d) => !!h.log[d];
 function streak(h) {
   // consecutive scheduled days completed; unscheduled days are skipped; today doesn't break the streak
@@ -137,15 +153,15 @@ function taskRow(t, showDate) {
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${esc(t.title)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:#fdf0d5;color:#9a6a12">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.brainless ? '<span class="chip" style="background:#fdf0d5;color:#9a6a12">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div></div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
   const on = habitDone(h, d), v = h.visionId ? visionName(h.visionId) : '';
   return `<div class="card row ${on ? 'done' : ''}">
     <button class="check ${on ? 'on' : ''}" data-act="toggleHabit" data-id="${h.id}" data-date="${d}">${on ? '✓' : ''}</button>
-    <div class="grow" data-act="editHabit" data-id="${h.id}"><div class="t">${esc(h.title)}</div>
-    <div class="meta"><span>🔥 ${streak(h)}</span>${v ? `<span class="chip">${esc(v)}</span>` : ''}</div></div></div>`;
+    <div class="grow" data-act="editHabit" data-id="${h.id}"><div class="t">${esc(h.task || h.title)}</div>
+    <div class="meta">${h.task ? `<span class="chip">🔁 ${esc(h.title)}</span>` : ''}<span>🔥 ${streak(h)}</span>${h.energy ? `<span style="color:var(--accent)">${stars(h.energy)}</span>` : ''}${h.mins ? `<span>${h.mins} ד׳</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div></div></div>`;
 }
 
 /* ---------- Upcoming board helpers ---------- */
@@ -158,7 +174,7 @@ function upCard(t, showDate) {
   return `<div class="ucard p${t.priority} ${t.done ? 'done' : ''}" data-task="${t.id}"><div class="urow">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${esc(t.title)}</div>
-    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
+    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${projectChip(t)}</div></div></div>${subs}</div>`;
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
@@ -168,9 +184,9 @@ const views = {
     const isToday = d === TODAY(); // the daily "ארגון" ritual counts as one item on today's list
     const total = ts.length + hs.length + (isToday ? 1 : 0), done = ts.filter(t => t.done).length + hs.filter(h => habitDone(h, d)).length + (isToday && orgDone(d) ? 1 : 0);
     const pct = total ? Math.round(done / total * 100) : 0;
-    return `<div class="top"><div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div>
+    return `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
       <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
-      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${(() => { const m = ts.filter(t => !t.done).reduce((s, t) => s + (t.mins || 0), 0); return m ? ` · נותרו ${m} ד׳` : ''; })()}</b></div><div class="bar"><div style="width:${pct}%"></div></div></div>
+      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${(() => { const m = ts.filter(t => !t.done).reduce((s, t) => s + (t.mins || 0), 0) + hs.filter(h => !habitDone(h, d)).reduce((s, h) => s + (h.mins || 0), 0); return m ? ` · נותרו ${m} ד׳` : ''; })()}</b></div><div class="bar"><div style="width:${pct}%"></div></div></div>
       <div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל משימות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>
       ${od.length ? `<h2>באיחור</h2>${od.map(t => taskRow(t, true)).join('')}` : ''}
       <h2>משימות</h2>${isToday ? orgCard() : ''}${ts.map(t => taskRow(t)).join('') || (isToday ? '' : '<div class="empty">אין משימות ליום הזה</div>')}
@@ -241,10 +257,10 @@ const views = {
   },
   habits() {
     const d = TODAY(), last7 = Array.from({ length: 7 }, (_, i) => addDays(d, i - 6));
-    return `<div class="top"><h1>הרגלים</h1></div>
+    return `<div class="top"><h1>הרגלים</h1><button class="iconbtn" data-act="addHabitBulk">📋 הזנה מרוכזת</button></div>
       ${D().habits.map(h => {
         const v = h.visionId ? visionName(h.visionId) : '';
-        return `<div class="card"><div class="row"><div class="grow" data-act="editHabit" data-id="${h.id}"><div class="t"><b>${esc(h.title)}</b></div>
+        return `<div class="card"><div class="row"><div class="grow" data-act="editHabit" data-id="${h.id}"><div class="t"><b>${esc(h.title)}</b></div>${h.task ? `<div class="sub">המשימה: ${esc(h.task)}${h.mins ? ` · ${h.mins} ד׳` : ''}${h.energy ? ' ' + stars(h.energy) : ''}</div>` : ''}
         <div class="meta"><span>🔥 ${streak(h)} ימים</span><span>${h.days.length === 7 ? 'כל יום' : h.days.map(x => DAYS[x]).join(' ')}</span>${v ? `<span class="chip">${esc(v)}</span>` : ''}</div></div></div>
         <div class="dots" style="margin-top:8px;justify-content:flex-start">${last7.map(x => `<button class="dot7 ${habitDone(h, x) ? 'on' : ''}" style="${h.days.includes(parse(x).getDay()) ? '' : 'opacity:.35'}" data-act="toggleHabit" data-id="${h.id}" data-date="${x}">${parse(x).getDate()}</button>`).join('')}</div></div>`;
       }).join('') || '<div class="empty">עדיין אין הרגלים</div>'}
@@ -261,11 +277,59 @@ const views = {
       }).join('') || '<div class="empty">כתוב כאן את החזון שלך, תחומי חיים ויעדים גדולים</div>'}
       <button class="fab" data-act="addVision">+</button>`;
   },
+  week() {
+    const ws = state.weekStart, we = addDays(ws, 6), T = TODAY(), cur = ws === weekStart(T);
+    const W = Object.assign({ vision: '', outcomes: [], visionIds: [], worked: '', improve: '' }, D().weeks[ws]);
+    const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
+    const wt = D().tasks.filter(t => t.date && t.date >= ws && t.date <= we), wdone = wt.filter(t => t.done).length;
+    const left = wt.filter(t => !t.done).reduce((s, t) => s + (t.mins || 0), 0);
+    let hPlan = 0, hDone = 0;
+    days.filter(d => d <= T).forEach(d => habitsOn(d).forEach(h => { hPlan++; if (habitDone(h, d)) hDone++; }));
+    const pct = wt.length ? Math.round(wdone / wt.length * 100) : 0, hp = hPlan ? Math.round(hDone / hPlan * 100) : 0;
+    const maxN = Math.max(1, ...days.map(d => tasksOn(d).length));
+    const okOut = W.outcomes.filter(o => o.done).length;
+    return `<div class="top"><div class="brand">${logoMark(36)}<h1>חזון שבועי</h1></div><button class="iconbtn" data-act="printWeekVision">🖨</button></div>
+      <div class="row" style="margin:0 0 10px"><button class="iconbtn" data-act="weekNav" data-n="-1" aria-label="שבוע קודם">${chev('r')}</button><b class="grow" style="text-align:center">${shortDate(ws)} – ${shortDate(we)}${cur ? ' · השבוע' : ''}</b><button class="iconbtn" data-act="weekNav" data-n="1" aria-label="שבוע הבא">${chev('l')}</button><button class="iconbtn" data-act="weekToday">היום</button></div>
+      <h2>הכיוון שלי לשבוע</h2>
+      <textarea data-weekfield="vision" placeholder="מה הדבר החשוב ביותר שאני רוצה להשיג השבוע, ולמה?">${esc(W.vision)}</textarea>
+      <h2>תוצאות מפתח (${okOut}/${W.outcomes.length}) · מומלץ 3</h2>
+      ${W.outcomes.map(o => `<div class="card row ${o.done ? 'done' : ''}"><button class="check ${o.done ? 'on' : ''}" data-act="weekOutToggle" data-id="${o.id}">${o.done ? '✓' : ''}</button><div class="t grow">${esc(o.text)}</div><button class="iconbtn" data-act="weekOutDel" data-id="${o.id}" aria-label="מחק">✕</button></div>`).join('') || '<div class="empty">מה 3 הדברים שיגרמו לי להרגיש שהשבוע הצליח?</div>'}
+      <form id="outForm" class="row" style="margin-top:8px"><input id="outText" placeholder="תוצאה מדידה, למשל: 3 לקוחות חדשים ענו להצעה" autocomplete="off"><button class="btn">הוסף</button></form>
+      <h2>החזון הגדול שהשבוע משרת</h2>
+      ${D().visions.length ? `<div class="opt">${D().visions.map(v => `<button class="${W.visionIds.includes(v.id) ? 'on' : ''}" data-act="weekVisionTog" data-id="${v.id}">${esc(v.title)}</button>`).join('')}</div>` : '<div class="sub">עדיין אין פריטי חזון. אפשר להוסיף בעוד ← חזון.</div>'}
+      <h2>התקדמות השבוע</h2>
+      <div class="card"><div class="row"><b class="grow">${wdone}/${wt.length} משימות · ${pct}%</b><span class="sub">${left} ד׳ נותרו</span></div><div class="bar"><div style="width:${pct}%"></div></div>
+        <div class="row" style="margin-top:8px"><b class="grow">הרגלים: ${hDone}/${hPlan} · ${hp}%</b></div><div class="bar"><div style="width:${hp}%"></div></div>
+        <div class="wbar" style="margin-top:12px">${days.map((d, i) => { const ts = tasksOn(d), dn = ts.filter(t => t.done).length; return `<div class="wcol" data-act="openDay" data-date="${d}"><div class="wfill" style="height:${Math.round(ts.length / maxN * 100)}%"><div class="wdone" style="height:${ts.length ? Math.round(dn / ts.length * 100) : 0}%"></div></div><span class="${d === T ? 'wtoday' : ''}">${DAYS[i]}</span><small>${ts.length}</small></div>`; }).join('')}</div></div>
+      <h2>סיכום שבועי</h2>
+      <label>מה עבד השבוע?</label><textarea data-weekfield="worked" placeholder="מה הלך טוב ורוצה להמשיך">${esc(W.worked)}</textarea>
+      <label>מה לשפר בשבוע הבא?</label><textarea data-weekfield="improve" placeholder="מה לשנות, לפשט או להפסיק">${esc(W.improve)}</textarea>`;
+  },
+  projects() {
+    if (state.openProject) {
+      const p = D().projects.find(x => x.id === state.openProject);
+      if (p) {
+        const s = projState(p), open = s.ts.filter(t => !t.done), done = s.ts.filter(t => t.done);
+        return `<div class="top"><div class="row"><button class="iconbtn" data-act="backProjects" aria-label="חזרה">${chev('r')}</button><h1>${esc(p.title)}</h1></div><div class="sw"><button class="iconbtn" data-act="renameProject" data-id="${p.id}" aria-label="שנה שם">✏️</button><button class="iconbtn" data-act="delProject" data-id="${p.id}" aria-label="מחק">🗑</button></div></div>
+         <div class="card"><div class="row"><b class="grow">${s.done}/${s.total} משימות הושלמו</b><span class="sub">${s.mins} ד׳ נותרו</span></div><div class="bar"><div style="width:${s.pct}%"></div></div></div>
+         <div class="opt" style="margin-bottom:10px"><button data-act="projAddTask" data-id="${p.id}">＋ משימה</button><button data-act="projBulk" data-id="${p.id}">📋 הזנה מרוכזת</button><button data-act="projAssign" data-id="${p.id}">🔗 שייך משימות קיימות</button></div>
+         <h2>פתוחות (${open.length})</h2>${open.map(t => taskRow(t, true)).join('') || '<div class="empty">אין משימות פתוחות בפרויקט</div>'}
+         ${done.length ? `<h2>הושלמו (${done.length})</h2>${done.map(t => taskRow(t, true)).join('')}` : ''}`;
+      }
+      state.openProject = null;
+    }
+    const ps = D().projects.map(p => ({ p, s: projState(p) }));
+    return `<div class="top"><h1>פרויקטים</h1></div>
+      ${ps.map(({ p, s }) => `<div class="card" data-act="openProject" data-id="${p.id}"><div class="row"><div class="grow"><div class="t"><b>📁 ${esc(p.title)}</b></div><div class="meta"><span>${s.done}/${s.total} משימות</span>${s.total && s.done === s.total ? '<span class="chip">✓ הושלם</span>' : ''}${s.mins ? `<span>${s.mins} ד׳ נותרו</span>` : ''}</div></div>${chev('l')}</div><div class="bar"><div style="width:${s.pct}%"></div></div></div>`).join('') || '<div class="empty">אגד משימות קשורות תחת פרויקט אחד, כדי לראות אותן ולהתקדם בהן יחד</div>'}
+      <button class="fab" data-act="addProject">+</button>`;
+  },
   more() {
     const gs = D().goals.map(goalState), activeG = gs.filter(s => !s.achieved && !s.missed).length;
     const wait = D().goals.filter(g => g.reward && !g.claimed && goalState(g).achieved).length;
     const item = (t, icon, title, sub) => `<div class="card row" data-act="goTab" data-t="${t}"><span style="font-size:26px">${icon}</span><div class="grow"><div class="t"><b>${title}</b></div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
-    return `<div class="top"><h1>עוד</h1></div>
+    return `<div class="top"><div class="brand">${logoMark(40)}<h1>Do It</h1></div></div>
+      ${item('tasks', '✅', 'כל המשימות', `${D().tasks.filter(t => !t.done).length} פתוחות`)}
+      ${item('projects', '📁', 'פרויקטים', `${D().projects.filter(p => projState(p).done < projState(p).total).length} פעילים`)}
       ${item('habits', '🔁', 'הרגלים', `${D().habits.length} הרגלים`)}
       ${item('goals', '🎯', 'יעדים ותגמולים', `${activeG} פעילים${wait ? ` · 🎁 ${wait} ממתינים` : ''}`)}
       ${item('vision', '🌟', 'חזון', `${D().visions.length} פריטים`)}
@@ -308,7 +372,7 @@ function render() {
   const board = $('#uboard'), boardScroll = board ? board.scrollLeft : null; // keep the board's horizontal position across re-renders
   document.body.classList.toggle('wide', state.tab === 'upcoming');
   $('#view').innerHTML = views[state.tab]();
-  if (MORE_TABS.includes(state.tab) && !(state.tab === 'lists' && state.openList)) // back to the "עוד" menu
+  if (MORE_TABS.includes(state.tab) && !(state.tab === 'lists' && state.openList) && !(state.tab === 'projects' && state.openProject)) // back to the "עוד" menu
     $('#view').insertAdjacentHTML('afterbegin', `<button class="iconbtn backmore" data-act="goTab" data-t="more" aria-label="חזרה לעוד">${chev('r')}<span style="margin-inline-start:6px">עוד</span></button>`);
   if (boardScroll !== null && $('#uboard')) $('#uboard').scrollLeft = boardScroll;
   // Entrance animation (FitMe-style soft rise, staggered) only when the screen changes, not on every re-render.
@@ -325,6 +389,12 @@ function render() {
   }
   const navTab = MORE_TABS.includes(state.tab) ? 'more' : state.tab;
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === navTab));
+  const of = $('#outForm');
+  if (of) of.onsubmit = e => {
+    e.preventDefault(); const txt = $('#outText').value.trim(); if (!txt) return;
+    weekData(state.weekStart).outcomes.push({ id: uid(), text: txt, done: false });
+    Store.save(); render(); $('#outText').focus();
+  };
   const f = $('#itemForm');
   if (f) f.onsubmit = e => {
     e.preventDefault();
@@ -345,8 +415,8 @@ function sheet(html) {
 function closeSheet() { $('#sheet').hidden = true; $('#sheet').innerHTML = ''; }
 const visionOpts = sel => `<option value="">ללא קישור</option>` + D().visions.map(v => `<option value="${v.id}" ${v.id === sel ? 'selected' : ''}>${esc(v.title)}</option>`).join('');
 
-function taskForm(id, presetDate) {
-  const t = id ? D().tasks.find(x => x.id === id) : { title: '', date: presetDate !== undefined ? presetDate : state.date, priority: 0, print: false, visionId: '', notes: '', energy: 3, mins: 15 };
+function taskForm(id, presetDate, presetProject) {
+  const t = id ? D().tasks.find(x => x.id === id) : { title: '', date: presetDate !== undefined ? presetDate : state.date, priority: 0, print: false, visionId: '', projectId: presetProject || '', notes: '', energy: 3, mins: 15 };
   const mo = [...new Set([5, 10, 15, 20, 30, 45, 60, 90, t.mins || 15])].sort((a, b) => a - b);
   sheet(`<h1>${id ? 'עריכת משימה' : 'משימה חדשה'}</h1>
   <form id="f">
@@ -363,6 +433,7 @@ function taskForm(id, presetDate) {
    <label>משך (עד 15 דקות; ארוך יותר יוצע לפיצול)</label>
    <select name="mins">${mo.map(m => `<option value="${m}" ${m == (t.mins || 15) ? 'selected' : ''}>${m} דקות</option>`).join('')}</select>
    <label>עדיפות</label><select name="priority"><option value="0" ${t.priority == 0 ? 'selected' : ''}>רגילה</option><option value="1" ${t.priority == 1 ? 'selected' : ''}>חשובה</option><option value="2" ${t.priority == 2 ? 'selected' : ''}>דחופה</option></select>
+   <label>פרויקט (אופציונלי): לאגד משימות קשורות</label><select name="projectId">${projectOpts(t.projectId)}</select>
    <label>קישור לחזון (אופציונלי)</label><select name="visionId">${visionOpts(t.visionId)}</select>
    <label>הערות</label><textarea name="notes">${esc(t.notes || '')}</textarea>
    <label class="row" style="color:var(--ink)"><input type="checkbox" name="brainless" style="width:auto" ${t.brainless ? 'checked' : ''}> ⚡ Brainless (משימה פשוטה שאפשר להעיף ברגע)</label>
@@ -371,6 +442,11 @@ function taskForm(id, presetDate) {
   </form>`);
   // Clarity gate: new tasks (or a changed title) must be confirmed with "זה ברור" before they are saved.
   const form = $('#f'), origTitle = id ? t.title : null;
+  form.projectId.addEventListener('change', () => { // "＋ פרויקט חדש" creates a project on the spot and selects it
+    if (form.projectId.value !== '__new__') return;
+    const p = newProject(); const sel = form.projectId;
+    if (p) { sel.add(new Option(p.title, p.id), sel.options[sel.options.length - 1]); sel.value = p.id; } else sel.value = '';
+  });
   const needClear = () => !id || form.title.value.trim() !== origTitle;
   form.title.addEventListener('input', () => {
     $('#clHint').innerHTML = clarityHTML(form.title.value);
@@ -381,27 +457,60 @@ function taskForm(id, presetDate) {
     e.preventDefault();
     if (needClear() && !form.clear.checked) { $('#clMsg').textContent = 'סמן "זה ברור" כדי להוסיף את המשימה.'; $('#clRow').hidden = false; return; }
     const f = new FormData(e.target);
-    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: +f.get('priority'), visionId: f.get('visionId') || '', notes: f.get('notes'), print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
+    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: +f.get('priority'), visionId: f.get('visionId') || '', projectId: f.get('projectId') === '__new__' ? '' : (f.get('projectId') || ''), notes: f.get('notes'), print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
     let saved = t;
     if (id) Object.assign(t, obj); else { saved = { id: uid(), done: false, subs: [], ...obj }; D().tasks.push(saved); }
     resolveLong([saved]);
   };
 }
 function habitForm(id) {
-  const h = id ? D().habits.find(x => x.id === id) : { title: '', days: [0, 1, 2, 3, 4, 5, 6], visionId: '' };
-  const days = new Set(h.days);
+  const h = id ? D().habits.find(x => x.id === id) : { title: '', task: '', mins: 10, energy: 2, days: [0, 1, 2, 3, 4, 5, 6], visionId: '' };
+  const days = new Set(h.days), mo = [...new Set([5, 10, 15, h.mins || 10])].sort((a, b) => a - b);
   sheet(`<h1>${id ? 'עריכת הרגל' : 'הרגל חדש'}</h1>
   <form id="f"><label>שם ההרגל</label><input name="title" required value="${esc(h.title)}">
+   <label>איזו משימה ההרגל מייצר? (פעולה קונקרטית, עד 15 דקות)</label><input name="task" required value="${esc(h.task || '')}" autocomplete="off" placeholder="למשל: ללכת 15 דקות סביב הבלוק">
+   <div id="htHint" class="clarity">${clarityHTML(h.task || '')}</div>
+   <label>כמה אנרגיה זה דורש? (1 = קל, 5 = הכי מאמץ)</label>
+   <div class="stars" id="stars">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="${n <= (h.energy || 0) ? 'on' : ''}" data-act="star" data-n="${n}">★</button>`).join('')}</div>
+   <input type="hidden" name="energy" value="${h.energy || 0}">
+   <label>משך</label><select name="mins">${mo.map(m => `<option value="${m}" ${m == (h.mins || 10) ? 'selected' : ''}>${m} דקות</option>`).join('')}</select>
    <label>באילו ימים</label><div class="days">${DAYS.map((x, i) => `<button type="button" class="${days.has(i) ? 'on' : ''}" data-act="dayTog" data-d="${i}">${x}</button>`).join('')}</div>
    <label>קישור לחזון (אופציונלי)</label><select name="visionId">${visionOpts(h.visionId)}</select>
    <div class="actions">${id ? '<button type="button" class="btn danger" data-act="delHabit" data-id="' + id + '">מחק</button>' : ''}<button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
+  $('#f').task.addEventListener('input', ev => { $('#htHint').innerHTML = clarityHTML(ev.target.value); });
   $('#f').onsubmit = e => {
     e.preventDefault();
-    const sel = [...document.querySelectorAll('.days .on')].map(b => +b.dataset.d);
-    const obj = { title: new FormData(e.target).get('title').trim(), days: sel.length ? sel : [0, 1, 2, 3, 4, 5, 6], visionId: new FormData(e.target).get('visionId') || '' };
+    const sel = [...document.querySelectorAll('.days .on')].map(b => +b.dataset.d), fd = new FormData(e.target);
+    const obj = { title: fd.get('title').trim(), task: fd.get('task').trim(), energy: +fd.get('energy'), mins: +fd.get('mins'), days: sel.length ? sel : [0, 1, 2, 3, 4, 5, 6], visionId: fd.get('visionId') || '' };
     if (id) Object.assign(h, obj); else D().habits.push({ id: uid(), log: {}, ...obj });
     Store.save(); closeSheet(); render();
   };
+}
+/* ---------- Bulk habits entry: for each habit we ask which concrete task it generates ---------- */
+let habBulk = [];
+function habBulkStart() {
+  sheet(`<h1>הזנת הרגלים בבת אחת</h1><p class="sub">הרגל בכל שורה. בשלב הבא אשאל אותך, לכל הרגל, איזו משימה קונקרטית הוא מייצר, באילו ימים, וכמה אנרגיה וזמן היא דורשת.</p>
+   <textarea id="habText" style="min-height:160px" placeholder="פעילות גופנית&#10;קריאה&#10;סדר בבית"></textarea>
+   <div class="actions"><button class="btn ghost" data-act="close">ביטול</button><button class="btn" data-act="habBulkNext">המשך</button></div>`);
+  setTimeout(() => $('#habText') && $('#habText').focus(), 50);
+}
+function habBulkRender(showMiss) {
+  const old = $('#sheet .panel'), st = old ? old.scrollTop : 0;
+  sheet(`<h1>איזו משימה כל הרגל מייצר?</h1>
+   <p class="sub">${habBulk.length} הרגלים. כל הרגל הופך למשימה קטנה וברורה בכל יום שנבחר.</p>
+   ${habBulk.map((b, i) => `<div class="bulkrow ${showMiss && (!b.task.trim() || !b.clear || !b.energy) ? 'miss' : ''}">
+     <input data-habtitle="${i}" value="${esc(b.title)}" style="font-weight:700" autocomplete="off">
+     <label>המשימה שההרגל מייצר (פעולה קונקרטית)</label>
+     <input data-habtask="${i}" value="${esc(b.task)}" autocomplete="off" placeholder="למשל: ללכת 15 דקות סביב הבלוק">
+     <div class="clarity" id="hcl${i}">${clarityHTML(b.task)}</div>
+     <button class="clearbtn ${b.clear ? 'on' : ''}" data-act="habClear" data-i="${i}">${b.clear ? '✅ זה ברור' : '☐ זה ברור: ' + CLEAR_LABEL}</button>
+     <label>באילו ימים</label><div class="days">${DAYS.map((x, d) => `<button type="button" class="${b.days.includes(d) ? 'on' : ''}" data-act="habDay" data-i="${i}" data-d="${d}">${x}</button>`).join('')}</div>
+     <label>אנרגיה</label><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="${n <= b.energy ? 'on' : ''}" data-act="habStar" data-i="${i}" data-n="${n}">★</button>`).join('')}</div>
+     <label>משך (דקות)</label><div class="opt">${[5, 10, 15].map(m => `<button class="${b.mins === m ? 'on' : ''}" data-act="habMins" data-i="${i}" data-m="${m}">${m}</button>`).join('')}</div></div>`).join('')}
+   ${CLARITY_EX}
+   ${showMiss ? '<div class="sub" style="color:var(--danger)">חסרה משימה, אנרגיה או אישור "זה ברור" בשורות המסומנות.</div>' : ''}
+   <div class="actions"><button class="btn ghost" data-act="close">ביטול</button><button class="btn" data-act="habBulkSave">הוסף ${habBulk.length} הרגלים</button></div>`);
+  $('#sheet .panel').scrollTop = st;
 }
 function visionForm(id) {
   const v = id ? D().visions.find(x => x.id === id) : { title: '', desc: '', area: '' };
@@ -562,7 +671,7 @@ function menuSheet(id) {
   const t = findTask(id); if (!t) return closeSheet();
   const v = t.visionId ? visionName(t.visionId) : '';
   sheet(`<h1>${esc(t.title)}</h1>
-   <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:#fdf0d5;color:#9a6a12">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+   <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:#fdf0d5;color:#9a6a12">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
    ${t.notes ? `<p class="sub" style="white-space:pre-wrap">${esc(t.notes)}</p>` : ''}
    ${(t.subs || []).map(s => `<div class="row ${s.done ? 'done' : ''}" style="margin:6px 0"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div><button class="iconbtn" data-act="subDel" data-id="${t.id}" data-sid="${s.id}">✕</button></div>`).join('')}
    <form id="subForm" class="row" style="margin-top:8px" hidden><input id="subText" placeholder="תת משימה חדשה" autocomplete="off"><button class="btn">הוסף</button></form>
@@ -620,9 +729,20 @@ function resolveLong(list) {
 }
 
 /* ---------- Bulk entry ---------- */
-let bulk = [];
+let bulk = [], bulkProject = '';
+function assignSheet(pid) {
+  const p = D().projects.find(x => x.id === pid), cand = D().tasks.filter(t => !t.done && t.projectId !== pid);
+  sheet(`<h1>שיוך משימות ל-${esc(p.title)}</h1><form id="f">
+   ${cand.map(t => `<label class="row" style="color:var(--ink);margin:8px 0"><input type="checkbox" name="t" value="${t.id}" style="width:auto"><span class="grow">${esc(t.title)}${t.projectId && projectName(t.projectId) ? ` <span class="sub">(כרגע ב-${esc(projectName(t.projectId))})</span>` : ''}</span></label>`).join('') || '<div class="empty">אין משימות פתוחות לשייך</div>'}
+   <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שייך</button></div></form>`);
+  $('#f').onsubmit = e => {
+    e.preventDefault(); new FormData(e.target).getAll('t').forEach(id => { const t = findTask(id); if (t) t.projectId = pid; });
+    Store.save(); closeSheet(); render();
+  };
+}
 const bulkDateOpts = () => { const T = TODAY(); return [['היום', T], ['מחר', addDays(T, 1)], ['מחרתיים', addDays(T, 2)], ['ללא', null]]; };
-function bulkStart() {
+function bulkStart(project) {
+  bulkProject = project || '';
   sheet(`<h1>הזנת משימות בבת אחת</h1><p class="sub">משימה בכל שורה. בשלב הבא אשאל אותך מתי לשלב כל אחת וכמה אנרגיה היא דורשת.</p>
    <div class="card" style="background:var(--soft)"><b>רשימה בכתב יד?</b>
     <div class="sub" style="margin:4px 0 8px">1. העתק את ההנחיה. 2. בצ'אט של Claude בטלפון הדבק אותה וצרף צילום של הרשימה. 3. העתק את התשובה וחזור לכאן.</div>
@@ -636,6 +756,7 @@ function bulkRender(showMiss) {
   const dopts = bulkDateOpts(), old = $('#sheet .panel'), st = old ? old.scrollTop : 0;
   sheet(`<h1>מתי ובאיזו אנרגיה?</h1>
    <p class="sub">${bulk.length} משימות. משימות עם אנרגיה גבוהה יופיעו תמיד בתחילת היום.</p>
+   <label>פרויקט לכל המשימות (אופציונלי)</label><select data-bulkproj="1">${projectOpts(bulkProject)}</select>
    <div class="sub">קבע תאריך לכולן:</div><div class="opt" style="margin:6px 0 12px">${dopts.map(([l], j) => `<button data-act="bulkAllDate" data-j="${j}">${l}</button>`).join('')}</div>
    ${bulk.map((b, i) => `<div class="bulkrow ${showMiss && (b.date === undefined || !b.energy || !b.clear || !b.title.trim()) ? 'miss' : ''}">
      <input data-bulktitle="${i}" value="${esc(b.title)}" style="font-weight:700" autocomplete="off">
@@ -660,7 +781,7 @@ function accountSheet() {
       <div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
     return;
   }
-  sheet(`<h1>כניסה וסנכרון</h1><p class="sub">התחבר כדי לשמור את הנתונים בענן ולראות אותם בכל המכשירים.</p>
+  sheet(`<div class="brand" style="margin-bottom:6px">${logoMark(40)}<h1>כניסה וסנכרון</h1></div><p class="sub">התחבר כדי לשמור את הנתונים בענן ולראות אותם בכל המכשירים.</p>
     <form id="f"><label>אימייל</label><input name="email" type="email" required autocomplete="email">
      <label>סיסמה (לפחות 8 תווים)</label><input name="password" type="password" required minlength="8" autocomplete="current-password">
      <div id="authMsg" class="sub" style="color:var(--danger);margin-top:8px"></div>
@@ -711,6 +832,7 @@ const A = {
   toggleTask: e => {
     const t = D().tasks.find(x => x.id === e.id); t.done = !t.done; Store.save(); state.pop = { id: e.id }; render();
     if (t.done && t.date) { const day = D().tasks.filter(x => x.date === t.date); if (day.length >= 2 && day.every(x => x.done)) celebrate(); }
+    if (t.done && t.projectId) { const pt = D().tasks.filter(x => x.projectId === t.projectId); if (pt.length >= 2 && pt.every(x => x.done)) celebrate(); }
   },
   toggleHabit: e => { const h = D().habits.find(x => x.id === e.id); if (h.log[e.date]) delete h.log[e.date]; else h.log[e.date] = true; Store.save(); state.pop = { id: e.id, date: e.date }; render(); },
   editTask: e => taskForm(e.id), addTask: () => taskForm(),
@@ -756,7 +878,46 @@ const A = {
   subDel: e => { const t = findTask(e.id); t.subs = t.subs.filter(x => x.id !== e.sid); Store.save(); render(); menuSheet(e.id); },
   keepLong: () => splitCtx.next(),
   doSplit: () => splitNameSheet(splitCtx.t, splitCtx.next),
-  goTab: e => { state.tab = e.t; state.openList = null; render(); window.scrollTo(0, 0); },
+  weekNav: e => { state.weekStart = addDays(state.weekStart, 7 * +e.n); render(); },
+  weekToday: () => { state.weekStart = weekStart(TODAY()); render(); },
+  weekOutToggle: e => { const o = weekData(state.weekStart).outcomes.find(x => x.id === e.id); o.done = !o.done; Store.save(); state.pop = { id: e.id }; render(); },
+  weekOutDel: e => { const W = weekData(state.weekStart); W.outcomes = W.outcomes.filter(x => x.id !== e.id); Store.save(); render(); },
+  weekVisionTog: e => { const W = weekData(state.weekStart); W.visionIds = W.visionIds.includes(e.id) ? W.visionIds.filter(x => x !== e.id) : [...W.visionIds, e.id]; Store.save(); render(); },
+  openDay: e => { state.date = e.date; state.tab = 'today'; render(); window.scrollTo(0, 0); },
+  printWeekVision: () => {
+    const ws = state.weekStart, we = addDays(ws, 6), W = Object.assign({ vision: '', outcomes: [], visionIds: [], worked: '', improve: '' }, D().weeks[ws]);
+    const wt = D().tasks.filter(t => t.date && t.date >= ws && t.date <= we && !t.done);
+    printHTML(`<h1>חזון שבועי · ${shortDate(ws)} – ${shortDate(we)}</h1>
+      <h2>הכיוון שלי לשבוע</h2><div style="min-height:50px;white-space:pre-wrap">${esc(W.vision) || '<div class="lines"><div></div><div></div></div>'}</div>
+      <h2>תוצאות מפתח</h2>${W.outcomes.map(o => pRow((o.done ? '✓ ' : '') + o.text)).join('') || '<div class="lines"><div></div><div></div><div></div></div>'}
+      ${W.visionIds.length ? `<h2>החזון הגדול</h2><div>${W.visionIds.map(id => esc(visionName(id) || '')).filter(Boolean).join(' · ')}</div>` : ''}
+      <h2>משימות פתוחות השבוע</h2>${wt.map(t => pRow(`${shortDate(t.date)} · ${t.title}${t.mins ? ` · ${t.mins} ד׳` : ''}${t.energy ? ' ' + stars(t.energy) : ''}`, true)).join('') || '<div class="pl">—</div>'}
+      <h2>סיכום: מה עבד? מה לשפר?</h2><div class="lines">${'<div></div>'.repeat(5)}</div>`);
+  },
+  goTab: e => { state.tab = e.t; state.openList = null; state.openProject = null; render(); window.scrollTo(0, 0); },
+  addProject: () => { const p = newProject(); if (p) { state.openProject = p.id; render(); } },
+  openProject: e => { state.openProject = e.id; render(); window.scrollTo(0, 0); },
+  backProjects: () => { state.openProject = null; render(); },
+  renameProject: e => { const p = D().projects.find(x => x.id === e.id), n = (prompt('שם הפרויקט', p.title) || '').trim(); if (n) { p.title = n; Store.save(); render(); } },
+  delProject: e => { if (confirm('למחוק את הפרויקט? המשימות שלו יישארו, בלי פרויקט.')) { D().tasks.forEach(t => { if (t.projectId === e.id) t.projectId = ''; }); D().projects = D().projects.filter(p => p.id !== e.id); state.openProject = null; Store.save(); render(); } },
+  projAddTask: e => taskForm(undefined, null, e.id),
+  projBulk: e => bulkStart(e.id),
+  projAssign: e => assignSheet(e.id),
+  addHabitBulk: () => habBulkStart(),
+  habBulkNext: () => {
+    const lines = $('#habText').value.split('\n').map(s => s.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
+    if (!lines.length) return;
+    habBulk = lines.map(title => ({ title, task: '', days: [0, 1, 2, 3, 4, 5, 6], mins: 10, energy: 0, clear: false })); habBulkRender();
+  },
+  habClear: e => { const b = habBulk[+e.i]; b.clear = !b.clear; habBulkRender(); },
+  habDay: e => { const b = habBulk[+e.i], d = +e.d; b.days = b.days.includes(d) ? b.days.filter(x => x !== d) : [...b.days, d].sort(); if (!b.days.length) b.days = [d]; habBulkRender(); },
+  habStar: e => { habBulk[+e.i].energy = +e.n; habBulkRender(); },
+  habMins: e => { habBulk[+e.i].mins = +e.m; habBulkRender(); },
+  habBulkSave: () => {
+    if (habBulk.some(b => !b.title.trim() || !b.task.trim() || !b.clear || !b.energy)) return habBulkRender(true);
+    D().habits.push(...habBulk.map(b => ({ id: uid(), log: {}, title: b.title.trim(), task: b.task.trim(), days: b.days, mins: b.mins, energy: b.energy, visionId: '' })));
+    habBulk = []; Store.save(); closeSheet(); render();
+  },
   orgOpen: () => orgOpen(),
   orgSuggest: () => orgSuggest(),
   orgSet: e => { findTask(e.id).date = e.d; Store.save(); render(); orgStep1(); },
@@ -765,7 +926,7 @@ const A = {
   orgMove: e => { findTask(e.id).date = e.d === 'none' ? null : e.d; Store.save(); render(); orgStep2(); },
   orgAddTomorrow: () => taskForm(undefined, addDays(TODAY(), 1)),
   orgFinish: () => { D().org = D().org || {}; D().org[TODAY()] = { at: new Date().toISOString() }; Store.save(); closeSheet(); render(); celebrate(); },
-  addBulk: bulkStart,
+  addBulk: () => bulkStart(),
   copyPrompt: async () => {
     const msg = $('#clipMsg');
     try { await navigator.clipboard.writeText('העתק את הרשימה שבתמונה, משימה אחת בכל שורה, בלי מספור ובלי תבליטים, בלי הסברים ובלי טקסט נוסף.'); msg.textContent = 'ההנחיה הועתקה. הדבק אותה בצ\'אט של Claude עם צילום הרשימה.'; }
@@ -792,7 +953,7 @@ const A = {
   bulkBrain: e => { bulk[+e.i].brainless = !bulk[+e.i].brainless; bulkRender(); },
   bulkSave: () => {
     if (bulk.some(b => b.date === undefined || !b.energy || !b.clear || !b.title.trim())) return bulkRender(true);
-    const created = bulk.map(b => ({ id: uid(), done: false, title: b.title.trim(), date: b.date, priority: 0, visionId: '', notes: '', print: false, brainless: b.brainless, energy: b.energy, mins: b.mins, subs: [] }));
+    const created = bulk.map(b => ({ id: uid(), done: false, title: b.title.trim(), date: b.date, priority: 0, visionId: '', notes: '', print: false, projectId: bulkProject, brainless: b.brainless, energy: b.energy, mins: b.mins, subs: [] }));
     D().tasks.push(...created); bulk = []; resolveLong(created);
   },
   account: accountSheet,
@@ -825,7 +986,7 @@ document.addEventListener('click', ev => {
   const el = ev.target.closest('[data-act]');
   if (el) { const fn = A[el.dataset.act]; if (fn) { ev.preventDefault(); fn({ ...el.dataset }, el); } return; }
   const nav = ev.target.closest('#nav button');
-  if (nav) { state.tab = nav.dataset.tab; state.openList = null; render(); window.scrollTo(0, 0); }
+  if (nav) { state.tab = nav.dataset.tab; state.openList = null; state.openProject = null; render(); window.scrollTo(0, 0); }
 });
 document.addEventListener('change', ev => {
   if (ev.target.id === 'upMonth') {
@@ -833,12 +994,28 @@ document.addEventListener('change', ev => {
     if (state.upMode === 'month') { state.upMonth = v; state.upSel = first; } else { state.upStart = first; state.upDays = 14; }
     render(); return;
   }
+  if (ev.target.dataset && ev.target.dataset.bulkproj !== undefined) { // project for the whole bulk batch
+    let v = ev.target.value;
+    if (v === '__new__') { const p = newProject(); v = p ? p.id : ''; }
+    bulkProject = v; bulkRender(); return;
+  }
   const od = ev.target.dataset && ev.target.dataset.orgdate;
   if (od !== undefined) { const t = findTask(od); if (t && ev.target.value) { t.date = ev.target.value; Store.save(); render(); orgStep1(); } return; }
   const i = ev.target.dataset && ev.target.dataset.bulkdate;
   if (i !== undefined) { bulk[+i].date = ev.target.value || undefined; bulkRender(); }
 });
 document.addEventListener('input', ev => {
+  const wf = ev.target.dataset && ev.target.dataset.weekfield;
+  if (wf !== undefined) { weekData(state.weekStart)[wf] = ev.target.value; Store.save(); return; } // weekly texts autosave
+  const ht = ev.target.dataset && ev.target.dataset.habtitle;
+  if (ht !== undefined) { habBulk[+ht].title = ev.target.value; return; }
+  const hk = ev.target.dataset && ev.target.dataset.habtask;
+  if (hk !== undefined) { // habit's generated task: live clarity check, needs a fresh "זה ברור" after edits
+    const b = habBulk[+hk]; b.task = ev.target.value; b.clear = false;
+    $('#hcl' + hk).innerHTML = clarityHTML(b.task);
+    const btn = ev.target.closest('.bulkrow').querySelector('.clearbtn'); btn.classList.remove('on'); btn.textContent = '☐ זה ברור: ' + CLEAR_LABEL;
+    return;
+  }
   const bi = ev.target.dataset && ev.target.dataset.bulktitle;
   if (bi !== undefined) { // edit a bulk task title in place: re-check clarity and require a fresh "זה ברור"
     const b = bulk[+bi]; b.title = ev.target.value; b.clear = false;

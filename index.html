@@ -7,7 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Do It - ניהול אישי</title>
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon.svg">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -16,12 +17,12 @@
   <nav id="nav">
     <button data-tab="today"><i>☀️</i><span>היום</span></button>
     <button data-tab="upcoming"><i>🗓️</i><span>בקרוב</span></button>
-    <button data-tab="tasks"><i>✅</i><span>משימות</span></button>
+    <button data-tab="week"><i>🧭</i><span>חזון שבועי</span></button>
     <button data-tab="more"><i>☰</i><span>עוד</span></button>
   </nav>
 </div>
 <div id="splash" aria-hidden="true">
-  <svg width="96" height="96" viewBox="0 0 512 512"><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <svg width="96" height="96" viewBox="0 0 512 512"><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/><circle class="dot" cx="390" cy="170" r="36" fill="#e8a33d"/></svg>
   <b>Do It</b>
 </div>
 <div id="sheet" class="sheet" hidden></div>
