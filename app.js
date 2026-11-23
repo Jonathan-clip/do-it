@@ -300,6 +300,7 @@ function runRender() {
     <button class="iconbtn runx" data-act="runClose" aria-label="סגור">✕</button>
     <div class="sub">${Run.brk ? 'הפסקה' : 'עכשיו עובדים על'}</div>
     <h1>${Run.brk ? esc(Run.label || '☕ הפסקה') : esc(t.title)}</h1>
+    ${!Run.brk && t && t.notes ? '<div class="sub" style="white-space:pre-wrap;margin:-6px 0 12px">' + esc(t.notes) + '</div>' : ''}
     ${Run.brk ? '' : `<label class="sub">הצעד הראשון</label><input id="runStep" value="${esc(step)}" placeholder="מה הדבר הראשון והקטן שעושים?" autocomplete="off" ${(t.subs || []).some(s => !s.done) ? 'readonly' : ''}>`}
     <div class="opt runmins">${mins.map(m => `<button class="${Run.total === m * 60 ? 'on' : ''}" data-act="runMins" data-m="${m}" ${Run.running ? 'disabled' : ''}>${m} ד׳</button>`).join('')}</div>
     <div class="remind" style="margin-top:14px">💬 ${esc(reminder())}</div>
@@ -665,8 +666,22 @@ function rewardNotify() { // first time today's condition is met: celebrate once
 }
 const setReward = title => { fo(TODAY()).rewardPicked = title; Store.save(); closeSheet(); render(); };
 /* A task (job) written together with its actions: one action per line */
+const newChips = active => '<div class="opt" style="margin-bottom:6px">' + [['action', 'פעולה', 'newActionForm'], ['job', '🧩 משימה עם פעולות', 'newJobForm'], ['project', '📁 פרויקט', 'newProjectForm']].map(([k, l, act]) => k === active ? '<button type="button" class="on">' + l + '</button>' : '<button type="button" data-act="' + act + '">' + l + '</button>').join('') + '</div>';
+function projectForm() {
+  sheet(`<h1>פרויקט חדש</h1>${newChips('project')}
+  <form id="f"><label>שם הפרויקט</label><input name="title" required autocomplete="off" placeholder="למשל: השקת האתר החדש" autofocus>
+   <label>משימות בפרויקט (אופציונלי, שורה לכל משימה)</label><textarea name="jobs" rows="4" placeholder="להקים את דף הבית&#10;לכתוב את הטקסטים&#10;להשיק קמפיין פתיחה"></textarea>
+   <div class="sub">את הפעולות של כל משימה מוסיפים אחר כך, בדף המשימה.</div>
+   <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
+  $('#f').onsubmit = e => {
+    e.preventDefault(); const f = new FormData(e.target), title = f.get('title').trim(); if (!title) return;
+    const p = { id: uid(), title, createdAt: TODAY() }; D().projects.push(p);
+    f.get('jobs').split('\n').map(x => x.trim()).filter(Boolean).forEach(t => D().jobs.push({ id: uid(), title: t, projectId: p.id, notes: '', createdAt: TODAY() }));
+    Store.save(); closeSheet(); state.tab = 'projects'; state.openJob = null; state.openProject = p.id; render(); window.scrollTo(0, 0);
+  };
+}
 function jobForm(projectId) {
-  sheet(`<h1>משימה חדשה עם פעולות</h1>
+  sheet(`<h1>משימה חדשה עם פעולות</h1>${newChips('job')}
   <form id="f"><label>המשימה (התוצאה שרוצים להשיג)</label><input name="title" required autocomplete="off" placeholder="למשל: להכין את חידוש כרטיסי האשראי" autofocus>
    <label>פעולות (שורה לכל פעולה, כל אחת קטנה וברורה)</label><textarea name="actions" rows="5" placeholder="לכתוב רשימה של כל הכרטיסים&#10;להתקשר לבנק ולבקש חידוש&#10;לעדכן את הכרטיס החדש באתר החשבונות"></textarea>
    <label>מתי לשבץ את הפעולות?</label><div class="opt" id="jdChips">${[['היום', TODAY()], ['מחר', addDays(TODAY(), 1)], ['ללא תאריך', '']].map(([l, v], i) => `<button type="button" class="${i === 2 ? 'on' : ''}" onclick="document.getElementById('jdate').value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div><input type="hidden" id="jdate" name="date" value="">
@@ -741,7 +756,7 @@ function taskRow(t, showDate) {
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${esc(t.title)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${t.jobId ? jobChip(t) : projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.notes ? '<span title="יש תיאור">📝</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${t.jobId ? jobChip(t) : projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -1091,10 +1106,11 @@ function taskForm(id, presetDate, presetProject, preset) {
   const t = id ? D().tasks.find(x => x.id === id) : { title: '', date: presetDate !== undefined ? presetDate : state.date, priority: 0, print: false, visionId: '', projectId: presetProject || '', notes: '', energy: 3, mins: 15, repeat: '', jobId: '', ...preset };
   const mo = [...new Set([5, 10, 15, 20, 30, 45, 60, 90, t.mins || 15])].sort((a, b) => a - b);
   sheet(`<h1>${id ? 'עריכת פעולה' : 'פעולה חדשה'}</h1>
-  ${id ? '' : '<div class="opt" style="margin-bottom:6px"><button type="button" class="on">פעולה</button><button type="button" data-act="newJobForm">🧩 משימה עם פעולות</button></div>'}
+  ${id ? '' : newChips('action')}
   <form id="f">
    <label>מה לעשות (פעולה אחת, ברורה ומוחשית)</label><input name="title" required value="${esc(t.title)}" autofocus autocomplete="off">
    <div id="clHint" class="clarity">${id ? '' : clarityHTML('', true)}</div>
+   <label>תיאור הפעולה (אופציונלי, באריכות)</label><textarea name="notes" rows="2" placeholder="פרטים: מה בדיוק, איפה, למי, מה צריך להיות מוכן">${esc(t.notes || '')}</textarea>
    <label>מתי?</label>
    <div class="opt" id="dateChips" style="margin-bottom:6px">${[['היום', TODAY()], ['מחר', addDays(TODAY(), 1)], ['ללא תאריך', '']].map(([l, v]) => `<button type="button" class="${(t.date || '') === v ? 'on' : ''}" onclick="const f=this.closest('form');f.elements.date.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div>
    <details class="moreopts" ${id || t.repeat ? 'open' : ''}><summary>אפשרויות נוספות</summary>
@@ -1108,7 +1124,6 @@ function taskForm(id, presetDate, presetProject, preset) {
    <label>עדיפות</label><select name="priority"><option value="0" ${t.priority == 0 ? 'selected' : ''}>רגילה</option><option value="1" ${t.priority == 1 ? 'selected' : ''}>חשובה</option><option value="2" ${t.priority == 2 ? 'selected' : ''}>דחופה</option></select>
    <label>שייכת ל... (משימה או פרויקט)</label><select name="owner">${ownerOpts(t.jobId ? 'j:' + t.jobId : t.projectId ? 'p:' + t.projectId : '')}</select>
    <label>קישור לחזון (אופציונלי)</label><select name="visionId">${visionOpts(t.visionId)}</select>
-   <label>הערות</label><textarea name="notes">${esc(t.notes || '')}</textarea>
    <label class="row" style="color:var(--ink)"><input type="checkbox" name="brainless" style="width:auto" ${t.brainless ? 'checked' : ''}> ⚡ Brainless (משימה פשוטה שאפשר להעיף ברגע)</label>
    <label class="row" style="color:var(--ink)"><input type="checkbox" name="print" style="width:auto" ${t.print ? 'checked' : ''}> סמן להדפסה</label>
    </details>
@@ -1594,7 +1609,7 @@ const A = {
   jPhotoDel: () => { jSet(state.jDate).photo = ''; Store.save(); render(); },
   jWinDel: e => { const J = jSet(state.jDate); J.wins = J.wins.filter(w => w.id !== e.id); Store.save(); render(); },
   goTab: e => { state.tab = e.t; state.openList = null; state.openProject = null; state.openJob = null; render(); window.scrollTo(0, 0); },
-  addProject: () => { const p = newProject(); if (p) { state.openProject = p.id; render(); } },
+  addProject: () => projectForm(),
   openProject: e => { state.openProject = e.id; render(); window.scrollTo(0, 0); },
   backProjects: () => { state.openProject = null; state.openJob = null; render(); },
   renameProject: e => { const p = D().projects.find(x => x.id === e.id), n = (prompt('שם הפרויקט', p.title) || '').trim(); if (n) { p.title = n; Store.save(); render(); } },
@@ -1602,6 +1617,8 @@ const A = {
   projAddTask: e => taskForm(undefined, null, e.id),
   projNewJob: e => jobForm(e.id),
   newJobForm: () => jobForm(''),
+  newProjectForm: () => projectForm(),
+  newActionForm: () => taskForm(),
   newLooseJob: () => jobForm(''),
   openJob: e => { const j = findJob(e.id); if (!j) return; state.tab = 'projects'; state.openJob = j.id; state.openProject = j.projectId || null; closeSheet(); render(); window.scrollTo(0, 0); },
   backFromJob: () => { state.openJob = null; render(); },
