@@ -15,7 +15,7 @@ h2{font-size:15px;margin:22px 0 8px;color:var(--muted);font-weight:600}
 button{font:inherit;color:inherit;cursor:pointer}
 .top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
 .sub{color:var(--muted);font-size:14px}
-.iconbtn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 12px;font-size:15px}
+.iconbtn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 12px;font-size:15px;color:var(--ink);display:inline-flex;align-items:center;justify-content:center;min-height:38px}
 .btn{border:0;background:var(--brand);color:var(--brand-ink);padding:12px 18px;border-radius:12px;font-weight:600}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
 .btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger)}
@@ -67,6 +67,38 @@ textarea{min-height:90px;resize:vertical}
 .empty{text-align:center;color:var(--muted);padding:26px 0}
 .sw{display:flex;gap:6px}
 [hidden]{display:none!important}
+/* ---------- Animations (soft, FitMe-style) ---------- */
+@keyframes rise{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:none}}
+@keyframes grow{0%{transform:scaleX(0)}100%{transform:scaleX(1)}}
+@keyframes pop{0%{transform:scale(.6)}55%{transform:scale(1.18)}100%{transform:scale(1)}}
+@keyframes sheet-up{0%{transform:translateY(36px);opacity:0}100%{transform:none;opacity:1}}
+@keyframes fade{0%{opacity:0}100%{opacity:1}}
+@keyframes draw{100%{stroke-dashoffset:0}}
+@keyframes splash{0%,65%{opacity:1}99%{opacity:0;visibility:visible}100%{opacity:0;visibility:hidden}}
+@keyframes fab-in{0%{transform:scale(0)}70%{transform:scale(1.12)}100%{transform:scale(1)}}
+@keyframes confetti{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--rot))}}
+#view.enter>*{animation:rise .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*45ms)}
+#view.enter>.fab{animation:fab-in .45s cubic-bezier(.2,.8,.2,1) .25s both}
+#view.enter .ucol{animation:rise .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--c,0)*55ms)}
+#view.enter .bar>div{transform-origin:100% 50%;animation:grow .8s cubic-bezier(.2,.8,.2,1) .15s both}
+.check.pop,.dot7.pop{animation:pop .4s cubic-bezier(.2,.9,.3,1.4)}
+#nav button.on i{animation:pop .4s cubic-bezier(.2,.9,.3,1.4)}
+.sheet.opening{animation:fade .2s ease}
+.sheet.opening .panel{animation:sheet-up .3s cubic-bezier(.2,.8,.2,1)}
+button{transition:transform .12s ease,background-color .2s,border-color .2s,color .2s}
+button:active{transform:scale(.96)}
+.card,.ucard,.mcell{transition:box-shadow .2s,transform .2s,background-color .2s,border-color .2s}
+@media (hover:hover){.card:hover,.ucard:hover{box-shadow:0 4px 14px #0001;transform:translateY(-1px)}}
+.ucard.ghost{transform-origin:center;box-shadow:0 12px 30px #0006;transition:none}
+.confetti{position:fixed;width:8px;height:12px;border-radius:2px;z-index:90;pointer-events:none;animation:confetti 1.1s cubic-bezier(.2,.7,.3,1) forwards}
+#splash{position:fixed;inset:0;z-index:100;background:var(--brand);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;pointer-events:none;animation:splash 1.6s ease forwards}
+#splash path{stroke-dasharray:260;stroke-dashoffset:260;animation:draw .7s ease .25s forwards}
+#splash b{color:#fff;font-size:26px;letter-spacing:.5px;animation:rise .5s ease .6s both}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important}
+  #splash{display:none}
+}
+@media print{#splash{display:none!important}}
 body.wide #app{max-width:none}
 .uboard{display:flex;gap:10px;overflow-x:auto;margin-inline:-16px;padding:2px 16px 14px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
 .ucol{flex:0 0 min(78vw,290px);scroll-snap-align:start;border-radius:14px;padding:4px;transition:background .15s}
@@ -91,7 +123,15 @@ body.wide #app{max-width:none}
 .lnk{margin-inline-start:auto;border:0;background:none;color:#9a6a12;font-size:13px;font-weight:600;padding:0}
 .uadd{width:100%;text-align:start;border:0;background:none;color:var(--brand);padding:6px 4px;font-size:14px;margin-bottom:6px}
 .umore{align-self:flex-start;flex-basis:140px}
-.ucard{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
+.urow{display:flex;gap:10px;align-items:flex-start}
+.usubs{display:flex;flex-direction:column;gap:6px;margin-top:8px;margin-inline-start:12px;padding-inline-start:10px;border-inline-start:2px solid var(--line)}
+.usubs .check{width:18px;height:18px;font-size:10px}
+.usubs .t{font-size:13px}
+.usubs .done .t{text-decoration:line-through;color:var(--muted)}
+.subtog{border:0;cursor:pointer;font-size:12px}
+.subtog::after{content:'';display:inline-block;margin-inline-start:6px;border:4px solid transparent;border-top-color:currentColor;border-bottom:0;vertical-align:middle}
+.subtog.closed::after{transform:rotate(90deg)}
+.ucard{display:flex;flex-direction:column;gap:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
 .ucard .grow{min-width:0}
 .ucard.done .t{text-decoration:line-through;color:var(--muted)}
 .ucard.dragging{opacity:.35}
@@ -112,6 +152,17 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
 .bulkrow{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
 .bulkrow.miss{border-color:var(--danger)}
+.backmore{margin-bottom:10px}
+.clarity{font-size:13px;margin:6px 0}
+.clarity .w{color:#9a6a12;margin-bottom:2px}
+.clarity .ok{color:var(--brand);font-weight:600}
+.clearbtn{width:100%;text-align:start;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 12px;margin-top:6px;font-size:14px}
+.clearbtn.on{background:var(--soft);border-color:var(--brand);color:var(--brand);font-weight:700}
+.clex{margin-top:8px;font-size:13px}
+.clex summary{cursor:pointer;color:var(--brand)}
+.clex table{width:100%;border-collapse:collapse;margin-top:6px}
+.clex th,.clex td{border-bottom:1px solid var(--line);padding:6px 4px;text-align:start}
+.clex th{color:var(--muted);font-weight:600}
 #print{display:none}
 @media print{
   @page{size:A4;margin:14mm}

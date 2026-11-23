@@ -1,7 +1,7 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
 const KEY = 'doit-data-v1';
-const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], notes: {} });
+const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], notes: {}, org: {} });
 const TS_KEY = 'doit-updated-v1';
 const Store = {
   data: empty(),
@@ -68,12 +68,16 @@ const shortDate = s => { const d = parse(s); return `${d.getDate()}/${d.getMonth
 const weekStart = s => addDays(s, -parse(s).getDay());
 const visionName = id => (D().visions.find(v => v.id === id) || {}).title;
 
+// Secondary sections live behind the "עוד" tab to keep the main navigation simple.
+const MORE_TABS = ['habits', 'goals', 'vision', 'lists'];
 const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', openList: null, goalFilter: 'active' };
 
 /* ---------- Domain ---------- */
 // High-energy tasks always come first in the day; then by priority.
 const tasksOn = d => D().tasks.filter(t => t.date === d).sort((a, b) => (b.energy || 0) - (a.energy || 0) || b.priority - a.priority);
 const stars = n => '★'.repeat(n || 0);
+// Chevron icons drawn as SVG (text arrows rendered inconsistently). In RTL "previous/back" points right, "next" points left.
+const chev = dir => `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="${dir === 'r' ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const subProg = t => (t.subs && t.subs.length) ? `${t.subs.filter(s => s.done).length}/${t.subs.length}` : '';
 const overdue = () => D().tasks.filter(t => !t.done && t.date && t.date < TODAY());
 const habitsOn = d => D().habits.filter(h => h.days.includes(parse(d).getDay()));
@@ -128,12 +132,12 @@ function goalCard({ g, s }) {
 function taskRow(t, showDate) {
   const v = t.visionId ? visionName(t.visionId) : '';
   // Parent task; its subtasks are nested right under it.
-  const subsHtml = (t.subs && t.subs.length) ? `<div class="subs">${t.subs.map(s => `<div class="row ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}</div></div>`).join('')}</div>` : '';
+  const subsHtml = (t.subs && t.subs.length && !t.collapsed) ? `<div class="subs">${t.subs.map(s => `<div class="row ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div></div>`).join('')}</div>` : '';
   return `<div class="grp"><div class="card row p${t.priority} ${t.done ? 'done' : ''}">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${esc(t.title)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:#fdf0d5;color:#9a6a12">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subProg(t) ? `<span>☰ ${subProg(t)}</span>` : ''}${t.print ? '<span>🖨</span>' : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.brainless ? '<span class="chip" style="background:#fdf0d5;color:#9a6a12">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div></div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -146,26 +150,30 @@ function habitRow(h, d) {
 
 /* ---------- Upcoming board helpers ---------- */
 const shiftMonth = (ym, n) => { const [y, m] = ym.split('-').map(Number); return fmt(new Date(y, m - 1 + n, 1)).slice(0, 7); };
+// Collapse/expand chip for a parent task's subtasks (state is saved on the task as `collapsed`).
+const subToggle = t => subProg(t) ? `<button class="chip subtog ${t.collapsed ? 'closed' : ''}" data-act="toggleSubs" data-id="${t.id}" aria-expanded="${!t.collapsed}">☰ ${subProg(t)}</button>` : '';
 function upCard(t, showDate) {
   const v = t.brainless ? '<span class="chip" style="background:#fdf0d5;color:#9a6a12">⚡ Brainless</span>' : '';
-  return `<div class="ucard p${t.priority} ${t.done ? 'done' : ''}" data-task="${t.id}">
+  const subs = (t.subs && t.subs.length && !t.collapsed) ? `<div class="usubs">${t.subs.map(s => `<div class="urow ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div></div>`).join('')}</div>` : '';
+  return `<div class="ucard p${t.priority} ${t.done ? 'done' : ''}" data-task="${t.id}"><div class="urow">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${esc(t.title)}</div>
-    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subProg(t) ? `<span>☰ ${subProg(t)}</span>` : ''}</div></div></div>`;
+    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
 const views = {
   today() {
     const d = state.date, ts = tasksOn(d), hs = habitsOn(d), od = d === TODAY() ? overdue() : [];
-    const total = ts.length + hs.length, done = ts.filter(t => t.done).length + hs.filter(h => habitDone(h, d)).length;
+    const isToday = d === TODAY(); // the daily "ארגון" ritual counts as one item on today's list
+    const total = ts.length + hs.length + (isToday ? 1 : 0), done = ts.filter(t => t.done).length + hs.filter(h => habitDone(h, d)).length + (isToday && orgDone(d) ? 1 : 0);
     const pct = total ? Math.round(done / total * 100) : 0;
     return `<div class="top"><div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div>
-      <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1">›</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1">‹</button></div></div>
+      <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
       <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${(() => { const m = ts.filter(t => !t.done).reduce((s, t) => s + (t.mins || 0), 0); return m ? ` · נותרו ${m} ד׳` : ''; })()}</b></div><div class="bar"><div style="width:${pct}%"></div></div></div>
       <div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל משימות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>
       ${od.length ? `<h2>באיחור</h2>${od.map(t => taskRow(t, true)).join('')}` : ''}
-      <h2>משימות</h2>${ts.map(t => taskRow(t)).join('') || '<div class="empty">אין משימות ליום הזה</div>'}
+      <h2>משימות</h2>${isToday ? orgCard() : ''}${ts.map(t => taskRow(t)).join('') || (isToday ? '' : '<div class="empty">אין משימות ליום הזה</div>')}
       <h2>הרגלים</h2>${hs.map(h => habitRow(h, d)).join('') || '<div class="empty">אין הרגלים ליום הזה</div>'}
       <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>
       <button class="fab" data-act="addTask" aria-label="משימה חדשה">+</button>`;
@@ -179,7 +187,7 @@ const views = {
     const ymList = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 2 + i); return fmt(d).slice(0, 7); });
     if (!ymList.includes(curYM)) { ymList.push(curYM); ymList.sort(); }
     const monthSel = `<select id="upMonth" style="width:auto">${ymList.map(v => { const [y, m] = v.split('-').map(Number); return `<option value="${v}" ${v === curYM ? 'selected' : ''}>${MONTHS[m - 1]} ${y}</option>`; }).join('')}</select>`;
-    const navRow = lbl => `<div class="row" style="margin:6px 0 10px"><button class="iconbtn" data-act="upNav" data-n="-1">›</button><b class="grow" style="text-align:center">${lbl}</b><button class="iconbtn" data-act="upNav" data-n="1">‹</button><button class="iconbtn" data-act="upToday">היום</button></div>`;
+    const navRow = lbl => `<div class="row" style="margin:6px 0 10px"><button class="iconbtn" data-act="upNav" data-n="-1" aria-label="הקודם">${chev('r')}</button><b class="grow" style="text-align:center">${lbl}</b><button class="iconbtn" data-act="upNav" data-n="1" aria-label="הבא">${chev('l')}</button><button class="iconbtn" data-act="upToday">היום</button></div>`;
     let nav = '', body = '';
     if (mode === 'week') {
       const ws = state.upWeek;
@@ -253,6 +261,18 @@ const views = {
       }).join('') || '<div class="empty">כתוב כאן את החזון שלך, תחומי חיים ויעדים גדולים</div>'}
       <button class="fab" data-act="addVision">+</button>`;
   },
+  more() {
+    const gs = D().goals.map(goalState), activeG = gs.filter(s => !s.achieved && !s.missed).length;
+    const wait = D().goals.filter(g => g.reward && !g.claimed && goalState(g).achieved).length;
+    const item = (t, icon, title, sub) => `<div class="card row" data-act="goTab" data-t="${t}"><span style="font-size:26px">${icon}</span><div class="grow"><div class="t"><b>${title}</b></div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
+    return `<div class="top"><h1>עוד</h1></div>
+      ${item('habits', '🔁', 'הרגלים', `${D().habits.length} הרגלים`)}
+      ${item('goals', '🎯', 'יעדים ותגמולים', `${activeG} פעילים${wait ? ` · 🎁 ${wait} ממתינים` : ''}`)}
+      ${item('vision', '🌟', 'חזון', `${D().visions.length} פריטים`)}
+      ${item('lists', '📝', 'רשימות', `${D().lists.length} רשימות`)}
+      <h2>חשבון</h2>
+      <div class="card row" data-act="account"><span style="font-size:26px">☁️</span><div class="grow"><div class="t"><b>כניסה וסנכרון</b></div><div class="meta">${Cloud.user ? esc(Cloud.user.email) : 'לא מחובר'}</div></div>${chev('l')}</div>`;
+  },
   goals() {
     const F = state.goalFilter, all = D().goals.map(g => ({ g, s: goalState(g) }));
     const active = all.filter(x => !x.s.achieved && !x.s.missed), done = all.filter(x => x.s.achieved), missed = all.filter(x => x.s.missed);
@@ -273,13 +293,13 @@ const views = {
   lists() {
     if (state.openList) {
       const l = D().lists.find(x => x.id === state.openList);
-      if (l) return `<div class="top"><div class="row"><button class="iconbtn" data-act="backLists">›</button><h1>${esc(l.title)}</h1></div><div class="sw"><button class="iconbtn" data-act="printList" data-id="${l.id}">🖨</button><button class="iconbtn" data-act="delList" data-id="${l.id}">🗑</button></div></div>
+      if (l) return `<div class="top"><div class="row"><button class="iconbtn" data-act="backLists" aria-label="חזרה">${chev('r')}</button><h1>${esc(l.title)}</h1></div><div class="sw"><button class="iconbtn" data-act="printList" data-id="${l.id}">🖨</button><button class="iconbtn" data-act="delList" data-id="${l.id}">🗑</button></div></div>
         ${l.items.map(i => `<div class="card row ${i.done ? 'done' : ''}"><button class="check ${i.done ? 'on' : ''}" data-act="toggleItem" data-id="${i.id}">${i.done ? '✓' : ''}</button><div class="t grow">${esc(i.text)}</div><button class="iconbtn" data-act="delItem" data-id="${i.id}">✕</button></div>`).join('') || '<div class="empty">הרשימה ריקה</div>'}
         <form id="itemForm" class="row" style="margin-top:10px"><input id="itemText" placeholder="פריט חדש" autocomplete="off"><button class="btn">הוסף</button></form>`;
       state.openList = null;
     }
     return `<div class="top"><h1>רשימות</h1></div>
-      ${D().lists.map(l => `<div class="card row" data-act="openList" data-id="${l.id}"><div class="grow"><div class="t"><b>${esc(l.title)}</b></div><div class="meta">${l.items.filter(i => i.done).length}/${l.items.length} פריטים</div></div><span class="sub">‹</span></div>`).join('') || '<div class="empty">עדיין אין רשימות</div>'}
+      ${D().lists.map(l => `<div class="card row" data-act="openList" data-id="${l.id}"><div class="grow"><div class="t"><b>${esc(l.title)}</b></div><div class="meta">${l.items.filter(i => i.done).length}/${l.items.length} פריטים</div></div><span class="sub">${chev('l')}</span></div>`).join('') || '<div class="empty">עדיין אין רשימות</div>'}
       <button class="fab" data-act="addList">+</button>`;
   }
 };
@@ -288,8 +308,23 @@ function render() {
   const board = $('#uboard'), boardScroll = board ? board.scrollLeft : null; // keep the board's horizontal position across re-renders
   document.body.classList.toggle('wide', state.tab === 'upcoming');
   $('#view').innerHTML = views[state.tab]();
+  if (MORE_TABS.includes(state.tab) && !(state.tab === 'lists' && state.openList)) // back to the "עוד" menu
+    $('#view').insertAdjacentHTML('afterbegin', `<button class="iconbtn backmore" data-act="goTab" data-t="more" aria-label="חזרה לעוד">${chev('r')}<span style="margin-inline-start:6px">עוד</span></button>`);
   if (boardScroll !== null && $('#uboard')) $('#uboard').scrollLeft = boardScroll;
-  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === state.tab));
+  // Entrance animation (FitMe-style soft rise, staggered) only when the screen changes, not on every re-render.
+  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.openList || '');
+  const enter = state.viewKey !== key; state.viewKey = key;
+  view.classList.toggle('enter', enter);
+  if (enter) {
+    [...view.children].forEach((el, i) => el.style.setProperty('--i', Math.min(i, 10)));
+    view.querySelectorAll('.ucol').forEach((el, i) => el.style.setProperty('--c', Math.min(i, 8)));
+  }
+  if (state.pop) { // little "pop" on the item that was just checked
+    const { id, sid, date } = state.pop; state.pop = null;
+    document.querySelectorAll(sid ? `[data-sid="${sid}"].on` : `[data-id="${id}"].on`).forEach(el => { if (!date || el.dataset.date === date) el.classList.add('pop'); });
+  }
+  const navTab = MORE_TABS.includes(state.tab) ? 'more' : state.tab;
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === navTab));
   const f = $('#itemForm');
   if (f) f.onsubmit = e => {
     e.preventDefault();
@@ -302,7 +337,9 @@ function render() {
 
 /* ---------- Sheets / forms ---------- */
 function sheet(html) {
-  const s = $('#sheet'); s.innerHTML = `<div class="panel">${html}</div>`; s.hidden = false;
+  const s = $('#sheet'), opening = s.hidden;
+  s.innerHTML = `<div class="panel">${html}</div>`; s.hidden = false;
+  if (opening) { s.classList.add('opening'); setTimeout(() => s.classList.remove('opening'), 380); }
   s.onclick = e => { if (e.target === s) closeSheet(); };
 }
 function closeSheet() { $('#sheet').hidden = true; $('#sheet').innerHTML = ''; }
@@ -313,7 +350,12 @@ function taskForm(id, presetDate) {
   const mo = [...new Set([5, 10, 15, 20, 30, 45, 60, 90, t.mins || 15])].sort((a, b) => a - b);
   sheet(`<h1>${id ? 'עריכת משימה' : 'משימה חדשה'}</h1>
   <form id="f">
-   <label>מה לעשות</label><input name="title" required value="${esc(t.title)}" autofocus>
+   <label>מה לעשות (פעולה אחת, ברורה ומוחשית)</label><input name="title" required value="${esc(t.title)}" autofocus autocomplete="off">
+   <div id="clHint" class="clarity">${id ? '' : clarityHTML('')}</div>
+   <div id="clRow" ${id ? 'hidden' : ''}>
+     <label class="row" style="color:var(--ink);font-weight:600;margin-top:6px"><input type="checkbox" name="clear" style="width:auto"> ✅ זה ברור: ${CLEAR_LABEL}</label>
+     <div id="clMsg" class="sub" style="color:var(--danger)"></div>${CLARITY_EX}
+   </div>
    <label>תאריך</label><input type="date" name="date" value="${t.date || ''}">
    <label>כמה אנרגיה זה דורש ממך? (1 = קל, 5 = הכי מאמץ)</label>
    <div class="stars" id="stars">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="${n <= (t.energy || 0) ? 'on' : ''}" data-act="star" data-n="${n}">★</button>`).join('')}</div>
@@ -327,8 +369,18 @@ function taskForm(id, presetDate) {
    <label class="row" style="color:var(--ink)"><input type="checkbox" name="print" style="width:auto" ${t.print ? 'checked' : ''}> סמן להדפסה</label>
    <div class="actions">${id ? '<button type="button" class="btn danger" data-act="delTask" data-id="' + id + '">מחק</button>' : ''}<button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div>
   </form>`);
+  // Clarity gate: new tasks (or a changed title) must be confirmed with "זה ברור" before they are saved.
+  const form = $('#f'), origTitle = id ? t.title : null;
+  const needClear = () => !id || form.title.value.trim() !== origTitle;
+  form.title.addEventListener('input', () => {
+    $('#clHint').innerHTML = clarityHTML(form.title.value);
+    form.clear.checked = false; $('#clMsg').textContent = '';
+    $('#clRow').hidden = !needClear();
+  });
   $('#f').onsubmit = e => {
-    e.preventDefault(); const f = new FormData(e.target);
+    e.preventDefault();
+    if (needClear() && !form.clear.checked) { $('#clMsg').textContent = 'סמן "זה ברור" כדי להוסיף את המשימה.'; $('#clRow').hidden = false; return; }
+    const f = new FormData(e.target);
     const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: +f.get('priority'), visionId: f.get('visionId') || '', notes: f.get('notes'), print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
     let saved = t;
     if (id) Object.assign(t, obj); else { saved = { id: uid(), done: false, subs: [], ...obj }; D().tasks.push(saved); }
@@ -396,8 +448,10 @@ function goalProgressSheet(id) {
    <div class="actions"><button type="button" class="btn ghost" data-act="close">סגור</button></div>`);
   $('#f').onsubmit = e => {
     e.preventDefault(); const d = new FormData(e.target);
+    const was = goalState(g).achieved;
     (g.entries = g.entries || []).push({ id: uid(), date: d.get('date'), amt: +d.get('amt') });
     Store.save(); render(); goalProgressSheet(id);
+    if (!was && goalState(g).achieved) celebrate();
   };
 }
 function listForm() {
@@ -409,6 +463,99 @@ function listForm() {
   };
 }
 
+/* ---------- Daily "ארגון": date undated/overdue tasks and verify tomorrow's schedule ---------- */
+const DAY_CAP = 120; // minutes of tasks per day before a day is flagged as overloaded
+const orgDone = d => !!(D().org && D().org[d]);
+const dayLoad = d => tasksOn(d).filter(t => !t.done).reduce((s, t) => s + (t.mins || 0), 0);
+const Org = { ids: [], orig: {} };
+function orgCard() {
+  const T = TODAY(), undated = D().tasks.filter(t => !t.date && !t.done).length, late = overdue().length, tm = addDays(T, 1), n = tasksOn(tm).length;
+  const done = orgDone(T);
+  return `<div class="card row org ${done ? 'done' : ''}" data-act="orgOpen"><button class="check ${done ? 'on' : ''}" data-act="orgOpen" aria-label="ארגון">${done ? '✓' : ''}</button>
+    <div class="grow"><div class="t">🗂 ארגון</div><div class="meta"><span>${undated} ללא תאריך</span><span>${late} באיחור</span><span>מחר: ${n} משימות · ${dayLoad(tm)} ד׳</span></div></div></div>`;
+}
+function orgOpen() {
+  const late = overdue(), undated = D().tasks.filter(t => !t.date && !t.done);
+  Org.ids = [...late, ...undated].map(t => t.id); Org.orig = Object.fromEntries([...late, ...undated].map(t => [t.id, t.date]));
+  orgStep1();
+}
+function orgStep1() {
+  const T = TODAY(), old = $('#sheet .panel'), st = old ? old.scrollTop : 0;
+  const rows = Org.ids.map(findTask).filter(Boolean);
+  const opts = [['היום', T], ['מחר', addDays(T, 1)], ['מחרתיים', addDays(T, 2)], ['בעוד 3 ימים', addDays(T, 3)], ['בעוד שבוע', addDays(T, 7)]];
+  const left = rows.filter(t => !t.date || t.date < T).length;
+  sheet(`<h1>🗂 ארגון · שלב 1 מתוך 2</h1><p class="sub">תארוך משימות שאין להן תאריך או שעבר המועד שלהן. ${rows.length ? `נותרו ${left} לתארוך.` : ''}</p>
+   ${rows.length ? `<div class="actions" style="margin:0 0 10px"><button class="btn ghost" data-act="orgSuggest">✨ הצע לי חלוקה לפי העומס</button></div>` : ''}
+   ${rows.map(t => `<div class="bulkrow ${!t.date || t.date < T ? 'miss' : ''}"><div class="t"><b>${esc(t.title)}</b></div>
+     <div class="meta">${Org.orig[t.id] ? `<span style="color:var(--danger)">היה ב-${shortDate(Org.orig[t.id])}</span>` : '<span>ללא תאריך</span>'}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}</div>
+     <div class="opt" style="margin-top:8px">${opts.map(([l, v]) => `<button class="${t.date === v ? 'on' : ''}" data-act="orgSet" data-id="${t.id}" data-d="${v}">${l}</button>`).join('')}<input type="date" style="width:auto" data-orgdate="${t.id}" value="${t.date && !opts.some(o => o[1] === t.date) ? t.date : ''}"></div></div>`).join('') || '<div class="empty">🎉 אין משימות ללא תאריך או באיחור</div>'}
+   <div class="actions"><button class="btn ghost" data-act="close">סגור</button><button class="btn" data-act="orgNext">המשך ללו"ז של מחר</button></div>`);
+  $('#sheet .panel').scrollTop = st;
+}
+function orgSuggest() {
+  const T = TODAY(), load = {}, get = d => (d in load ? load[d] : (load[d] = dayLoad(d)));
+  const items = Org.ids.map(findTask).filter(t => t && (!t.date || t.date < T)).sort((a, b) => (b.energy || 0) - (a.energy || 0) || b.priority - a.priority);
+  for (const t of items) {
+    const first = t.date ? 0 : 1, m = t.mins || 15; // overdue may start today, undated start tomorrow
+    let best = null;
+    for (let i = first; i < first + 14 && !best; i++) { const d = addDays(T, i); if (get(d) + m <= DAY_CAP) best = d; }
+    if (!best) { let min = Infinity; for (let i = first; i < first + 14; i++) { const d = addDays(T, i); if (get(d) < min) { min = get(d); best = d; } } }
+    t.date = best; load[best] = get(best) + m;
+  }
+  Store.save(); render(); orgStep1();
+}
+function orgStep2() {
+  const T = TODAY(), tm = addDays(T, 1), ts = tasksOn(tm), load = dayLoad(tm), old = $('#sheet .panel'), st = old ? old.scrollTop : 0;
+  const warns = [];
+  if (!ts.length) warns.push('אין משימות למחר. כדאי להוסיף לפחות משימה חשובה אחת.');
+  if (load > DAY_CAP) warns.push(`מחר עמוס: ${load} דקות (מעל ${DAY_CAP}). כדאי להעביר משהו ליום אחר.`);
+  const noEn = ts.filter(t => !t.energy).length; if (noEn) warns.push(noEn === 1 ? 'משימה אחת בלי דירוג אנרגיה.' : `${noEn} משימות בלי דירוג אנרגיה.`);
+  const longs = ts.filter(t => (t.mins || 0) > 15 && !(t.subs && t.subs.length)).length; if (longs) warns.push(longs === 1 ? 'משימה אחת ארוכה מ-15 דקות בלי פיצול לתתי-משימות.' : `${longs} משימות ארוכות מ-15 דקות בלי פיצול לתתי-משימות.`);
+  const unclear = ts.filter(t => clarity(t.title).length).length; if (unclear) warns.push(unclear === 1 ? 'משימה אחת בניסוח לא ברור.' : `${unclear} משימות בניסוח לא ברור.`);
+  const first = ts.find(t => !t.done);
+  const mv = [['מחרתיים', addDays(T, 2)], ['בעוד 3 ימים', addDays(T, 3)], ['ללא תאריך', 'none']];
+  sheet(`<h1>🗂 ארגון · שלב 2 מתוך 2</h1><p class="sub">הלו"ז של מחר, ${longDate(tm)}</p>
+   <div class="card" style="background:var(--soft)"><b>${ts.length} משימות · ${load} דקות</b>${first ? `<div class="sub">המשימה הראשונה: ${esc(first.title)}${first.energy ? ' ' + stars(first.energy) : ''}. משימות עם אנרגיה גבוהה תמיד בהתחלה.</div>` : ''}</div>
+   ${warns.length ? warns.map(w => `<div class="clarity"><div class="w">⚠ ${esc(w)}</div></div>`).join('') : '<div class="clarity"><div class="ok">✓ הלו"ז של מחר נראה מאוזן וברור.</div></div>'}
+   ${ts.map(t => { const cl = clarity(t.title); return `<div class="bulkrow"><div class="t"><b>${esc(t.title)}</b></div>
+     <div class="meta">${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : '<span>בלי אנרגיה</span>'}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${cl.length ? '<span style="color:#9a6a12">⚠ ניסוח לא ברור</span>' : ''}</div>
+     <div class="opt" style="margin-top:8px"><span class="sub">להעביר ל:</span>${mv.map(([l, v]) => `<button data-act="orgMove" data-id="${t.id}" data-d="${v}">${l}</button>`).join('')}</div></div>`; }).join('')}
+   <div class="actions"><button class="btn ghost" data-act="orgAddTomorrow">＋ משימה למחר</button></div>
+   <div class="actions"><button class="btn ghost" data-act="orgBack">חזרה</button><button class="btn" data-act="orgFinish">✅ סיימתי ארגון</button></div>`);
+  $('#sheet .panel').scrollTop = st;
+}
+
+/* ---------- Clarity gate: a task is only entered after the user confirms "זה ברור" ---------- */
+const VAGUE_VERBS = ['לקדם', 'לטפל', 'לסדר', 'לעבוד על', 'לחשוב על', 'להתכונן', 'לשפר', 'לנסות', 'לדאוג', 'לנהל', 'לארגן', 'ללמוד', 'להמשיך', 'לעשות', 'להתעסק'];
+const VAGUE_WORDS = ['פרויקט', 'עניינים', 'דברים', 'משהו', 'הכל', 'כללי', 'וכו'];
+const CONCRETE_VERBS = ['לכתוב', 'לשלוח', 'להתקשר', 'לפתוח', 'לשלם', 'לקנות', 'להזמין', 'לצלם', 'לערוך', 'להעלות', 'לחתום', 'לתאם', 'לקרוא', 'לצפות', 'לפרסם', 'להדפיס', 'לסרוק', 'למלא', 'להוריד', 'להעביר', 'לענות', 'להגיש', 'לבנות', 'לשרטט', 'להקליט', 'לקבוע', 'לרשום', 'לבדוק', 'לחפש', 'להכין', 'לנקות', 'לפנות', 'לשטוף', 'לקפל', 'להוציא', 'להכניס', 'לבחור', 'לסכם', 'לתרגל', 'לצלצל', 'להגדיר'];
+// Advisory only: the user always decides by ticking "זה ברור". Returns a list of problems (empty = looks clear).
+function clarity(title) {
+  const t = title.trim().replace(/\s+/g, ' '), words = t.split(' ').filter(Boolean), issues = [];
+  if (!t) return issues;
+  const hasNum = /\d/.test(t);
+  if (words.length < 3) issues.push('קצר מדי. הוסף מה בדיוק, למי או כמה.');
+  const vv = VAGUE_VERBS.find(v => t === v || t.startsWith(v + ' '));
+  if (vv && !hasNum) issues.push(`"${vv}" הוא פועל מעורפל. כתוב את הפעולה הבאה המדויקת, למשל לכתוב, לשלוח, להתקשר או לפתוח.`);
+  const vw = VAGUE_WORDS.find(w => t.includes(w));
+  if (vw) issues.push(`"${vw}" היא מילה כללית. פרט למה הכוונה.`);
+  if (!vv && !CONCRETE_VERBS.some(v => t.startsWith(v))) issues.push('לא זיהיתי פועל פעולה מוחשי בתחילת המשימה. התחל בפועל כמו "לכתוב", "לשלוח" או "להתקשר".');
+  if (words.length > 14) issues.push('ארוכה מאוד. אולי אלה כמה משימות? פצל אותן.');
+  return issues;
+}
+function clarityHTML(title) {
+  if (!title.trim()) return '<div class="sub">כתוב את הפעולה הבאה, בצורה שאפשר להתחיל מיד.</div>';
+  const issues = clarity(title);
+  return issues.length ? issues.map(x => `<div class="w">⚠ ${esc(x)}</div>`).join('') : '<div class="ok">✓ נראית ברורה: יש פועל מוחשי ופעולה מוגדרת.</div>';
+}
+const CLARITY_EX = `<details class="clex"><summary>דוגמאות: ממשימה מעורפלת לפעולה הבאה</summary><table>
+  <tr><th>מעורפלת</th><th>הפעולה הבאה</th></tr>
+  <tr><td>לקדם את Giftimonials</td><td>לכתוב 3 בעיות שהמוצר פותר</td></tr>
+  <tr><td>ללמוד כלי AI</td><td>לצפות בהדרכה אחת ולנסות דוגמה</td></tr>
+  <tr><td>לטפל בקמפיין</td><td>לבדוק אילו מודעות דורשות שינוי</td></tr>
+  <tr><td>לסדר את הבית</td><td>לפנות את שולחן העבודה במשך 10 דקות</td></tr></table></details>`;
+const CLEAR_LABEL = 'אני יודע מה בדיוק הפעולה הראשונה ואיך אדע שסיימתי';
+
 /* ---------- Task menu, move, subtasks ---------- */
 const findTask = id => D().tasks.find(x => x.id === id);
 function menuSheet(id) {
@@ -417,7 +564,7 @@ function menuSheet(id) {
   sheet(`<h1>${esc(t.title)}</h1>
    <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:#fdf0d5;color:#9a6a12">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
    ${t.notes ? `<p class="sub" style="white-space:pre-wrap">${esc(t.notes)}</p>` : ''}
-   ${(t.subs || []).map(s => `<div class="row ${s.done ? 'done' : ''}" style="margin:6px 0"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow">${esc(s.title)}</div><button class="iconbtn" data-act="subDel" data-id="${t.id}" data-sid="${s.id}">✕</button></div>`).join('')}
+   ${(t.subs || []).map(s => `<div class="row ${s.done ? 'done' : ''}" style="margin:6px 0"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div><button class="iconbtn" data-act="subDel" data-id="${t.id}" data-sid="${s.id}">✕</button></div>`).join('')}
    <form id="subForm" class="row" style="margin-top:8px" hidden><input id="subText" placeholder="תת משימה חדשה" autocomplete="off"><button class="btn">הוסף</button></form>
    <div class="grid2">
      <button class="btn" data-act="menuDone" data-id="${t.id}">${t.done ? '↺ בטל ביצוע' : '✓ בוצע'}</button>
@@ -443,18 +590,30 @@ function moveSheet(id) {
 
 /* ---------- Tasks must be <= 15 min: offer to split longer ones ---------- */
 let splitCtx = null;
-function splitParts(t) {
+// Splitting keeps the task as the parent (with its total minutes) and creates clearly named subtasks of <= 15 min each.
+function splitNameSheet(t, next) {
   const n = Math.ceil(t.mins / 15), each = Math.ceil(t.mins / n);
-  return Array.from({ length: n }, (_, i) => ({ ...t, id: uid(), title: `${t.title} (${i + 1}/${n})`, mins: each, subs: i === 0 ? (t.subs || []) : [] }));
+  sheet(`<h1>שמות לתתי-המשימות</h1>
+   <p>"${esc(t.title)}" תתפצל ל-${n} שלבים של כ-${each} דקות. תן לכל שלב שם ברור, שיגיד מה בדיוק עושים בו.</p>
+   <form id="f">${Array.from({ length: n }, (_, i) => `<label>שלב ${i + 1} (${each} ד׳)</label><input name="s${i}" required autocomplete="off" placeholder="מה עושים בשלב הזה?" ${i === 0 ? 'autofocus' : ''}>`).join('')}
+   <div id="splitMsg" class="sub" style="color:var(--danger);margin-top:8px"></div>
+   <div class="actions"><button type="button" class="btn ghost" data-act="keepLong">להשאיר כמו שהיא</button><button class="btn">שמור</button></div></form>`);
+  $('#f').onsubmit = e => {
+    e.preventDefault(); const f = new FormData(e.target);
+    const names = Array.from({ length: n }, (_, i) => f.get('s' + i).trim());
+    if (names.some(x => !x) || new Set(names.map(x => x.toLowerCase())).size !== names.length) { $('#splitMsg').textContent = 'לכל שלב צריך שם ברור, וכל השמות צריכים להיות שונים.'; return; }
+    t.subs = (t.subs || []).concat(names.map(title => ({ id: uid(), title, done: false, mins: each })));
+    next();
+  };
 }
 function resolveLong(list) {
-  const q = list.filter(t => (t.mins || 0) > 15);
+  const q = list.filter(t => (t.mins || 0) > 15 && !(t.subs && t.subs.length));
   const next = () => {
     const t = q.shift();
     if (!t) { Store.save(); closeSheet(); render(); return; }
     const n = Math.ceil(t.mins / 15);
     splitCtx = { t, next };
-    sheet(`<h1>משימה ארוכה</h1><p>"${esc(t.title)}" נמשכת ${t.mins} דקות, ומשימה צריכה להיות עד 15 דקות. לפצל ל-${n} חלקים של כ-${Math.ceil(t.mins / n)} דקות?</p>
+    sheet(`<h1>משימה ארוכה</h1><p>"${esc(t.title)}" נמשכת ${t.mins} דקות, ומשימה צריכה להיות עד 15 דקות. לפצל ל-${n} תתי-משימות של כ-${Math.ceil(t.mins / n)} דקות? אבקש ממך לתת שם ברור לכל אחת.</p>
      <div class="actions"><button class="btn ghost" data-act="keepLong">להשאיר כמו שהיא</button><button class="btn" data-act="doSplit">לפצל ל-${n}</button></div>`);
   };
   next();
@@ -478,12 +637,16 @@ function bulkRender(showMiss) {
   sheet(`<h1>מתי ובאיזו אנרגיה?</h1>
    <p class="sub">${bulk.length} משימות. משימות עם אנרגיה גבוהה יופיעו תמיד בתחילת היום.</p>
    <div class="sub">קבע תאריך לכולן:</div><div class="opt" style="margin:6px 0 12px">${dopts.map(([l], j) => `<button data-act="bulkAllDate" data-j="${j}">${l}</button>`).join('')}</div>
-   ${bulk.map((b, i) => `<div class="bulkrow ${showMiss && (b.date === undefined || !b.energy) ? 'miss' : ''}"><div class="t"><b>${esc(b.title)}</b></div>
+   ${bulk.map((b, i) => `<div class="bulkrow ${showMiss && (b.date === undefined || !b.energy || !b.clear || !b.title.trim()) ? 'miss' : ''}">
+     <input data-bulktitle="${i}" value="${esc(b.title)}" style="font-weight:700" autocomplete="off">
+     <div class="clarity" id="cl${i}">${clarityHTML(b.title)}</div>
+     <button class="clearbtn ${b.clear ? 'on' : ''}" data-act="bulkClear" data-i="${i}">${b.clear ? '✅ זה ברור' : '☐ זה ברור: ' + CLEAR_LABEL}</button>
      <label>מתי?</label><div class="opt">${dopts.map(([l, v], j) => `<button class="${b.date === v ? 'on' : ''}" data-act="bulkDate" data-i="${i}" data-j="${j}">${l}</button>`).join('')}<input type="date" style="width:auto" data-bulkdate="${i}" value="${b.date && !dopts.some(o => o[1] === b.date) ? b.date : ''}"></div>
      <label>אנרגיה</label><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="${n <= b.energy ? 'on' : ''}" data-act="bulkStar" data-i="${i}" data-n="${n}">★</button>`).join('')}</div>
      <label>משך (דקות)</label><div class="opt">${[5, 10, 15, 20, 30, 45, 60].map(m => `<button class="${b.mins === m ? 'on' : ''}" data-act="bulkMins" data-i="${i}" data-m="${m}">${m}</button>`).join('')}</div>
      <div class="opt" style="margin-top:8px"><button class="${b.brainless ? 'on' : ''}" data-act="bulkBrain" data-i="${i}">⚡ Brainless (פשוטה, אפשר להעיף ברגע)</button></div></div>`).join('')}
-   ${showMiss ? '<div class="sub" style="color:var(--danger)">חסר תאריך או אנרגיה בשורות המסומנות.</div>' : ''}
+   ${bulk.length ? CLARITY_EX : ''}
+   ${showMiss ? '<div class="sub" style="color:var(--danger)">חסר תאריך, אנרגיה או אישור "זה ברור" בשורות המסומנות.</div>' : ''}
    <div class="actions"><button class="btn ghost" data-act="close">ביטול</button><button class="btn" data-act="bulkSave">הוסף ${bulk.length} משימות</button></div>`);
   $('#sheet .panel').scrollTop = st;
 }
@@ -526,7 +689,8 @@ function printDayCore(all) {
     const flagged = ts.filter(t => t.print);
     if (flagged.length) ts = flagged;
   }
-  printHTML(`<h1>${longDate(d)}</h1><h2>משימות</h2>${ts.map(t => '<div>' + pRow((t.done ? '✓ ' : '') + (t.priority == 2 ? '‼ ' : t.priority == 1 ? '! ' : '') + t.title + (t.mins ? ` · ${t.mins} ד׳` : '') + (t.energy ? ' ' + stars(t.energy) : '')) + (t.subs || []).filter(s => all || !s.done).map(s => `<div style="margin-inline-start:26px">${pRow(s.title, true)}</div>`).join('') + '</div>').join('') || '<div class="pl">—</div>'}
+  const orgRow = d === TODAY() && (all || !orgDone(d)) ? pRow('🗂 ארגון: לתארך משימות ולוודא את הלו"ז של מחר') : '';
+  printHTML(`<h1>${longDate(d)}</h1><h2>משימות</h2>${orgRow}${ts.map(t => '<div>' + pRow((t.done ? '✓ ' : '') + (t.priority == 2 ? '‼ ' : t.priority == 1 ? '! ' : '') + t.title + (t.mins ? ` · ${t.mins} ד׳` : '') + (t.energy ? ' ' + stars(t.energy) : '')) + (t.subs || []).filter(s => all || !s.done).map(s => `<div style="margin-inline-start:26px">${pRow(s.title, true)}</div>`).join('') + '</div>').join('') || '<div class="pl">—</div>'}
    <h2>הרגלים</h2>${habitsOn(d).map(h => pRow(h.title)).join('') || '<div class="pl">—</div>'}
    <h2>הערות</h2><div class="lines">${'<div></div>'.repeat(8)}</div>`);
 }
@@ -544,8 +708,11 @@ function printSel() {
 
 /* ---------- Events ---------- */
 const A = {
-  toggleTask: e => { const t = D().tasks.find(x => x.id === e.id); t.done = !t.done; Store.save(); render(); },
-  toggleHabit: e => { const h = D().habits.find(x => x.id === e.id); if (h.log[e.date]) delete h.log[e.date]; else h.log[e.date] = true; Store.save(); render(); },
+  toggleTask: e => {
+    const t = D().tasks.find(x => x.id === e.id); t.done = !t.done; Store.save(); state.pop = { id: e.id }; render();
+    if (t.done && t.date) { const day = D().tasks.filter(x => x.date === t.date); if (day.length >= 2 && day.every(x => x.done)) celebrate(); }
+  },
+  toggleHabit: e => { const h = D().habits.find(x => x.id === e.id); if (h.log[e.date]) delete h.log[e.date]; else h.log[e.date] = true; Store.save(); state.pop = { id: e.id, date: e.date }; render(); },
   editTask: e => taskForm(e.id), addTask: () => taskForm(),
   editHabit: e => habitForm(e.id), addHabit: () => habitForm(),
   editVision: e => visionForm(e.id), addVision: () => visionForm(),
@@ -557,6 +724,7 @@ const A = {
   addTaskOn: e => taskForm(undefined, e.date || ''),
   rescheduleOverdue: () => { const o = overdue(); if (o.length && confirm(`להעביר ${o.length} משימות באיחור להיום?`)) { o.forEach(t => { t.date = TODAY(); }); Store.save(); render(); } },
   upMore: () => { state.upDays += 14; render(); },
+  toggleSubs: e => { const t = findTask(e.id); t.collapsed = !t.collapsed; Store.save(); render(); },
   upMode: e => { state.upMode = e.m; render(); },
   upPick: e => { state.upSel = e.date; render(); },
   upNav: e => {
@@ -574,7 +742,7 @@ const A = {
   addGoal: () => goalForm(), editGoal: e => goalForm(e.id),
   goalAdd: e => goalProgressSheet(e.id),
   goalFilter: e => { state.goalFilter = e.f; render(); },
-  goalClaim: e => { const g = D().goals.find(x => x.id === e.id); g.claimed = true; g.claimedAt = TODAY(); Store.save(); render(); },
+  goalClaim: e => { const g = D().goals.find(x => x.id === e.id); g.claimed = true; g.claimedAt = TODAY(); Store.save(); render(); celebrate(); },
   goalEntryDel: e => { const g = D().goals.find(x => x.id === e.id); g.entries = g.entries.filter(x => x.id !== e.eid); Store.save(); render(); goalProgressSheet(e.id); },
   delGoal: e => { if (confirm('למחוק את היעד?')) { D().goals = D().goals.filter(x => x.id !== e.id); Store.save(); closeSheet(); render(); } },
   star: e => { const n = +e.n; document.querySelectorAll('#stars button').forEach((b, i) => b.classList.toggle('on', i < n)); document.querySelector('input[name=energy]').value = n; },
@@ -584,10 +752,19 @@ const A = {
   moveTo: e => { findTask(e.id).date = e.d === 'none' ? null : e.d; Store.save(); closeSheet(); render(); },
   moveCustom: e => { const v = $('#moveDate').value; if (!v) return; findTask(e.id).date = v; Store.save(); closeSheet(); render(); },
   subShow: () => { const f = $('#subForm'); f.hidden = false; $('#subText').focus(); },
-  subToggle: e => { const s = findTask(e.id).subs.find(x => x.id === e.sid); s.done = !s.done; Store.save(); render(); if (!$('#sheet').hidden) menuSheet(e.id); },
+  subToggle: e => { const s = findTask(e.id).subs.find(x => x.id === e.sid); s.done = !s.done; Store.save(); state.pop = { id: e.id, sid: e.sid }; render(); if (!$('#sheet').hidden) menuSheet(e.id); },
   subDel: e => { const t = findTask(e.id); t.subs = t.subs.filter(x => x.id !== e.sid); Store.save(); render(); menuSheet(e.id); },
   keepLong: () => splitCtx.next(),
-  doSplit: () => { const { t, next } = splitCtx; D().tasks.splice(D().tasks.indexOf(t), 1, ...splitParts(t)); next(); },
+  doSplit: () => splitNameSheet(splitCtx.t, splitCtx.next),
+  goTab: e => { state.tab = e.t; state.openList = null; render(); window.scrollTo(0, 0); },
+  orgOpen: () => orgOpen(),
+  orgSuggest: () => orgSuggest(),
+  orgSet: e => { findTask(e.id).date = e.d; Store.save(); render(); orgStep1(); },
+  orgNext: () => orgStep2(),
+  orgBack: () => orgStep1(),
+  orgMove: e => { findTask(e.id).date = e.d === 'none' ? null : e.d; Store.save(); render(); orgStep2(); },
+  orgAddTomorrow: () => taskForm(undefined, addDays(TODAY(), 1)),
+  orgFinish: () => { D().org = D().org || {}; D().org[TODAY()] = { at: new Date().toISOString() }; Store.save(); closeSheet(); render(); celebrate(); },
   addBulk: bulkStart,
   copyPrompt: async () => {
     const msg = $('#clipMsg');
@@ -605,16 +782,17 @@ const A = {
   bulkNext: () => {
     const lines = $('#bulkText').value.split('\n').map(s => s.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
     if (!lines.length) return;
-    bulk = lines.map(title => ({ title, date: undefined, energy: 0, mins: 15, brainless: false })); bulkRender();
+    bulk = lines.map(title => ({ title, date: undefined, energy: 0, mins: 15, brainless: false, clear: false })); bulkRender();
   },
   bulkAllDate: e => { const v = bulkDateOpts()[+e.j][1]; bulk.forEach(b => { b.date = v; }); bulkRender(); },
   bulkDate: e => { bulk[+e.i].date = bulkDateOpts()[+e.j][1]; bulkRender(); },
   bulkStar: e => { bulk[+e.i].energy = +e.n; bulkRender(); },
   bulkMins: e => { bulk[+e.i].mins = +e.m; bulkRender(); },
+  bulkClear: e => { const b = bulk[+e.i]; b.clear = !b.clear; bulkRender(); },
   bulkBrain: e => { bulk[+e.i].brainless = !bulk[+e.i].brainless; bulkRender(); },
   bulkSave: () => {
-    if (bulk.some(b => b.date === undefined || !b.energy)) return bulkRender(true);
-    const created = bulk.map(b => ({ id: uid(), done: false, title: b.title, date: b.date, priority: 0, visionId: '', notes: '', print: false, brainless: b.brainless, energy: b.energy, mins: b.mins, subs: [] }));
+    if (bulk.some(b => b.date === undefined || !b.energy || !b.clear || !b.title.trim())) return bulkRender(true);
+    const created = bulk.map(b => ({ id: uid(), done: false, title: b.title.trim(), date: b.date, priority: 0, visionId: '', notes: '', print: false, brainless: b.brainless, energy: b.energy, mins: b.mins, subs: [] }));
     D().tasks.push(...created); bulk = []; resolveLong(created);
   },
   account: accountSheet,
@@ -655,12 +833,32 @@ document.addEventListener('change', ev => {
     if (state.upMode === 'month') { state.upMonth = v; state.upSel = first; } else { state.upStart = first; state.upDays = 14; }
     render(); return;
   }
+  const od = ev.target.dataset && ev.target.dataset.orgdate;
+  if (od !== undefined) { const t = findTask(od); if (t && ev.target.value) { t.date = ev.target.value; Store.save(); render(); orgStep1(); } return; }
   const i = ev.target.dataset && ev.target.dataset.bulkdate;
   if (i !== undefined) { bulk[+i].date = ev.target.value || undefined; bulkRender(); }
 });
 document.addEventListener('input', ev => {
+  const bi = ev.target.dataset && ev.target.dataset.bulktitle;
+  if (bi !== undefined) { // edit a bulk task title in place: re-check clarity and require a fresh "זה ברור"
+    const b = bulk[+bi]; b.title = ev.target.value; b.clear = false;
+    $('#cl' + bi).innerHTML = clarityHTML(b.title);
+    const btn = ev.target.closest('.bulkrow').querySelector('.clearbtn'); btn.classList.remove('on'); btn.textContent = '☐ זה ברור: ' + CLEAR_LABEL;
+    return;
+  }
   if (ev.target.id === 'note') { D().notes[state.date] = ev.target.value; Store.save(); }
 });
+
+/* ---------- Celebration (confetti) for finished days and achieved goals / claimed rewards ---------- */
+function celebrate(x = innerWidth / 2, y = innerHeight / 3) {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = ['#1f6f5c', '#e8a33d', '#c0453a', '#3aa68c', '#f2c94c'];
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('i'); p.className = 'confetti';
+    p.style.cssText = `left:${x}px;top:${y}px;background:${colors[i % colors.length]};--dx:${(Math.random() - .5) * 320}px;--dy:${80 + Math.random() * 260}px;--rot:${Math.random() * 720}deg;animation-delay:${Math.random() * 60}ms`;
+    document.body.appendChild(p); setTimeout(() => p.remove(), 1500);
+  }
+}
 
 /* ---------- Drag & drop of task cards between day columns (mouse drag; touch long-press; RTL-safe) ---------- */
 const Drag = { el: null, ghost: null, id: null, timer: null, raf: null, active: false, pid: null, over: null, sx: 0, sy: 0, x: 0, y: 0, offX: 0, offY: 0, suppressClick: false };
@@ -733,4 +931,11 @@ document.addEventListener('contextmenu', e => { if (Drag.el && e.target.closest(
 
 render();
 Cloud.init();
+{ // intro splash, once per session (FitMe-style): the check mark draws itself, then fades out
+  const sp = $('#splash');
+  if (sp) {
+    let seen = false; try { seen = !!sessionStorage.getItem('doit-splash'); sessionStorage.setItem('doit-splash', '1'); } catch (e) {}
+    if (seen) sp.remove(); else { sp.addEventListener('animationend', e => { if (e.animationName === 'splash') sp.remove(); }); setTimeout(() => sp.remove(), 2200); }
+  }
+}
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
