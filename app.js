@@ -155,7 +155,10 @@ const weekData = ws => (D().weeks[ws] = D().weeks[ws] || { vision: '', outcomes:
 
 /* ---------- Domain ---------- */
 // High-energy tasks always come first in the day; then by priority.
-const taskOrder = (d, a, b) => { // today's order follows the energy mode chosen by the user; unset keeps "high energy first"
+const taskOrder = (d, a, b) => { // a manual drag order wins; otherwise today's order follows the energy mode chosen by the user
+  if (a.ord !== undefined && b.ord !== undefined) return a.ord - b.ord;
+  if (a.ord !== undefined) return -1;
+  if (b.ord !== undefined) return 1;
   const m = d === TODAY() ? normEnergy((D().focus[d] || {}).energy) : '', e = x => x.energy || 3, p = x => x.priority || 0;
   if (m === 'midlow' || m === 'tired' || m === 'flood' || m === 'focus') return e(a) - e(b) || p(b) - p(a); // gentler states: easy actions first
   return (b.energy || 0) - (a.energy || 0) || p(b) - p(a);
@@ -240,10 +243,11 @@ function tasksBlock(d, ts) {
   const open = ts.filter(t => !t.done), f = focusOn(d);
   const rows = list => list.map(t => taskRow(t)).join('');
   if (!ts.length) return d === TODAY() ? '' : '<div class="empty">אין פעולות ליום הזה</div>';
-  if (state.showAll) return rows(ts) + (open.length > 3 ? '<button class="btn ghost more3" data-act="toggleShowAll">הצג רק שלוש</button>' : '');
-  const first = open.filter(t => t.id === f.mitId), pick = [...first, ...open.filter(t => t.id !== f.mitId)].slice(0, f.energy === 'flood' ? 1 : 3);
+  if (state.showAll) return rows(state.showDone ? ts : open) + (ts.length > open.length ? '<button class="lnk" data-act="toggleShowDone">' + (state.showDone ? 'הסתר פעולות שבוצעו' : 'הצג פעולות שבוצעו (' + (ts.length - open.length) + ')') + '</button>' : '') + (open.length > 3 ? '<button class="btn ghost more3" data-act="toggleShowAll">הצג רק שלוש</button>' : '') + (ts.some(t => t.ord !== undefined) ? '<button class="lnk" data-act="resetOrder">↺ חזרה לסדר אוטומטי</button>' : '');
+  const manual = ts.some(t => t.ord !== undefined), first = open.filter(t => t.id === f.mitId), pick = (manual ? open : [...first, ...open.filter(t => t.id !== f.mitId)]).slice(0, f.energy === 'flood' ? 1 : 3);
   const hidden = ts.length - pick.length;
   return (pick.length ? rows(pick) : '<div class="empty">🎉 סיימת את כל הפעולות להיום</div>')
+    + (manual ? '<button class="lnk" data-act="resetOrder">↺ חזרה לסדר אוטומטי</button>' : '')
     + (hidden > 0 ? `<button class="btn ghost more3" data-act="toggleShowAll">הצג את כל הפעולות (${hidden} נוספות)</button>` : '');
 }
 function nextTask(excludeId) { // the single suggestion after finishing: the MIT first, then by the current order
@@ -539,7 +543,7 @@ function dayHistoryHTML() {
 }
 
 /* Deferral nudge: an action pushed to a later date three times gets a gentle "should we rewrite it?" */
-function deferTo(t, nd) { const od = t.date; if (od && (!nd || nd > od)) t.defers = (t.defers || 0) + 1; t.date = nd; }
+function deferTo(t, nd) { const od = t.date; if (od && (!nd || nd > od)) t.defers = (t.defers || 0) + 1; t.date = nd; delete t.ord; }
 const needsNudge = t => t && !t.done && (t.defers || 0) >= 3 && t.defers > (t.nudged || 0);
 function rewriteSheet(t) {
   sheet(`<h1>נדחתה ${t.defers} פעמים 🤔</h1><p><b>${esc(t.title)}</b></p><p class="sub">משהו בה תוקע אותך. אולי הניסוח עמום, אולי היא גדולה מדי, ואולי היא כבר לא באמת חשובה. רוצה לכתוב אותה מחדש?</p>
@@ -710,7 +714,7 @@ function taskRow(t, showDate) {
   const v = t.visionId ? visionName(t.visionId) : '';
   // Parent task; its subtasks are nested right under it.
   const subsHtml = (t.subs && t.subs.length && !t.collapsed) ? `<div class="subs">${t.subs.map(s => `<div class="row ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div></div>`).join('')}</div>` : '';
-  return `<div class="grp"><div class="card row p${t.priority} ${t.done ? 'done' : ''}">
+  return `<div class="grp" data-tid="${t.id}"><div class="card row p${t.priority} ${t.done ? 'done' : ''}">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${esc(t.title)}</div>
@@ -758,7 +762,7 @@ const views = {
       ${rewardTop ? rewardCard(d) : ''}
       ${energyBar(d)}
       ${focusCard(d)}
-      <h2>פעולות</h2>${isToday ? orgCard() : ''}${tasksBlock(d, ts)}
+      <h2>פעולות</h2>${isToday && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
       <details class="todaymore" id="todayMore" ${state.moreOpen ? 'open' : ''}><summary>עוד להיום${hAct ? ` · ${hAct} הרגלים` : ''}</summary>
        ${dayCard(d)}${visTop ? '' : visualCard(d)}${rewardTop ? '' : rewardCard(d)}${rhythmStrip(d, 'rest')}
        <div class="remind" data-act="nextReminder" title="לחץ להחלפה">💬 ${esc(reminder())}</div>
@@ -1584,6 +1588,7 @@ const A = {
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
   noiseOff: () => toggleNoise(),
+  resetOrder: () => { tasksOn(state.date).forEach(t => { delete t.ord; }); Store.save(); render(); },
   rewardOpen: () => { $('#toast').hidden = true; rewardSheet(); },
   rewardManage: () => { closeSheet(); state.tab = 'dayrewards'; render(); },
   rewardPick: e => { const r = D().dayRewards.find(x => x.id === e.id); if (r) setReward(r.title); },
@@ -1623,6 +1628,7 @@ const A = {
   rewriteDel: e => { if (confirm('למחוק את הפעולה?')) { D().tasks = D().tasks.filter(t => t.id !== e.id); Store.save(); closeSheet(); render(); } },
   rewriteKeep: e => { const t = findTask(e.id); t.nudged = t.defers; Store.save(); closeSheet(); },
   toggleShowAll: () => { state.showAll = !state.showAll; render(); },
+  toggleShowDone: () => { state.showDone = !state.showDone; render(); },
   toastClose: () => { $('#toast').hidden = true; },
   runStart: e => {
     $('#toast').hidden = true; let id = e.id;
@@ -1782,6 +1788,47 @@ document.addEventListener('input', ev => {
   if (ev.target.id === 'note') { D().notes[state.date] = ev.target.value; Store.save(); }
 });
 
+/* ---------- Reorder today's actions by dragging a row over another (mouse drag, or long-press on touch) ---------- */
+const RDrag = { el: null, pid: 0, sx: 0, sy: 0, active: false, timer: null, target: null, before: true, suppress: false };
+function rdClear() { document.querySelectorAll('.drop-before,.drop-after').forEach(r => r.classList.remove('drop-before', 'drop-after')); }
+function rdReset() { clearTimeout(RDrag.timer); rdClear(); if (RDrag.el) { RDrag.el.classList.remove('rdrag'); RDrag.el.style.transform = ''; } RDrag.el = null; RDrag.active = false; RDrag.target = null; document.body.classList.remove('dragging'); }
+function rdStart() { RDrag.active = true; RDrag.el.classList.add('rdrag'); document.body.classList.add('dragging'); try { navigator.vibrate && navigator.vibrate(15); } catch (e) {} }
+function rdMove(y) {
+  RDrag.el.style.transform = 'translateY(' + (y - RDrag.sy) + 'px)'; rdClear();
+  const rows = [...document.querySelectorAll('#view > .grp[data-tid]')].filter(r => r !== RDrag.el);
+  if (!rows.length) return;
+  let t = rows.find(r => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; }), before = true;
+  if (!t) { t = rows[rows.length - 1]; before = false; }
+  t.classList.add(before ? 'drop-before' : 'drop-after'); RDrag.target = t; RDrag.before = before;
+  if (y < 90) window.scrollBy(0, -12); else if (y > innerHeight - 110) window.scrollBy(0, 12);
+}
+function rdEnd(commit) {
+  const el = RDrag.el, target = RDrag.target, before = RDrag.before, was = RDrag.active;
+  rdReset();
+  if (!was) return;
+  RDrag.suppress = true; setTimeout(() => { RDrag.suppress = false; }, 350);
+  if (!commit || !target || !el) return;
+  const ids = [...document.querySelectorAll('#view > .grp[data-tid]')].map(r => r.dataset.tid).filter(id => id !== el.dataset.tid);
+  const at = ids.indexOf(target.dataset.tid) + (before ? 0 : 1); ids.splice(at, 0, el.dataset.tid);
+  const d = state.date, rest = tasksOn(d).map(t => t.id).filter(id => !ids.includes(id));
+  [...ids, ...rest].forEach((id, i) => { const t = findTask(id); if (t) t.ord = i; });
+  Store.save(); render();
+}
+document.addEventListener('pointerdown', e => {
+  if (state.tab !== 'today' || e.target.closest('button,input,textarea,select,summary,a,details')) return;
+  const row = e.target.closest('#view > .grp[data-tid]'); if (!row || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  Object.assign(RDrag, { el: row, pid: e.pointerId, sx: e.clientX, sy: e.clientY, active: false, target: null });
+  if (e.pointerType !== 'mouse') RDrag.timer = setTimeout(rdStart, 380);
+});
+document.addEventListener('pointermove', e => {
+  if (!RDrag.el || e.pointerId !== RDrag.pid) return;
+  if (RDrag.active) return rdMove(e.clientY);
+  if (Math.hypot(e.clientX - RDrag.sx, e.clientY - RDrag.sy) > 8) { if (e.pointerType === 'mouse') { rdStart(); rdMove(e.clientY); } else rdReset(); } // touch moved first: let it scroll
+});
+document.addEventListener('pointerup', e => { if (RDrag.el && e.pointerId === RDrag.pid) rdEnd(true); });
+document.addEventListener('pointercancel', e => { if (RDrag.el && e.pointerId === RDrag.pid) rdEnd(false); });
+document.addEventListener('touchmove', e => { if (RDrag.active) e.preventDefault(); }, { passive: false });
+document.addEventListener('click', e => { if (RDrag.suppress) { e.stopPropagation(); e.preventDefault(); } }, true);
 /* ---------- Celebration (confetti) for finished days and achieved goals / claimed rewards ---------- */
 function celebrate(x = innerWidth / 2, y = innerHeight / 3) {
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -1922,4 +1969,8 @@ Cloud.init();
   }
 }
 ensureDayStart(); setTimeout(() => { askMorning(); askEnergyToast(); }, 2400); // after the splash and the first cloud sync
-if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  const hadController = !!navigator.serviceWorker.controller; // an update replaces an older worker: reload once so the new version is the one on screen
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !window.__swReloaded) { window.__swReloaded = true; location.reload(); } });
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
