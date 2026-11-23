@@ -242,3 +242,8 @@ body.running #capture{display:none}
 .grp.drop-before{box-shadow:0 -3px 0 var(--brand)}
 .grp.drop-after{box-shadow:0 3px 0 var(--brand)}
 body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
+.ebar{display:flex;gap:8px;align-items:center}
+.esel{flex:1;min-width:0;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:9px 10px;font-size:15px;color:var(--ink)}
+.esel.set{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:600}
+.esel option{background:var(--card);color:var(--ink);font-weight:400}
+.okbtn{width:100%;margin-top:6px;padding:8px}

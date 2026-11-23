@@ -237,7 +237,7 @@ const ENERGY_MODES = [['high', '⚡ אנרגיה גבוהה'], ['midlow', '🙂 
 function energyBar(d) {
   if (d !== TODAY()) return '';
   const cur = focusOn(d).energy;
-  return `<div class="ebar"><span class="sub">האנרגיה שלי עכשיו:</span>${ENERGY_MODES.map(([v, l]) => `<button class="${cur === v ? 'on' : ''}" data-act="setEnergy" data-v="${v}">${l}</button>`).join('')}</div>`;
+  return `<div class="ebar"><label class="sub" for="energySel" style="margin:0">האנרגיה שלי עכשיו:</label><select id="energySel" class="esel ${cur ? 'set' : ''}"><option value="">בחר מצב...</option>${ENERGY_MODES.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}</select>${cur ? '<button class="iconbtn" data-act="energyHelpOpen" aria-label="הצעות למצב הנוכחי">💡</button>' : ''}</div>`;
 }
 function tasksBlock(d, ts) {
   const open = ts.filter(t => !t.done), f = focusOn(d);
@@ -664,6 +664,24 @@ function rewardNotify() { // first time today's condition is met: celebrate once
   return true;
 }
 const setReward = title => { fo(TODAY()).rewardPicked = title; Store.save(); closeSheet(); render(); };
+/* A task (job) written together with its actions: one action per line */
+function jobForm(projectId) {
+  sheet(`<h1>משימה חדשה עם פעולות</h1>
+  <form id="f"><label>המשימה (התוצאה שרוצים להשיג)</label><input name="title" required autocomplete="off" placeholder="למשל: להכין את חידוש כרטיסי האשראי" autofocus>
+   <label>פעולות (שורה לכל פעולה, כל אחת קטנה וברורה)</label><textarea name="actions" rows="5" placeholder="לכתוב רשימה של כל הכרטיסים&#10;להתקשר לבנק ולבקש חידוש&#10;לעדכן את הכרטיס החדש באתר החשבונות"></textarea>
+   <label>מתי לשבץ את הפעולות?</label><div class="opt" id="jdChips">${[['היום', TODAY()], ['מחר', addDays(TODAY(), 1)], ['ללא תאריך', '']].map(([l, v], i) => `<button type="button" class="${i === 2 ? 'on' : ''}" onclick="document.getElementById('jdate').value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div><input type="hidden" id="jdate" name="date" value="">
+   <label>פרויקט (אופציונלי)</label><select name="projectId"><option value="">ללא פרויקט</option>${D().projects.map(p => `<option value="${p.id}" ${p.id === projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select>
+   <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
+  $('#f').onsubmit = e => {
+    e.preventDefault(); const f = new FormData(e.target), title = f.get('title').trim(), lines = f.get('actions').split('\n').map(x => x.trim()).filter(Boolean);
+    const bad = lines.map(l => ({ l, why: clarity(l)[0] })).filter(x => x.why);
+    if (bad.length) { alert('לא ניתן לשמור: פעולה אחת או יותר לא כתובות בצורה ברורה.\n"' + bad[0].l + '"\n' + bad[0].why); return; }
+    const pid = f.get('projectId') || '', j = { id: uid(), title, projectId: pid, notes: '', createdAt: TODAY() };
+    D().jobs.push(j);
+    lines.forEach(l => D().tasks.push({ id: uid(), title: l, date: f.get('date') || null, done: false, priority: 0, energy: 3, mins: 15, brainless: false, print: false, visionId: '', projectId: pid, notes: '', subs: [], jobId: j.id }));
+    Store.save(); closeSheet(); state.tab = 'projects'; state.openJob = j.id; state.openProject = pid || null; render(); window.scrollTo(0, 0);
+  };
+}
 /* ---------- Personal reminders: two sentences shown on the daily screen and while working ---------- */
 const REMINDERS = ['להרגיש את הכאב של הצמיחה, לצאת מאזור הנוחות.', 'האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.'];
 const remIndex = () => { const n = Math.floor(parse(TODAY()).getTime() / 864e5) + (state.remShift || 0); return ((n % REMINDERS.length) + REMINDERS.length) % REMINDERS.length; };
@@ -1000,7 +1018,7 @@ function render() {
   const typed = {}; let focusKey = null, caret = null;
   document.querySelectorAll('#view input, #view select, #view textarea').forEach(el => {
     const k = el.name || el.id; if (!k || ['hidden', 'checkbox', 'file', 'radio'].includes(el.type)) return;
-    const changed = el.tagName === 'SELECT' ? [...el.options].findIndex(o => o.defaultSelected) !== el.selectedIndex : (el.value !== '' && el.value !== el.defaultValue);
+    const changed = el.tagName === 'SELECT' ? el.value !== (([...el.options].find(o => o.defaultSelected) || el.options[0] || {}).value ?? '') : (el.value !== '' && el.value !== el.defaultValue);
     if (changed) typed[k] = el.value;
     if (el === document.activeElement) { focusKey = k; try { caret = el.selectionStart; } catch (e) {} }
   });
@@ -1073,9 +1091,10 @@ function taskForm(id, presetDate, presetProject, preset) {
   const t = id ? D().tasks.find(x => x.id === id) : { title: '', date: presetDate !== undefined ? presetDate : state.date, priority: 0, print: false, visionId: '', projectId: presetProject || '', notes: '', energy: 3, mins: 15, repeat: '', jobId: '', ...preset };
   const mo = [...new Set([5, 10, 15, 20, 30, 45, 60, 90, t.mins || 15])].sort((a, b) => a - b);
   sheet(`<h1>${id ? 'עריכת פעולה' : 'פעולה חדשה'}</h1>
+  ${id ? '' : '<div class="opt" style="margin-bottom:6px"><button type="button" class="on">פעולה</button><button type="button" data-act="newJobForm">🧩 משימה עם פעולות</button></div>'}
   <form id="f">
    <label>מה לעשות (פעולה אחת, ברורה ומוחשית)</label><input name="title" required value="${esc(t.title)}" autofocus autocomplete="off">
-   <div id="clHint" class="clarity">${id ? '' : clarityHTML('')}</div>
+   <div id="clHint" class="clarity">${id ? '' : clarityHTML('', true)}</div>
    <label>מתי?</label>
    <div class="opt" id="dateChips" style="margin-bottom:6px">${[['היום', TODAY()], ['מחר', addDays(TODAY(), 1)], ['ללא תאריך', '']].map(([l, v]) => `<button type="button" class="${(t.date || '') === v ? 'on' : ''}" onclick="const f=this.closest('form');f.elements.date.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div>
    <details class="moreopts" ${id || t.repeat ? 'open' : ''}><summary>אפשרויות נוספות</summary>
@@ -1103,13 +1122,13 @@ function taskForm(id, presetDate, presetProject, preset) {
     if (made) { sel.add(new Option((v === '__new__' ? '📁 ' : '🧩 ') + made.title, (v === '__new__' ? 'p:' : 'j:') + made.id), sel.options[sel.options.length - 2]); sel.value = (v === '__new__' ? 'p:' : 'j:') + made.id; } else sel.value = '';
   });
   form.title.addEventListener('input', () => {
-    $('#clHint').innerHTML = clarityHTML(form.title.value);
+    delete form.dataset.ok; $('#clHint').innerHTML = clarityHTML(form.title.value, true); // a changed title needs a fresh approval
   });
   // An unclear action (new, or with a changed title) is not saved: an alert explains what to fix.
-  const blocked = () => (!id || form.title.value.trim() !== origTitle) && clarity(form.title.value).length > 0;
+  const blocked = () => !form.dataset.ok && (!id || form.title.value.trim() !== origTitle) && clarity(form.title.value).length > 0;
   $('#f').onsubmit = e => {
     e.preventDefault();
-    if (blocked()) { const why = clarity(form.title.value)[0]; $('#clHint').innerHTML = clarityHTML(form.title.value); form.title.focus(); alert('לא ניתן לשמור: הפעולה לא כתובה בצורה ברורה.\n' + why); return; }
+    if (blocked()) { const why = clarity(form.title.value)[0]; $('#clHint').innerHTML = clarityHTML(form.title.value, true); form.title.focus(); alert('לא ניתן לשמור: הפעולה לא כתובה בצורה ברורה.\n' + why); return; }
     const f = new FormData(e.target), own = f.get('owner') || '', jobId = own.startsWith('j:') ? own.slice(2) : '', projectId = jobId ? ((findJob(jobId) || {}).projectId || '') : (own.startsWith('p:') ? own.slice(2) : '');
     const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: +f.get('priority'), visionId: f.get('visionId') || '', jobId, projectId, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
     let saved = t;
@@ -1293,6 +1312,9 @@ function orgStep2() {
 
 /* ---------- Clarity gate: a task is only entered after the user confirms "זה ברור" ---------- */
 const VAGUE_VERBS = ['לקדם', 'לטפל', 'לסדר', 'לעבוד על', 'לחשוב על', 'להתכונן', 'לשפר', 'לנסות', 'לדאוג', 'לנהל', 'לארגן', 'ללמוד', 'להמשיך', 'לעשות', 'להתעסק'];
+const SELF_CARE = ['להתקלח', 'להתגלח', 'להתלבש', 'לכבס', 'להתפלל', 'לבשל', 'לנקות']; // one-word everyday actions that are already concrete
+const NOT_VERBS = ['לקוח', 'לקוחות', 'לוח', 'לוחות', 'לילה', 'לחם', 'לימוד', 'לימודים', 'לחץ', 'לבוש', 'לבד', 'לאט', 'לעת', 'לפני', 'לאחר', 'לגבי', 'לבית', 'לעבודה']; // nouns/prepositions that start with ל
+const looksLikeVerb = w => /^ל[א-ת]{3,}$/.test(w || '') && !NOT_VERBS.includes(w); // a Hebrew infinitive: ל + 3 letters or more
 const VAGUE_WORDS = ['פרויקט', 'עניינים', 'דברים', 'משהו', 'הכל', 'כללי', 'וכו'];
 const CONCRETE_VERBS = ['לכתוב', 'לשלוח', 'להתקשר', 'לפתוח', 'לשלם', 'לקנות', 'להזמין', 'לצלם', 'לערוך', 'להעלות', 'לחתום', 'לתאם', 'לקרוא', 'לצפות', 'לפרסם', 'להדפיס', 'לסרוק', 'למלא', 'להוריד', 'להעביר', 'לענות', 'להגיש', 'לבנות', 'לשרטט', 'להקליט', 'לקבוע', 'לרשום', 'לבדוק', 'לחפש', 'להכין', 'לנקות', 'לפנות', 'לשטוף', 'לקפל', 'להוציא', 'להכניס', 'לבחור', 'לסכם', 'לתרגל', 'לצלצל', 'להגדיר', 'ללכת', 'לרוץ', 'לצאת', 'לשתות', 'לאכול', 'לעשות', 'להתאמן', 'למתוח', 'לנשום', 'לשבת', 'לקום', 'לעלות', 'לרדת', 'לבשל', 'לכבס', 'לשטוף', 'לגהץ', 'להתקלח', 'לישון', 'לטעון', 'לחבר', 'לתלות'];
 // Advisory only: the user always decides by ticking "זה ברור". Returns a list of problems (empty = looks clear).
@@ -1300,19 +1322,23 @@ function clarity(title) {
   const t = title.trim().replace(/\s+/g, ' '), words = t.split(' ').filter(Boolean), issues = [];
   if (!t) return issues;
   const hasNum = /\d/.test(t);
-  if (words.length < 3) issues.push('קצר מדי. הוסף מה בדיוק, למי או כמה.');
+  if (words.length < 3 && !(words.length === 1 && SELF_CARE.includes(words[0]))) issues.push('קצר מדי. הוסף מה בדיוק, למי או כמה.');
   const vv = VAGUE_VERBS.find(v => t === v || t.startsWith(v + ' '));
   if (vv && !hasNum) issues.push(`"${vv}" הוא פועל מעורפל. כתוב את הפעולה הבאה המדויקת, למשל לכתוב, לשלוח, להתקשר או לפתוח.`);
   const vw = VAGUE_WORDS.find(w => t.includes(w));
   if (vw) issues.push(`"${vw}" היא מילה כללית. פרט למה הכוונה.`);
-  if (!vv && !CONCRETE_VERBS.some(v => t.startsWith(v))) issues.push('לא זיהיתי פועל פעולה מוחשי בתחילת המשימה. התחל בפועל כמו "לכתוב", "לשלוח" או "להתקשר".');
+  if (!vv && !CONCRETE_VERBS.some(v => t.startsWith(v)) && !looksLikeVerb(words[0])) issues.push('לא זיהיתי פועל פעולה מוחשי בתחילת המשימה. התחל בפועל כמו "לכתוב", "לשלוח" או "להתקשר".');
   if (words.length > 14) issues.push('ארוכה מאוד. אולי אלה כמה משימות? פצל אותן.');
   return issues;
 }
-function clarityHTML(title) {
+const ROUTINE = { 'מקלחת': 'להתקלח', 'מקלחת בוקר': 'להתקלח', 'הליכה': 'ללכת 15 דקות', 'ריצה': 'לרוץ 20 דקות', 'אימון': 'להתאמן 20 דקות', 'כושר': 'ללכת לחדר כושר', 'שינה': 'ללכת לישון', 'שנץ': 'לישון שנץ של 20 דקות', 'שנצ': 'לישון שנץ של 20 דקות', 'כביסה': 'לכבס', 'קניות': 'לקנות מצרכים', 'ניקיון': 'לנקות את הבית', 'בישול': 'לבשל ארוחת ערב', 'ארוחה': 'לאכול ארוחה', 'ארוחת צהריים': 'לאכול ארוחת צהריים', 'ארוחת בוקר': 'לאכול ארוחת בוקר', 'ארוחת ערב': 'לאכול ארוחת ערב', 'קפה': 'לשתות קפה', 'תפילה': 'להתפלל', 'מדיטציה': 'לעשות מדיטציה 10 דקות', 'קריאה': 'לקרוא 10 עמודים', 'כתיבה': 'לכתוב 10 דקות', 'מייל': 'לכתוב מייל אחד', 'מיילים': 'לענות על 5 מיילים', 'שיחה': 'להתקשר לשיחה אחת', 'פגישה': 'להגיע לפגישה', 'חשבונית': 'לשלוח חשבונית', 'חשבוניות': 'לשלוח חשבונית אחת', 'ספורט': 'לעשות ספורט 20 דקות', 'פושאפס': 'לעשות 20 שכיבות סמיכה' };
+const suggestFix = title => { const t = title.trim().replace(/[\s"'׳״.]+/g, ' ').trim(); return ROUTINE[t] || ROUTINE[t.replace(/"/g, '')] || ''; };
+function clarityHTML(title, withFix) {
+  const fix = withFix ? suggestFix(title) : '';
+  if (fix) return '<div class="w">⚠ קצר מדי. פעולה צריכה להתחיל בפועל.</div><button type="button" class="lnk" data-act="useSuggest" data-s="' + esc(fix) + '">✏️ להחליף ל: "' + esc(fix) + '"</button>';
   if (!title.trim()) return '<div class="sub">כתוב את הפעולה הבאה, בצורה שאפשר להתחיל מיד.</div>';
   const issues = clarity(title);
-  return issues.length ? issues.map(x => `<div class="w">⚠ ${esc(x)}</div>`).join('') : '<div class="ok">✓ נראית ברורה: יש פועל מוחשי ופעולה מוגדרת.</div>';
+  return issues.length ? issues.map(x => `<div class="w">⚠ ${esc(x)}</div>`).join('') + (withFix ? '<button type="button" class="btn ghost okbtn" data-act="clearOk">✓ זה בסדר</button>' : '') : '<div class="ok">✓ נראית ברורה: יש פועל מוחשי ופעולה מוגדרת.</div>';
 }
 const CLARITY_EX = `<details class="clex"><summary>דוגמאות: ממשימה מעורפלת לפעולה הבאה</summary><table>
   <tr><th>מעורפלת</th><th>הפעולה הבאה</th></tr>
@@ -1574,8 +1600,9 @@ const A = {
   renameProject: e => { const p = D().projects.find(x => x.id === e.id), n = (prompt('שם הפרויקט', p.title) || '').trim(); if (n) { p.title = n; Store.save(); render(); } },
   delProject: e => { if (confirm('למחוק את הפרויקט? המשימות והפעולות שלו יישארו, בלי פרויקט.')) { D().tasks.forEach(t => { if (t.projectId === e.id) t.projectId = ''; }); D().jobs.forEach(j => { if (j.projectId === e.id) j.projectId = ''; }); D().projects = D().projects.filter(p => p.id !== e.id); state.openProject = null; Store.save(); render(); } },
   projAddTask: e => taskForm(undefined, null, e.id),
-  projNewJob: e => { const j = newJob(e.id); if (j) { state.openJob = j.id; render(); window.scrollTo(0, 0); } },
-  newLooseJob: () => { const j = newJob(''); if (j) { state.openJob = j.id; state.openProject = null; render(); window.scrollTo(0, 0); } },
+  projNewJob: e => jobForm(e.id),
+  newJobForm: () => jobForm(''),
+  newLooseJob: () => jobForm(''),
   openJob: e => { const j = findJob(e.id); if (!j) return; state.tab = 'projects'; state.openJob = j.id; state.openProject = j.projectId || null; closeSheet(); render(); window.scrollTo(0, 0); },
   backFromJob: () => { state.openJob = null; render(); },
   renameJob: e => { const j = findJob(e.id), n = (prompt('שם המשימה', j.title) || '').trim(); if (n) { j.title = n; Store.save(); render(); } },
@@ -1607,6 +1634,10 @@ const A = {
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
   noiseOff: () => toggleNoise(),
+  clearOk: () => { const f = $('#f'); if (!f) return; f.dataset.ok = '1'; $('#clHint').innerHTML = '<div class="ok">✓ אישרת את הניסוח. אפשר לשמור.</div>'; },
+  useSuggest: e => { const f = $('#f'); if (!f || !f.title) return; f.title.value = e.s; f.title.dispatchEvent(new Event('input')); f.title.focus(); },
+  setEnergyTo: v => { $('#toast').hidden = true; const f = fo(TODAY()); f.energy = v; f.energyAt = new Date().toISOString(); Store.save(); render(); if (v) energyHelp(v); },
+  energyHelpOpen: () => { const v = focusOn(TODAY()).energy; if (v) energyHelp(v); },
   resetOrder: () => { tasksOn(state.date).forEach(t => { delete t.ord; }); Store.save(); render(); },
   rewardOpen: () => { $('#toast').hidden = true; rewardSheet(); },
   rewardManage: () => { closeSheet(); state.tab = 'dayrewards'; render(); },
@@ -1769,6 +1800,7 @@ document.addEventListener('click', ev => {
   if (nav) { state.tab = nav.dataset.tab; state.openList = null; state.openProject = null; state.openJob = null; render(); window.scrollTo(0, 0); }
 });
 document.addEventListener('change', ev => {
+  if (ev.target.id === 'energySel') { A.setEnergyTo(ev.target.value); return; }
   if (ev.target.id === 'upMonth') {
     const v = ev.target.value, first = v === TODAY().slice(0, 7) ? TODAY() : v + '-01';
     if (state.upMode === 'month') { state.upMonth = v; state.upSel = first; } else { state.upStart = first; state.upDays = 14; }
