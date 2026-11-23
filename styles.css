@@ -189,3 +189,12 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
   #print .wd b{display:block;border-bottom:1px solid #000;margin-bottom:4px}
   #print .pl.sm{font-size:12px;padding:3px 0}
 }
+.jphoto{width:100%;max-height:360px;object-fit:cover;border-radius:14px;display:block}
+.jthumb{width:52px;height:52px;object-fit:cover;border-radius:10px;flex:none}
+.win{background:var(--soft)}
+#jnote{min-height:130px}
+.iconbtn[disabled]{opacity:.35;pointer-events:none}
+.focus{cursor:pointer;background:var(--soft)}
+.focus .frow{display:flex;gap:10px;align-items:flex-start;padding:4px 0}
+.focus .frow>span{font-size:20px}
+.demobar{background:#fdf0d5;color:#9a6a12;border-radius:10px;padding:6px 12px;font-size:13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
