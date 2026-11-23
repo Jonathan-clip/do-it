@@ -2,10 +2,25 @@
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
-const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
+const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
 const TS_KEY = DEMO ? 'doit-demo-updated-v1' : 'doit-updated-v1';
 const SYNC_KEY = DEMO ? 'doit-demo-synced-v1' : 'doit-synced-v1';
-const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org'];
+// v2 structure: a task that had subtasks becomes a "job" (task) and each subtask an action; every other old task is already an action.
+// Ids are derived from the old ids, so two devices migrating independently produce the same items and sync merges them cleanly.
+function migrate(d) {
+  if (d.v >= 2) return d;
+  d.jobs = d.jobs || []; const keep = [];
+  (d.tasks || []).forEach(t => {
+    if (t.subs && t.subs.length) {
+      const jid = 'j' + t.id;
+      if (!d.jobs.some(j => j.id === jid)) d.jobs.push({ id: jid, title: t.title, projectId: t.projectId || '', notes: t.notes || '', createdAt: t.date || '' });
+      t.subs.forEach(s => keep.push({ id: 's' + s.id, title: s.title, date: t.date || null, done: !!(s.done || t.done), priority: t.priority || 0, energy: t.energy || 3, mins: s.mins || Math.min(t.mins || 15, 15), brainless: !!t.brainless, print: !!t.print, visionId: t.visionId || '', projectId: t.projectId || '', notes: '', subs: [], jobId: jid }));
+      Object.values(d.focus || {}).forEach(f => { if (f.mitId === t.id) { f.mit = t.title; f.mitId = ''; } });
+    } else { t.subs = []; keep.push(t); }
+  });
+  d.tasks = keep; d.v = 2; return d;
+}
+const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual'];
 const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return h + ':' + str.length; };
 function itemHashes(d) { // one entry per collection item / per dated entry, so changes and deletions can be tracked
   const o = {};
@@ -17,7 +32,7 @@ const Store = {
   data: empty(), snap: {},
   load() {
     try { this.data = Object.assign(empty(), JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { this.data = empty(); }
-    this.resnap();
+    migrate(this.data); this.resnap();
   },
   resnap() { this.snap = itemHashes(this.data); },
   track() { // stamp what changed since the last save; remember deletions as tombstones
@@ -53,7 +68,7 @@ function mergeData(local, remote) {
     new Set([...Object.keys(L), ...Object.keys(R)]).forEach(k => { const w = decide(m + '|' + k, L[k], R[k]); if (w !== undefined) out[m][k] = w; });
   });
   [lm.del, rm.del].forEach(dm => Object.keys(dm).forEach(k => { if (!(k in om.u) && !om.del[k]) om.del[k] = dm[k]; }));
-  return out;
+  out.v = 2; return out;
 }
 
 /* ---------- Cloud sync (Supabase: table doit_data, one row per user, RLS) ---------- */
@@ -77,11 +92,11 @@ const Cloud = {
     if (error) { this.status = 'error'; render(); return; }
     const lt = this.localTs(), ls = this.lastSynced(), dirty = !!lt && lt > ls, cloudNew = !!row && row.updated_at > ls;
     if (row && cloudNew && !dirty) { // only the cloud changed: take it
-      Store.data = Object.assign(empty(), row.data); Store.resnap();
+      Store.data = migrate(Object.assign(empty(), row.data)); Store.resnap();
       try { localStorage.setItem(KEY, JSON.stringify(Store.data)); localStorage.setItem(TS_KEY, row.updated_at); localStorage.setItem(SYNC_KEY, row.updated_at); } catch (e) {}
       this.status = 'ok'; render();
     } else if (row && cloudNew && dirty) { // both sides changed (e.g. phone and computer): merge, never overwrite
-      Store.data = mergeData(Store.data, Object.assign(empty(), row.data)); Store.resnap();
+      Store.data = mergeData(migrate(Store.data), migrate(Object.assign(empty(), row.data))); Store.resnap();
       const now = new Date().toISOString();
       try { localStorage.setItem(KEY, JSON.stringify(Store.data)); localStorage.setItem(TS_KEY, now); } catch (e) {}
       await this.push(); render();
@@ -133,17 +148,16 @@ function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in lo
   }; im.src = r.result; };
   r.readAsDataURL(file);
 }
-const MORE_TABS = ['journal', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
-const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', jDate: TODAY(), openList: null, openProject: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
+const MORE_TABS = ['journal', 'rhythm', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
+const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
 // Weekly vision data lives in D().weeks[<Sunday date>]; created lazily on first edit.
 const weekData = ws => (D().weeks[ws] = D().weeks[ws] || { vision: '', outcomes: [], visionIds: [], worked: '', improve: '' });
 
 /* ---------- Domain ---------- */
 // High-energy tasks always come first in the day; then by priority.
 const taskOrder = (d, a, b) => { // today's order follows the energy mode chosen by the user; unset keeps "high energy first"
-  const m = d === TODAY() ? ((D().focus[d] || {}).energy || '') : '', e = x => x.energy || 3, p = x => x.priority || 0;
-  if (m === 'low') return e(a) - e(b) || p(b) - p(a);
-  if (m === 'mid') return p(b) - p(a) || e(b) - e(a);
+  const m = d === TODAY() ? normEnergy((D().focus[d] || {}).energy) : '', e = x => x.energy || 3, p = x => x.priority || 0;
+  if (m === 'midlow' || m === 'tired' || m === 'flood' || m === 'focus') return e(a) - e(b) || p(b) - p(a); // gentler states: easy actions first
   return (b.energy || 0) - (a.energy || 0) || p(b) - p(a);
 };
 const tasksOn = d => D().tasks.filter(t => t.date === d).sort((a, b) => taskOrder(d, a, b));
@@ -216,7 +230,7 @@ function goalCard({ g, s }) {
 
 /* ---------- Rendering ---------- */
 /* ---------- Energy mode, "my three tasks", quick capture, start-now timer, stuck, what's next ---------- */
-const ENERGY_MODES = [['low', '🪫 נמוכה'], ['mid', '🙂 בינונית'], ['high', '⚡ גבוהה']];
+const ENERGY_MODES = [['high', '⚡ אנרגיה גבוהה'], ['midlow', '🙂 בינונית או נמוכה'], ['tired', '😴 עייפות'], ['flood', '🌊 הצפה'], ['judge', '🪞 שיפוטיות'], ['focus', '🎯 חוסר ריכוז'], ['victim', '🥀 אני קורבן']];
 function energyBar(d) {
   if (d !== TODAY()) return '';
   const cur = focusOn(d).energy;
@@ -225,12 +239,12 @@ function energyBar(d) {
 function tasksBlock(d, ts) {
   const open = ts.filter(t => !t.done), f = focusOn(d);
   const rows = list => list.map(t => taskRow(t)).join('');
-  if (!ts.length) return d === TODAY() ? '' : '<div class="empty">אין משימות ליום הזה</div>';
+  if (!ts.length) return d === TODAY() ? '' : '<div class="empty">אין פעולות ליום הזה</div>';
   if (state.showAll) return rows(ts) + (open.length > 3 ? '<button class="btn ghost more3" data-act="toggleShowAll">הצג רק שלוש</button>' : '');
-  const first = open.filter(t => t.id === f.mitId), pick = [...first, ...open.filter(t => t.id !== f.mitId)].slice(0, 3);
+  const first = open.filter(t => t.id === f.mitId), pick = [...first, ...open.filter(t => t.id !== f.mitId)].slice(0, f.energy === 'flood' ? 1 : 3);
   const hidden = ts.length - pick.length;
-  return (pick.length ? rows(pick) : '<div class="empty">🎉 סיימת את כל המשימות להיום</div>')
-    + (hidden > 0 ? `<button class="btn ghost more3" data-act="toggleShowAll">הצג את כל המשימות (${hidden} נוספות)</button>` : '');
+  return (pick.length ? rows(pick) : '<div class="empty">🎉 סיימת את כל הפעולות להיום</div>')
+    + (hidden > 0 ? `<button class="btn ghost more3" data-act="toggleShowAll">הצג את כל הפעולות (${hidden} נוספות)</button>` : '');
 }
 function nextTask(excludeId) { // the single suggestion after finishing: the MIT first, then by the current order
   const T = TODAY(), f = focusOn(T), open = tasksOn(T).filter(t => !t.done && t.id !== excludeId);
@@ -242,7 +256,7 @@ function toast(html, ms = 9000) {
 }
 function showNext(doneId) {
   const n = nextTask(doneId);
-  if (!n) { toast('<span>🎉 סיימת את משימות היום</span><button data-act="toastClose">✕</button>', 5000); return; }
+  if (!n) { toast('<span>🎉 סיימת את פעולות היום</span><button data-act="toastClose">✕</button>', 5000); return; }
   toast(`<span>מה הדבר הבא? <b>${esc(n.title)}</b></span><button class="btn" data-act="runStart" data-id="${n.id}">התחל</button><button class="btn ghost" data-act="runBreak">☕ הפסקה</button><button data-act="toastClose" aria-label="סגור">✕</button>`);
 }
 /* Quick capture: one field, no date/energy/priority; classified later in the daily "ארגון" */
@@ -265,11 +279,11 @@ function runBeep() {
   try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
 }
 const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-function runOpen(id, brk) {
+function runOpen(id, brk, bmins, blabel, rid) {
   clearInterval(Run.tick); closeSheet();
-  Object.assign(Run, { id: brk ? null : id, brk: !!brk, running: false, ended: false });
+  Object.assign(Run, { id: brk ? null : id, brk: !!brk, running: false, ended: false, label: blabel || '', rhythmId: rid || '', brkStarted: false, pomo: false });
   const t = findTask(id);
-  const pick = brk ? 5 : [5, 15, 25].reduce((a, m) => Math.abs(m - ((t && t.mins) || 15)) < Math.abs(a - ((t && t.mins) || 15)) ? m : a, 15);
+  const pick = brk ? (bmins || 10) : [5, 15, 25].reduce((a, m) => Math.abs(m - ((t && t.mins) || 15)) < Math.abs(a - ((t && t.mins) || 15)) ? m : a, 15);
   Run.total = Run.left = pick * 60; runRender(); $('#run').hidden = false; document.body.classList.add('running');
 }
 function runClose() { clearInterval(Run.tick); Run.running = false; $('#run').hidden = true; document.body.classList.remove('running'); render(); }
@@ -277,17 +291,18 @@ function runRender() {
   const t = Run.brk ? null : findTask(Run.id), el = $('#run');
   if (!Run.brk && !t) return runClose();
   const step = t ? ((t.subs || []).find(s => !s.done) || {}).title || t.first || '' : '';
-  const mins = Run.brk ? [5, 10] : [5, 15, 25];
+  const mins = Run.brk ? [...new Set([5, 10, Math.round(Run.total / 60)])].sort((a, b) => a - b) : [5, 15, 25];
   el.innerHTML = `<div class="runbox">
     <button class="iconbtn runx" data-act="runClose" aria-label="סגור">✕</button>
     <div class="sub">${Run.brk ? 'הפסקה' : 'עכשיו עובדים על'}</div>
-    <h1>${Run.brk ? '☕ נושמים קצת' : esc(t.title)}</h1>
+    <h1>${Run.brk ? esc(Run.label || '☕ הפסקה') : esc(t.title)}</h1>
     ${Run.brk ? '' : `<label class="sub">הצעד הראשון</label><input id="runStep" value="${esc(step)}" placeholder="מה הדבר הראשון והקטן שעושים?" autocomplete="off" ${(t.subs || []).some(s => !s.done) ? 'readonly' : ''}>`}
     <div class="opt runmins">${mins.map(m => `<button class="${Run.total === m * 60 ? 'on' : ''}" data-act="runMins" data-m="${m}" ${Run.running ? 'disabled' : ''}>${m} ד׳</button>`).join('')}</div>
+    <div class="remind" style="margin-top:14px">💬 ${esc(reminder())}</div>
     <div class="runtime ${Run.ended ? 'end' : ''}" id="runTime">${mmss(Run.left)}</div>
     ${Run.ended ? `<div class="sub" style="text-align:center">${Run.brk ? 'ההפסקה נגמרה' : 'הזמן נגמר. איך הלך?'}</div>` : ''}
     <div class="grid2">
-      ${Run.ended ? (Run.brk ? '<button class="btn" data-act="runNext">חזרה לעבודה</button>' : '<button class="btn" data-act="runDone">✓ סיימתי</button><button class="btn ghost" data-act="runMore">עוד 5 דקות</button>')
+      ${Run.ended ? (Run.brk ? '<button class="btn" data-act="runNext">חזרה לעבודה</button>' : '<button class="btn" data-act="runDone">✓ סיימתי</button><button class="btn ghost" data-act="runMore">עוד 5 דקות</button>' + (Run.pomo ? '<button class="btn ghost" data-act="runBreakMin" data-m="5" data-l="🍅 הפסקת פומודורו">☕ הפסקה 5 דקות</button>' : ''))
         : `<button class="btn" data-act="runToggle">${Run.running ? '⏸ השהה' : '▶ התחל'}</button>${Run.brk ? '<button class="btn ghost" data-act="runNext">דלג</button>' : '<button class="btn ghost" data-act="runDone">✓ סיימתי</button>'}`}
       ${Run.brk ? '' : '<button class="btn ghost" data-act="stuck">🤝 נתקעתי</button>'}
     </div></div>`;
@@ -296,9 +311,9 @@ function runRender() {
 function runTick() {
   Run.left = Math.max(0, Math.round((Run.endAt - Date.now()) / 1000));
   const el = $('#runTime'); if (el) el.textContent = mmss(Run.left);
-  if (Run.left <= 0) { clearInterval(Run.tick); Run.running = false; Run.ended = true; runBeep(); runRender(); }
+  if (Run.left <= 0) { clearInterval(Run.tick); Run.running = false; Run.ended = true; if (!Run.brk) { addWork(Run.total / 60); Work.skipId = Run.id; } runBeep(); runRender(); }
 }
-function runStartTimer() { Run.endAt = Date.now() + Run.left * 1000; Run.running = true; clearInterval(Run.tick); Run.tick = setInterval(runTick, 250); runRender(); }
+function runStartTimer() { Run.endAt = Date.now() + Run.left * 1000; Run.running = true; if (Run.brk) Run.brkStarted = true; clearInterval(Run.tick); Run.tick = setInterval(runTick, 250); runRender(); }
 function stuckSheet() {
   const T = TODAY(), t = findTask(Run.id), easy = t && tasksOn(T).filter(x => !x.done && x.id !== t.id).sort((a, b) => (a.energy || 3) - (b.energy || 3))[0];
   sheet(`<h1>זה קורה 🤝</h1><p class="sub">בוא נקל על זה. בחר מה מתאים עכשיו:</p>
@@ -309,12 +324,302 @@ function stuckSheet() {
      <button class="btn ghost" data-act="stuckLater">📆 לחזור אליה אחר כך</button>
    </div><div class="actions"><button class="btn ghost" data-act="stuckClose">חזרה</button></div>`);
 }
+/* ---------- Structure: project > task (a "job", D().jobs) > action (D().tasks, the unit that gets a date, energy and duration) ---------- */
+const findJob = id => D().jobs.find(j => j.id === id);
+const jobName = id => (findJob(id) || {}).title;
+const jobChip = t => t.jobId && jobName(t.jobId) ? `<span class="chip" data-act="openJob" data-id="${t.jobId}">🧩 ${esc(jobName(t.jobId))}</span>` : '';
+const jobState = j => {
+  const ts = D().tasks.filter(t => t.jobId === j.id), done = ts.filter(t => t.done).length;
+  return { ts, done, total: ts.length, pct: ts.length ? Math.round(done / ts.length * 100) : 0, mins: ts.filter(t => !t.done).reduce((s, t) => s + (t.mins || 0), 0) };
+};
+function newJob(projectId) {
+  const title = (prompt('שם המשימה (התוצאה שרוצים להשיג)') || '').trim(); if (!title) return null;
+  const j = { id: uid(), title, projectId: projectId || '', notes: '', createdAt: TODAY() };
+  D().jobs.push(j); Store.save(); return j;
+}
+const syncJob = j => D().tasks.forEach(t => { if (t.jobId === j.id) t.projectId = j.projectId; }); // an action always carries its task's project
+function ownerOpts(sel) { // "belongs to": nothing, directly a project, or a task (optionally inside a project)
+  const opt = (v, l) => `<option value="${v}" ${v === sel ? 'selected' : ''}>${l}</option>`;
+  const jobsOf = pid => D().jobs.filter(j => (j.projectId || '') === pid).map(j => opt('j:' + j.id, '🧩 ' + esc(j.title))).join('');
+  return opt('', 'ללא (פעולה בודדת)')
+    + D().projects.map(p => `<optgroup label="📁 ${esc(p.title)}">${opt('p:' + p.id, 'ישירות בפרויקט')}${jobsOf(p.id)}</optgroup>`).join('')
+    + (jobsOf('') ? `<optgroup label="משימות ללא פרויקט">${jobsOf('')}</optgroup>` : '')
+    + '<option value="__newjob__">＋ משימה חדשה...</option><option value="__new__">＋ פרויקט חדש...</option>';
+}
+function jobView(j) {
+  const s = jobState(j), open = s.ts.filter(t => !t.done), done = s.ts.filter(t => t.done);
+  return `<div class="top"><div class="row"><button class="iconbtn" data-act="backFromJob" aria-label="חזרה">${chev('r')}</button><h1>🧩 ${esc(j.title)}</h1></div><div class="sw"><button class="iconbtn" data-act="renameJob" data-id="${j.id}" aria-label="שנה שם">✏️</button><button class="iconbtn" data-act="delJob" data-id="${j.id}" aria-label="מחק">🗑</button></div></div>
+    ${j.projectId && projectName(j.projectId) ? `<div class="sub" style="margin-bottom:8px">📁 ${esc(projectName(j.projectId))}</div>` : ''}
+    <div class="card"><div class="row"><b class="grow">${s.done}/${s.total} פעולות הושלמו</b><span class="sub">${s.mins} ד׳ נותרו</span></div><div class="bar"><div style="width:${s.pct}%"></div></div></div>
+    <div class="opt" style="margin-bottom:10px"><button data-act="jobAddAction" data-id="${j.id}">＋ פעולה</button></div>
+    <h2>פתוחות (${open.length})</h2>${open.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות פתוחות. פרק את המשימה לפעולות קטנות של עד 15 דקות</div>'}
+    ${done.length ? `<h2>הושלמו (${done.length})</h2>${done.map(t => taskRow(t, true)).join('')}` : ''}`;
+}
+const jobCard = j => { const s = jobState(j); return `<div class="card" data-act="openJob" data-id="${j.id}"><div class="row"><div class="grow"><div class="t"><b>🧩 ${esc(j.title)}</b></div><div class="meta"><span>${s.done}/${s.total} פעולות</span>${s.total && s.done === s.total ? '<span class="chip">✓ הושלמה</span>' : ''}${s.mins ? `<span>${s.mins} ד׳ נותרו</span>` : ''}</div></div>${chev('l')}</div><div class="bar"><div style="width:${s.pct}%"></div></div></div>`; };
+/* ---------- Wellbeing: energy states with suggestions, rhythm (meals / rest / hourly break), day start & end, deferral nudge, morning review ---------- */
+const normEnergy = v => (v === 'low' || v === 'mid') ? 'midlow' : (v || '');
+const fo = d => (D().focus[d] = D().focus[d] || {});
+const nowHM = () => { const n = new Date(); return pad(n.getHours()) + ':' + pad(n.getMinutes()); };
+const toMin = hm => (+hm.slice(0, 2)) * 60 + (+hm.slice(3, 5));
+const fmtDur = m => { const h = Math.floor(m / 60), r = m % 60; return h ? `${h} שעות${r ? ` ו-${r} דק׳` : ''}` : `${r} דק׳`; };
+const easiest = () => { const T = TODAY(); return D().tasks.filter(t => !t.done && t.date === T).sort((a, b) => (b.brainless ? 1 : 0) - (a.brainless ? 1 : 0) || (a.energy || 3) - (b.energy || 3))[0] || null; };
+
+/* Energy: each state comes with a concrete suggestion */
+function energyHelp(v) {
+  if (v === 'focus') return focusHelp();
+  if (v === 'victim') return victimHelp();
+  const T = TODAY(), f = focusOn(T), easy = easiest(), mit = f.mitId ? findTask(f.mitId) : null, first = nextTask('');
+  const b = (act, label, extra = '') => `<button class="btn ghost" data-act="${act}" ${extra}>${label}</button>`;
+  const M = {
+    high: ['⚡ אנרגיה גבוהה', ['זה הזמן לדבר הקשה והחשוב, לפני שהאנרגיה יורדת.', 'בלוק אחד של 25 דקות בלי הפרעות, ואז הפסקה.'],
+      [mit && !mit.done ? b('runStart', '▶ להתחיל את הפעולה החשובה', `data-id="${mit.id}"`) : '', first ? b('runStart', '▶ להתחיל: ' + esc(first.title), `data-id="${first.id}"`) : '']],
+    midlow: ['🙂 אנרגיה בינונית או נמוכה', ['לא מכריחים. מתחילים בקל ובקצר, וצוברים תנופה.', 'סידרתי את היום כך שהפעולות הקלות קודם.', 'שלוש פעולות להיום מספיקות.'],
+      [easy ? b('runStart', '🍃 פעולה קלה: ' + esc(easy.title), `data-id="${easy.id}"`) : '']],
+    tired: ['😴 עייפות', ['עייפות היא מידע, לא כישלון.', 'עשר דקות הפסקה: מים, תנועה קלה או אוויר צח.', 'אחר כך פעולה קלה אחת של 5 דקות. אם עדיין קשה, זה סימן שצריך מנוחה ארוכה יותר.'],
+      [b('runBreakMin', '☕ הפסקה של 10 דקות', 'data-m="10" data-l="🛋 מתרעננים"'), easy ? b('runStart', '🍃 פעולה קלה: ' + esc(easy.title), `data-id="${easy.id}"`) : '']],
+    flood: ['🌊 הצפה', ['עוצרים הכל לדקה. נשימה איטית: שאיפה 4, נשיפה 6.', 'פורקים הכל לדף, בלי לארגן (הכפתור 💭).', 'מציגים רק פעולה אחת. השאר מחכות.'],
+      [b('runBreakMin', '🫁 דקה של נשימה', 'data-m="1" data-l="🫁 נושמים לאט"'), b('capture', '💭 לפרוק הכל לדף'), easy ? b('runStart', '▶ פעולה אחת: ' + esc(easy.title), `data-id="${easy.id}"`) : '']],
+    judge: ['🪞 שיפוטיות', ['"' + REMINDERS[1] + '"', 'הקול הפנימי הזה לא מדד של האמת. משווים רק לעצמך של אתמול.', 'כתוב הצלחה אחת קטנה, ואז שתי דקות בלבד על פעולה קלה, בלי חובה לסיים.'],
+      [b('goTab', '🏆 לכתוב הצלחה קטנה', 'data-t="journal"'), easy ? b('run2', '⏱ שתי דקות על: ' + esc(easy.title), `data-id="${easy.id}"`) : '']]
+  }[v];
+  if (!M) return;
+  sheet(`<h1>${M[0]}</h1>${M[1].map(x => `<p style="margin:6px 0">• ${x}</p>`).join('')}<div class="grid2" style="grid-template-columns:1fr">${M[2].join('')}</div><div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
+}
+/* "I'm a victim": four steps, from questioning the thought to action */
+function victimHelp() {
+  const t = focusTarget();
+  sheet(`<h1>🥀 אני קורבן</h1><p class="sub">מרגיש שזה קורה לך ולא בידיים שלך. ארבעה צעדים, אפשר לעבור עליהם לפי הסדר:</p>
+   <div class="card"><div class="t"><b>1. לשאול את עצמי: האם זה באמת נכון?</b></div>
+    <textarea id="vThought" rows="2" placeholder="המחשבה שיש לי עכשיו..."></textarea>
+    <div class="sub" style="margin:4px 0">האם זה 100% נכון? מה עוד יכול להיות נכון?</div><button class="btn ghost" data-act="victimSave" data-k="q">✍ לשמור ביומן</button></div>
+   <div class="card"><div class="t"><b>2. לקחת אחריות</b></div>
+    <input id="vResp" placeholder="מה החלק שבאחריותי כאן?" autocomplete="off"><button class="btn ghost" data-act="victimSave" data-k="r" style="margin-top:6px">✍ לשמור ביומן</button></div>
+   <div class="card"><div class="t"><b>3. להתמקד בפתרונות</b></div><div class="sub">מהו הצעד הבא שאני יכול לעשות?</div>
+    <input id="vStep" placeholder="צעד קטן וברור" autocomplete="off"><button class="btn ghost" data-act="victimStep" style="margin-top:6px">➕ להוסיף להיום ולהתחיל</button></div>
+   <div class="card"><div class="t"><b>4. לעבור לפעולה</b></div>${t ? `<button class="btn" data-act="runStart" data-id="${t.id}" style="margin-top:6px">▶ להתחיל: ${esc(t.title)}</button>` : '<div class="sub">אין פעולה פתוחה להיום</div>'}</div>
+   <div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
+}
+/* Lack of focus: seven methods to choose from */
+const FOCUS_METHODS = [
+  ['body', '🤸 הפעלת הגוף', 'לקום, להתמתח או לעשות כמה קפיצות פיסוק כדי להחזיר אנרגיה.', '⏱ שתי דקות תנועה'],
+  ['reset', '🔹 איפוס משימה', 'לפרק את העבודה לצעדים זעירים ולהתחיל מהקל ביותר.', '🔹 לפרק לצעד קטן'],
+  ['pomo', '🍅 חלוקת זמן', 'שיטת הפומודורו: 25 דקות עבודה ו-5 דקות הפסקה.', '▶ להתחיל 25 דקות'],
+  ['env', '🚪 החלפת סביבה', 'לעבור למקום אחר או לשנות את הסביבה הקרובה.', '⏱ עשר דקות במקום אחר'],
+  ['noise', '🎧 גירוי רקע', 'מוזיקה אינסטרומנטלית או רעש רקע כדי לעזור בריכוז.', '▶ רעש רקע'],
+  ['account', '📣 טריגר אחריותיות', 'לספר למישהו מה המטרה שלך, או להגדיר טיימר קצר כדי להישאר במסלול.', ''],
+  ['touch', '🖍 מעורבות מישושית', 'צעצוע פידג׳ט, כדור לחץ או שרבוט תוך כדי חשיבה.', '']
+];
+const Noise = { ctx: null, src: null, on: false };
+function toggleNoise() {
+  if (Noise.on) { try { Noise.src.stop(); } catch (e) {} Noise.on = false; $('#toast').hidden = true; return; }
+  try {
+    const c = Noise.ctx = Noise.ctx || new (window.AudioContext || window.webkitAudioContext)(), len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+    let last = 0; for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; } // soft brown-ish noise
+    const src = c.createBufferSource(), g = c.createGain(); src.buffer = buf; src.loop = true; g.gain.value = 0.35; src.connect(g); g.connect(c.destination); src.start();
+    Noise.src = src; Noise.on = true;
+    toast('<span>🎧 רעש רקע פועל</span><button class="btn ghost" data-act="noiseOff">כבה</button>', 36e5);
+  } catch (e) {}
+}
+const focusTarget = () => { const f = focusOn(TODAY()), m = f.mitId ? findTask(f.mitId) : null; return (m && !m.done) ? m : nextTask(''); };
+function focusHelp() {
+  const btn = (k, label) => `<button class="btn ghost" data-act="focusMethod" data-k="${k}">${label}</button>`;
+  sheet(`<h1>🎯 חוסר ריכוז</h1><p class="sub">זה קורה לכולם. בחר שיטה אחת לנסות עכשיו:</p>
+   ${FOCUS_METHODS.map(([k, title, desc, label]) => `<div class="card"><div class="t"><b>${title}</b></div><div class="sub" style="margin:4px 0 8px">${desc}</div>${k === 'account' ? `<div class="opt">${btn('share', '📲 לשתף את המטרה')}${btn('timer', '⏱ טיימר 5 דקות')}</div>` : label ? btn(k, k === 'noise' && Noise.on ? '⏹ לכבות את הרעש' : label) : ''}</div>`).join('')}
+   <div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
+}
+function focusMethod(k) {
+  const t = focusTarget(), timed = (m, pomo) => { if (!t) return toast('<span>אין פעולה פתוחה להיום</span><button data-act="toastClose">✕</button>', 4000); runOpen(t.id); Run.total = Run.left = m * 60; Run.pomo = !!pomo; runStartTimer(); };
+  if (k === 'body') return runOpen(null, true, 2, '🤸 מזיזים את הגוף');
+  if (k === 'env') return runOpen(null, true, 10, '🚪 מחליפים סביבה');
+  if (k === 'pomo') return timed(25, true);
+  if (k === 'timer') return timed(5);
+  if (k === 'reset') { if (!t) return toast('<span>אין פעולה פתוחה להיום</span><button data-act="toastClose">✕</button>', 4000); runOpen(t.id); return A.stuckSmall(); }
+  if (k === 'noise') { toggleNoise(); return focusHelp(); }
+  if (k === 'share') {
+    const txt = t ? `המטרה שלי עכשיו: ${t.title}. אעדכן אותך כשאסיים.` : 'המטרה שלי להיום: להתמקד. אעדכן אותך.';
+    if (navigator.share) navigator.share({ text: txt }).catch(() => {});
+    else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast('<span>הטקסט הועתק. שלח אותו למישהו 👍</span><button data-act="toastClose">✕</button>', 5000)).catch(() => {});
+  }
+}
+let lastEnergyAsk = 0;
+function askEnergyToast(force) { // recommended moments: morning, after a break, every ~3 hours while the app is open
+  const T = TODAY(), f = D().focus[T] || {}, h = new Date().getHours();
+  if (!force && (h < 7 || h >= 22)) return;
+  if (!force && ((f.energyAt && Date.now() - new Date(f.energyAt).getTime() < 3 * 36e5) || Date.now() - lastEnergyAsk < 3 * 36e5)) return;
+  if (!$('#toast').hidden || !$('#sheet').hidden || !$('#run').hidden) return;
+  lastEnergyAsk = Date.now();
+  toast(`<span>מה מצב האנרגיה שלך עכשיו?</span><div class="opt etoast">${ENERGY_MODES.map(([v, l]) => `<button data-act="setEnergy" data-v="${v}">${l}</button>`).join('')}</div><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000);
+}
+
+/* Work time and the hourly break: after ~50 minutes of work (timer + completed actions) suggest 10 minutes off */
+const Work = { skipId: '', pending: false };
+function addWork(m) {
+  const f = fo(TODAY()); f.work = (f.work || 0) + Math.max(0, m); Store.save();
+  return Work.pending = f.work >= (f.workNext || 50);
+}
+function suggestBreak() {
+  if (!$('#run').hidden) return;
+  toast(`<span>☕ עבדת בערך ${Math.round(fo(TODAY()).work || 50)} דקות. הגיע הזמן ל-10 דקות הפסקה.</span><button class="btn" data-act="runBreak">☕ התחל הפסקה</button><button class="btn ghost" data-act="breakLater">עוד מעט</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 20000);
+}
+function afterDone(t) {
+  let due;
+  if (Work.skipId === t.id) { due = Work.pending; Work.skipId = ''; } else due = addWork(t.mins || 5);
+  if (due) suggestBreak(); else showNext(t.id);
+}
+function finishBreak() {
+  const T = TODAY(), f = fo(T); f.work = 0; f.workNext = 50;
+  if (Run.rhythmId) { (D().rhythmLog[T] = D().rhythmLog[T] || {})[Run.rhythmId] = true; }
+  Store.save(); runClose(); askEnergyToast(true);
+}
+
+/* Rhythm of the day: meals and rest you define; separate from actions and not counted as progress */
+const rhythmSorted = () => D().rhythm.slice().sort((a, b) => a.time.localeCompare(b.time));
+function rhythmStrip(d) {
+  if (d !== TODAY()) return '';
+  const items = rhythmSorted(), log = D().rhythmLog[d] || {}, now = nowHM(), noRest = !items.some(r => r.kind === 'rest');
+  const rows = items.map(r => {
+    const done = !!log[r.id], due = !done && r.time <= now;
+    return `<div class="card row rh ${done ? 'done' : ''} ${due ? 'due' : ''}"><button class="check ${done ? 'on' : ''}" data-act="rhythmDone" data-id="${r.id}" aria-label="סמן">${done ? '✓' : ''}</button><div class="grow"><div class="t">${r.kind === 'meal' ? '🍽' : '😌'} ${esc(r.label)}</div><div class="meta"><span>${r.time}</span><span>${r.mins} ד׳</span>${due ? '<span style="color:var(--accent)">הגיע הזמן</span>' : ''}</div></div>${done ? '' : `<button class="iconbtn" data-act="rhythmStart" data-id="${r.id}">▶ הפסקה</button>`}</div>`;
+  }).join('');
+  if (!rows && !noRest) return '';
+  return `<h2>מקצב היום</h2>${rows}${noRest ? '<div class="card" data-act="goTab" data-t="rhythm"><div class="t">😌 עדיין לא הגדרת מנוחה יומית</div><div class="sub">לחץ כדי להגדיר</div></div>' : ''}`;
+}
+let tickBusy = false;
+function tick() {
+  if (document.hidden || tickBusy) return; tickBusy = true;
+  try {
+    const T = TODAY(); ensureDayStart();
+    if (!$('#toast').hidden || !$('#sheet').hidden || !$('#run').hidden) return;
+    const now = toMin(nowHM()), log = D().rhythmLog[T] || {}, f = D().focus[T] || {};
+    const r = rhythmSorted().find(x => !log[x.id] && toMin(x.time) <= now && now < toMin(x.time) + 180 && !tick.shown[T + x.id]);
+    if (r) { tick.shown[T + r.id] = 1; toast(`<span>${r.kind === 'meal' ? '🍽' : '😌'} הגיע הזמן: <b>${esc(r.label)}</b> (${r.mins} ד׳)</span><button class="btn" data-act="rhythmStart" data-id="${r.id}">▶ התחל</button><button class="btn ghost" data-act="rhythmDone" data-id="${r.id}">✓ עשיתי</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000); return; }
+    if ((f.work || 0) >= (f.workNext || 50)) { suggestBreak(); return; }
+    askEnergyToast();
+  } finally { tickBusy = false; }
+}
+tick.shown = {};
+setInterval(tick, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(tick, 600); });
+
+/* Day start and end: stamped automatically on the first open, end by button; both editable */
+function ensureDayStart() {
+  const T = TODAY(), L = (D().dayLog[T] = D().dayLog[T] || null);
+  if (!L) { D().dayLog[T] = { start: nowHM(), end: '' }; Store.save(); }
+}
+const dayDurMin = L => L && L.start && L.end ? Math.max(0, toMin(L.end) - toMin(L.start)) : (L && L.start ? Math.max(0, toMin(nowHM()) - toMin(L.start)) : 0);
+function dayCard(d) {
+  if (d !== TODAY()) return '';
+  const L = D().dayLog[d] || {};
+  const btn = !L.start ? '<button class="iconbtn" data-act="dayStart">▶ התחל יום</button>' : !L.end ? '<button class="iconbtn" data-act="dayEnd">🌙 סיימתי יום</button>' : '<button class="iconbtn" data-act="dayReopen" aria-label="פתח מחדש">↺</button>';
+  return `<div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow" data-act="dayEdit"><div class="t">${L.start ? 'התחלת ב-' + L.start : 'היום עוד לא התחיל'}${L.end ? ' · סיימת ב-' + L.end : ''}</div>${L.start ? `<div class="meta"><span>${L.end ? 'משך היום' : 'עד עכשיו'}: ${fmtDur(dayDurMin(L))}</span></div>` : ''}</div>${btn}</div>`;
+}
+function dayEditSheet() {
+  const T = TODAY(), L = D().dayLog[T] || {};
+  sheet(`<h1>שעות היום</h1><form id="f"><label>התחלת יום</label><input type="time" name="start" value="${L.start || ''}"><label>סיום יום</label><input type="time" name="end" value="${L.end || ''}">
+   <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
+  $('#f').onsubmit = e => { e.preventDefault(); const f = new FormData(e.target); D().dayLog[T] = { start: f.get('start') || '', end: f.get('end') || '' }; Store.save(); closeSheet(); render(); };
+}
+function dayHistoryHTML() {
+  const days = Object.keys(D().dayLog).filter(k => D().dayLog[k] && D().dayLog[k].start).sort().reverse().slice(0, 7);
+  if (!days.length) return '<div class="empty">עדיין אין נתוני שעות</div>';
+  const done = days.filter(k => D().dayLog[k].end), avg = done.length ? Math.round(done.reduce((s, k) => s + dayDurMin(D().dayLog[k]), 0) / done.length) : 0;
+  return days.map(k => { const L = D().dayLog[k]; return `<div class="card row"><div class="grow"><div class="t"><b>${shortDate(k)}</b></div><div class="meta"><span>התחלה ${L.start}</span><span>סיום ${L.end || '—'}</span>${L.end ? `<span>${fmtDur(dayDurMin(L))}</span>` : ''}</div></div></div>`; }).join('')
+    + (avg ? `<div class="sub" style="margin-top:6px">ממוצע ימים שהסתיימו: ${fmtDur(avg)}</div>` : '');
+}
+
+/* Deferral nudge: an action pushed to a later date three times gets a gentle "should we rewrite it?" */
+function deferTo(t, nd) { const od = t.date; if (od && (!nd || nd > od)) t.defers = (t.defers || 0) + 1; t.date = nd; }
+const needsNudge = t => t && !t.done && (t.defers || 0) >= 3 && t.defers > (t.nudged || 0);
+function rewriteSheet(t) {
+  sheet(`<h1>נדחתה ${t.defers} פעמים 🤔</h1><p><b>${esc(t.title)}</b></p><p class="sub">משהו בה תוקע אותך. אולי הניסוח עמום, אולי היא גדולה מדי, ואולי היא כבר לא באמת חשובה. רוצה לכתוב אותה מחדש?</p>
+   <div class="grid2" style="grid-template-columns:1fr"><button class="btn" data-act="rewriteEdit" data-id="${t.id}">✏️ לכתוב מחדש</button><button class="btn ghost" data-act="rewriteSplit" data-id="${t.id}">✂️ לפצל לשתי פעולות קטנות</button><button class="btn ghost" data-act="rewriteDel" data-id="${t.id}">🗑 למחוק, כנראה לא צריך אותה</button><button class="btn ghost" data-act="rewriteKeep" data-id="${t.id}">להשאיר כמו שהיא</button></div>`);
+}
+function nudgeAny(ids) { if (!$('#sheet').hidden) return; const t = (ids ? ids.map(findTask) : D().tasks).find(needsNudge); if (t) rewriteSheet(t); }
+
+/* Morning review: did you keep yesterday's actions, and what to improve */
+let reviewSnooze = false;
+function reviewSheet() {
+  const T = TODAY(), y = addDays(T, -1), ts = tasksOn(y), done = ts.filter(t => t.done).length, left = ts.filter(t => !t.done), L = D().dayLog[y] || {};
+  const planned = ts.reduce((s, t) => s + (t.mins || 0), 0), tips = [];
+  if (planned > DAY_CAP) tips.push(`תכננת ${planned} דקות, יותר מ-${DAY_CAP}. מחר אפשר לתכנן פחות.`);
+  if (left.some(t => (t.energy || 0) >= 4)) tips.push('פעולות עתירות אנרגיה נשארו בלי ביצוע. כדאי לשבץ אותן בתחילת היום.');
+  if (left.some(t => (t.defers || 0) >= 2)) tips.push('יש פעולות שנדחות שוב ושוב. שווה לכתוב אותן מחדש או לפצל.');
+  if (L.start && L.end && dayDurMin(L) > 600) tips.push('היום היה ארוך מאוד (' + fmtDur(dayDurMin(L)) + '). כדאי לקבוע שעת סיום.');
+  if (ts.length && done === ts.length) tips.push('עמדת בכל הפעולות. שים לב מה עזר לך, ושמור על זה.');
+  else if (!tips.length && left.length) tips.push('נסה לתכנן פחות פעולות, ובחר מראש את החשובה ביותר.');
+  sheet(`<h1>סיכום אתמול ☀️</h1>
+   <p class="sub">${done}/${ts.length} פעולות בוצעו${L.start ? ` · התחלת ב-${L.start}${L.end ? ' וסיימת ב-' + L.end : ''}` : ''}</p>
+   ${left.length ? `<div class="sub">לא בוצעו: ${left.slice(0, 4).map(t => esc(t.title)).join(' · ')}${left.length > 4 ? '…' : ''}</div>` : ''}
+   ${tips.length ? `<div class="clarity">${tips.map(x => `<div class="ok">💡 ${esc(x)}</div>`).join('')}</div>` : ''}
+   <form id="f"><label>עמדת במשימות של אתמול?</label>
+   <div class="opt" id="metOpts">${[['yes', '✅ כן'], ['part', '🟡 חלקית'], ['no', '❌ לא']].map(([v, l]) => `<button type="button" onclick="const f=this.closest('form');f.met.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div><input type="hidden" name="met" value="">
+   <label>מה הייתי משפר?</label><textarea name="improve" rows="3" placeholder="דבר אחד קטן לשפר היום"></textarea>
+   <div class="actions"><button type="button" class="btn ghost" data-act="reviewLater">אחר כך</button><button class="btn">שמור והמשך</button></div></form>`);
+  $('#f').onsubmit = e => { e.preventDefault(); const f = new FormData(e.target); D().review[y] = { met: f.get('met') || '', improve: f.get('improve').trim(), at: new Date().toISOString() }; Store.save(); closeSheet(); setTimeout(askFocus, 250); };
+}
+function askMorning() {
+  if (!$('#sheet').hidden || !$('#run').hidden) return;
+  const T = TODAY(), y = addDays(T, -1);
+  if (!visualSnooze && !D().visual[T] && new Date().getHours() < 14) return visualOffer();
+  if (!reviewSnooze && !D().review[y] && tasksOn(y).length) return reviewSheet();
+  askFocus();
+}
+/* ---------- Morning guided visualization: shown paragraph by paragraph, optional auto-advance and read-aloud ---------- */
+const VISUALIZATION = [
+  'דמיין שאתה קם בבוקר.\nלא סתם בוקר — זה יום שאתה עומד לפגוש את היעד שלך.\nאתה יודע את זה.\nאתה מרגיש את זה בגוף.\nהנשימה שלך רגועה, הגוף שלך מלא באנרגיה.\nיש שקט פנימי.\nאין לחץ.\nיש בהירות.',
+  'אתה מסתכל על היומן שלך — כל דבר שאתה עושה היום מוביל אותך אל היעד.\nאבל בניגוד לעבר, אתה לא רץ.\nאתה מתקדם בדיוק, בפוקוס, ובחיבור.',
+  'אתה רואה את עצמך נכנס למשרד/הסטודיו/המרחב שלך.\nיש שם תחושת ביטחון, סדר, נוכחות.\nהעבודה זורמת.\nהפעולות שאתה עושה – נכונות, מדויקות, ממוקדות.\nאתה עונה למיילים, שולח הצעות, מדבר עם לקוחות, מציג רעיונות –\nוהכל מתוך תחושת עוצמה ובשליטה.\nאין התפזרות. אין דחיינות.\nרק בהירות.',
+  'אתה רואה בעיני רוחך את היעד שלך כבר מושג.\nהמספר שרצית — נמצא במערכת.\nהפרויקט שרצית — נחתם.\nהתגובות שרצית — מגיעות.\nאתה עומד ומסתכל על התוצאה ואומר לעצמך:\n"עשיתי את זה. כי הלכתי בדרך. כי לא וויתרתי לעצמי. כי הייתי שם — יום אחרי יום."',
+  'תן לעצמך רגע ממש להרגיש את התחושה של ההישג.\nאיך הגוף שלך מרגיש כשאתה עומד שם?\nמה הפנים שלך משדרות?\nמי איתך שם?\nאיך אתה מדבר?\nמה אתה משדר לעולם?',
+  'ועכשיו... קח את התחושה הזו, ותכניס אותה לתוך הלב שלך.\nתנשום אותה פנימה.\nזוהי אנרגיית הביצוע שלך.\nהיא שלך — היא תמיד הייתה.'
+];
+const Vis = { i: 0, auto: false, speak: false, timer: null };
+let visualSnooze = false;
+const canSpeak = () => 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+function visSay() {
+  if (!canSpeak()) return; speechSynthesis.cancel();
+  if (!Vis.speak) return;
+  const u = new SpeechSynthesisUtterance(VISUALIZATION[Vis.i].replace(/\n/g, '. ')); u.lang = 'he-IL'; u.rate = 0.85; speechSynthesis.speak(u);
+}
+function visSchedule() {
+  clearTimeout(Vis.timer);
+  if (!Vis.auto) return;
+  const words = VISUALIZATION[Vis.i].split(/\s+/).length;
+  Vis.timer = setTimeout(() => { if (Vis.i < VISUALIZATION.length - 1) { Vis.i++; visRender(); } }, Math.max(9000, words * 650));
+}
+function visRender() {
+  const el = $('#run'), last = Vis.i === VISUALIZATION.length - 1;
+  el.innerHTML = `<div class="runbox visbox"><button class="iconbtn runx" data-act="visClose" aria-label="סגור">✕</button>
+    <div class="sub">🧘 דמיון מודרך · ${Vis.i + 1}/${VISUALIZATION.length}</div>
+    <div class="visdots">${VISUALIZATION.map((_, k) => `<i class="${k <= Vis.i ? 'on' : ''}"></i>`).join('')}</div>
+    <div class="vistext" key="${Vis.i}">${VISUALIZATION[Vis.i].split('\n').map(l => `<p>${esc(l)}</p>`).join('')}</div>
+    <div class="opt" style="justify-content:center;margin:10px 0">
+      <button class="${Vis.auto ? 'on' : ''}" data-act="visAuto">${Vis.auto ? '⏸ אוטומטי' : '▶ אוטומטי'}</button>
+      ${canSpeak() ? `<button class="${Vis.speak ? 'on' : ''}" data-act="visSpeak">🔊 הקראה</button>` : ''}</div>
+    <div class="grid2">${Vis.i > 0 ? '<button class="btn ghost" data-act="visPrev">הקודם</button>' : '<span></span>'}${last ? '<button class="btn" data-act="visDone">✓ סיימתי</button>' : '<button class="btn" data-act="visNext">הבא</button>'}</div></div>`;
+  visSchedule(); visSay();
+}
+function visOpen() { clearInterval(Run.tick); closeSheet(); Vis.i = 0; Vis.auto = false; $('#run').hidden = false; document.body.classList.add('running'); visRender(); }
+function visStop() { clearTimeout(Vis.timer); if (canSpeak()) speechSynthesis.cancel(); $('#run').hidden = true; document.body.classList.remove('running'); }
+function visualOffer() {
+  sheet(`<h1>🧘 דמיון מודרך</h1><p class="sub">כמה דקות של דמיון לפני שמתחילים את היום. תקרא בקצב שלך, או תן לאפליקציה להתקדם לבד.</p>
+   <div class="actions"><button class="btn ghost" data-act="visLater">אחר כך</button><button class="btn" data-act="visStart">▶ להתחיל</button></div>`);
+}
+function visualCard(d) {
+  if (d !== TODAY()) return '';
+  const done = !!D().visual[d];
+  return `<div class="card row ${done ? 'done' : ''}"><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>${done ? 'בוצע היום ✓' : 'עוד לא בוצע'}</span></div></div><button class="iconbtn" data-act="visStart">${done ? '↺ שוב' : '▶ להתחיל'}</button></div>`;
+}
+/* ---------- Personal reminders: two sentences shown on the daily screen and while working ---------- */
+const REMINDERS = ['להרגיש את הכאב של הצמיחה, לצאת מאזור הנוחות.', 'האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.'];
+const remIndex = () => { const n = Math.floor(parse(TODAY()).getTime() / 864e5) + (state.remShift || 0); return ((n % REMINDERS.length) + REMINDERS.length) % REMINDERS.length; };
+const reminder = () => REMINDERS[remIndex()];
 /* ---------- Daily focus: the most important task and the "fun" of the day; asked at the start of the day when missing ---------- */
-const focusOn = d => { const f = D().focus[d] || {}, t = f.mitId ? D().tasks.find(x => x.id === f.mitId) : null; return { mit: t ? t.title : (f.mit || ''), mitId: t ? t.id : '', fun: f.fun || '', energy: f.energy || '' }; };
+const focusOn = d => { const f = D().focus[d] || {}, t = f.mitId ? D().tasks.find(x => x.id === f.mitId) : null; return { mit: t ? t.title : (f.mit || ''), mitId: t ? t.id : '', fun: f.fun || '', energy: normEnergy(f.energy) }; };
 function focusCard(d) {
   const f = focusOn(d);
   if (!f.mit && !f.fun) return `<div class="card focus" data-act="focusEdit"><div class="t"><b>⭐ מה החשוב היום, ומה הפאן?</b></div><div class="sub">לחץ כדי לקבוע</div></div>`;
-  return `<div class="card focus" data-act="focusEdit"><div class="frow"><span>⭐</span><div class="grow"><div class="sub">המשימה החשובה של היום</div><div class="t">${f.mit ? esc(f.mit) : '—'}</div></div></div>
+  return `<div class="card focus" data-act="focusEdit"><div class="frow"><span>⭐</span><div class="grow"><div class="sub">הפעולה החשובה של היום</div><div class="t">${f.mit ? esc(f.mit) : '—'}</div></div></div>
     <div class="frow"><span>🎉</span><div class="grow"><div class="sub">הפאן של היום</div><div class="t">${f.fun ? esc(f.fun) : '—'}</div></div></div>
     ${f.mit && d === TODAY() && !(f.mitId && (D().tasks.find(x => x.id === f.mitId) || {}).done) ? `<button class="btn startnow" data-act="runStart" data-id="${f.mitId}">▶ התחל עכשיו</button>` : ''}</div>`;
 }
@@ -322,8 +627,10 @@ let focusSnooze = false;
 function focusSheet(d) {
   const f = focusOn(d), open = D().tasks.filter(t => !t.done && t.date === d).sort((a, b) => (b.energy || 0) - (a.energy || 0) || (b.priority || 0) - (a.priority || 0)).slice(0, 6);
   sheet(`<h1>${d === TODAY() ? 'בוקר טוב 👋' : 'מיקוד היום'}</h1>
+  <div class="remind">💬 ${esc(reminder())}</div>
+  ${(D().review[addDays(d, -1)] || {}).improve ? '<div class="remind" style="background:var(--warn-bg);color:var(--warn-ink)">אתמול רצית לשפר: ' + esc(D().review[addDays(d, -1)].improve) + '</div>' : ''}
   <form id="f">
-   <label>⭐ מה המשימה החשובה ביותר היום?</label>
+   <label>⭐ מה הפעולה החשובה ביותר היום?</label>
    <input name="mit" value="${esc(f.mit)}" autocomplete="off" placeholder="כתוב, או בחר ממשימות היום">
    <input type="hidden" name="mitId" value="${f.mitId}">
    ${open.length ? '<div class="opt" style="margin-top:6px">' + open.map(t => '<button type="button" data-act="focusPick" data-id="' + t.id + '">' + esc(t.title) + '</button>').join('') + '</div>' : ''}
@@ -335,7 +642,7 @@ function focusSheet(d) {
   $('#f').mit.addEventListener('input', () => { $('#f').mitId.value = ''; });
   $('#f').onsubmit = e => {
     e.preventDefault(); const fd = new FormData(e.target);
-    D().focus[d] = { mit: fd.get('mit').trim(), mitId: fd.get('mitId') || '', fun: fd.get('fun').trim(), energy: fd.get('energy') || '' };
+    Object.assign(fo(d), { mit: fd.get('mit').trim(), mitId: fd.get('mitId') || '', fun: fd.get('fun').trim(), energy: fd.get('energy') || '', energyAt: new Date().toISOString() });
     Store.save(); closeSheet(); render();
   };
 }
@@ -360,7 +667,7 @@ function taskRow(t, showDate) {
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${esc(t.title)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${t.jobId ? jobChip(t) : projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div></div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -381,7 +688,7 @@ function upCard(t, showDate) {
   return `<div class="ucard p${t.priority} ${t.done ? 'done' : ''}" data-task="${t.id}"><div class="urow">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${esc(t.title)}</div>
-    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${projectChip(t)}</div></div></div>${subs}</div>`;
+    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.jobId ? jobChip(t) : projectChip(t)}</div></div></div>${subs}</div>`;
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
@@ -394,10 +701,14 @@ const views = {
     return `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
       <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
       <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${(() => { const m = ts.filter(t => !t.done).reduce((s, t) => s + (t.mins || 0), 0) + hs.filter(h => !habitDone(h, d)).reduce((s, h) => s + (h.mins || 0), 0); return m ? ` · נותרו ${m} ד׳` : ''; })()}</b></div><div class="bar"><div style="width:${pct}%"></div></div></div>
+      ${dayCard(d)}
+      ${visualCard(d)}
       ${focusCard(d)}
-      <div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל משימות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>
+      <div class="remind" data-act="nextReminder" title="לחץ להחלפה">💬 ${esc(reminder())}</div>
+      <div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל פעולות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>
       ${energyBar(d)}
-      <h2>משימות</h2>${isToday ? orgCard() : ''}${tasksBlock(d, ts)}
+      ${rhythmStrip(d)}
+      <h2>פעולות</h2>${isToday ? orgCard() : ''}${tasksBlock(d, ts)}
       ${hs.length ? `<h2>הרגלים</h2>${hs.map(h => habitRow(h, d)).join('')}` : ''}
       <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>
       <button class="fab" data-act="addTask" aria-label="משימה חדשה">+</button>`;
@@ -432,7 +743,7 @@ const views = {
       const sel = state.upSel, sts = tasksOn(sel);
       nav = navRow(`${MONTHS[m - 1]} ${y}`);
       body = `<div class="mgrid">${cells}</div><h2>${longDate(sel)}</h2>
-        <section class="ucol msel" data-drop="${sel}"><button class="uadd" data-act="addTaskOn" data-date="${sel}">＋ הוסף משימה</button>${sts.map(t => upCard(t)).join('') || '<div class="empty">אין משימות ליום הזה</div>'}</section>`;
+        <section class="ucol msel" data-drop="${sel}"><button class="uadd" data-act="addTaskOn" data-date="${sel}">＋ הוסף משימה</button>${sts.map(t => upCard(t)).join('') || '<div class="empty">אין פעולות ליום הזה</div>'}</section>`;
     } else {
       const start = state.upStart, days = Array.from({ length: state.upDays }, (_, i) => addDays(start, i));
       const undated = D().tasks.filter(t => !t.date && !t.done);
@@ -512,21 +823,25 @@ const views = {
       <label>מה לשפר בשבוע הבא?</label><textarea data-weekfield="improve" placeholder="מה לשנות, לפשט או להפסיק">${esc(W.improve)}</textarea>`;
   },
   projects() {
+    if (state.openJob) { const j = findJob(state.openJob); if (j) return jobView(j); state.openJob = null; }
     if (state.openProject) {
       const p = D().projects.find(x => x.id === state.openProject);
       if (p) {
-        const s = projState(p), open = s.ts.filter(t => !t.done), done = s.ts.filter(t => t.done);
+        const s = projState(p), loose = s.ts.filter(t => !t.jobId), open = loose.filter(t => !t.done), done = loose.filter(t => t.done), jobs = D().jobs.filter(j => j.projectId === p.id);
         return `<div class="top"><div class="row"><button class="iconbtn" data-act="backProjects" aria-label="חזרה">${chev('r')}</button><h1>${esc(p.title)}</h1></div><div class="sw"><button class="iconbtn" data-act="renameProject" data-id="${p.id}" aria-label="שנה שם">✏️</button><button class="iconbtn" data-act="delProject" data-id="${p.id}" aria-label="מחק">🗑</button></div></div>
-         <div class="card"><div class="row"><b class="grow">${s.done}/${s.total} משימות הושלמו</b><span class="sub">${s.mins} ד׳ נותרו</span></div><div class="bar"><div style="width:${s.pct}%"></div></div></div>
-         <div class="opt" style="margin-bottom:10px"><button data-act="projAddTask" data-id="${p.id}">＋ משימה</button><button data-act="projBulk" data-id="${p.id}">📋 הזנה מרוכזת</button><button data-act="projAssign" data-id="${p.id}">🔗 שייך משימות קיימות</button></div>
-         <h2>פתוחות (${open.length})</h2>${open.map(t => taskRow(t, true)).join('') || '<div class="empty">אין משימות פתוחות בפרויקט</div>'}
+         <div class="card"><div class="row"><b class="grow">${s.done}/${s.total} פעולות הושלמו</b><span class="sub">${s.mins} ד׳ נותרו</span></div><div class="bar"><div style="width:${s.pct}%"></div></div></div>
+         <div class="opt" style="margin-bottom:10px"><button data-act="projNewJob" data-id="${p.id}">＋ משימה</button><button data-act="projAddTask" data-id="${p.id}">＋ פעולה</button><button data-act="projBulk" data-id="${p.id}">📋 הזנה מרוכזת</button><button data-act="projAssign" data-id="${p.id}">🔗 שייך פעולות קיימות</button></div>
+         ${jobs.length ? `<h2>משימות (${jobs.length})</h2>${jobs.map(jobCard).join('')}` : ''}
+         <h2>פעולות ישירות בפרויקט (${open.length})</h2>${open.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות פתוחות. הוסף משימה ופרק אותה לפעולות</div>'}
          ${done.length ? `<h2>הושלמו (${done.length})</h2>${done.map(t => taskRow(t, true)).join('')}` : ''}`;
       }
       state.openProject = null;
     }
     const ps = D().projects.map(p => ({ p, s: projState(p) }));
     return `<div class="top"><h1>פרויקטים</h1></div>
-      ${ps.map(({ p, s }) => `<div class="card" data-act="openProject" data-id="${p.id}"><div class="row"><div class="grow"><div class="t"><b>📁 ${esc(p.title)}</b></div><div class="meta"><span>${s.done}/${s.total} משימות</span>${s.total && s.done === s.total ? '<span class="chip">✓ הושלם</span>' : ''}${s.mins ? `<span>${s.mins} ד׳ נותרו</span>` : ''}</div></div>${chev('l')}</div><div class="bar"><div style="width:${s.pct}%"></div></div></div>`).join('') || '<div class="empty">אגד משימות קשורות תחת פרויקט אחד, כדי לראות אותן ולהתקדם בהן יחד</div>'}
+      ${ps.map(({ p, s }) => `<div class="card" data-act="openProject" data-id="${p.id}"><div class="row"><div class="grow"><div class="t"><b>📁 ${esc(p.title)}</b></div><div class="meta"><span>${D().jobs.filter(j => j.projectId === p.id).length} משימות · ${s.done}/${s.total} פעולות</span>${s.total && s.done === s.total ? '<span class="chip">✓ הושלם</span>' : ''}${s.mins ? `<span>${s.mins} ד׳ נותרו</span>` : ''}</div></div>${chev('l')}</div><div class="bar"><div style="width:${s.pct}%"></div></div></div>`).join('') || '<div class="empty">פרויקט מכיל משימות, וכל משימה מורכבת מפעולות קטנות של עד 15 דקות</div>'}
+      ${D().jobs.some(j => !j.projectId) ? `<h2>משימות ללא פרויקט</h2>${D().jobs.filter(j => !j.projectId).map(jobCard).join('')}` : ''}
+      <div class="opt" style="margin-top:10px"><button data-act="newLooseJob">＋ משימה ללא פרויקט</button></div>
       <button class="fab" data-act="addProject">+</button>`;
   },
   more() {
@@ -534,8 +849,9 @@ const views = {
     const wait = D().goals.filter(g => g.reward && !g.claimed && goalState(g).achieved).length;
     const item = (t, icon, title, sub) => `<div class="card row" data-act="goTab" data-t="${t}"><span style="font-size:26px">${icon}</span><div class="grow"><div class="t"><b>${title}</b></div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
     return `<div class="top"><div class="brand">${logoMark(40)}<h1>Do It</h1></div></div>
+      ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
       ${item('journal', '📓', 'יומן', `${journalDays().length} ימים עם רישום`)}
-      ${item('tasks', '✅', 'כל המשימות', `${D().tasks.filter(t => !t.done).length} פתוחות`)}
+      ${item('tasks', '✅', 'כל הפעולות', `${D().tasks.filter(t => !t.done).length} פתוחות`)}
       ${item('projects', '📁', 'פרויקטים', `${D().projects.filter(p => projState(p).done < projState(p).total).length} פעילים`)}
       ${item('habits', '🔁', 'הרגלים', `${D().habits.length} הרגלים`)}
       ${item('goals', '🎯', 'יעדים ותגמולים', `${activeG} פעילים${wait ? ` · 🎁 ${wait} ממתינים` : ''}`)}
@@ -561,6 +877,21 @@ const views = {
       ${J.wins.map(w => `<div class="card row win"><span style="font-size:20px">🏆</span><div class="t grow">${esc(w.text)}</div><button class="iconbtn" data-act="jWinDel" data-id="${w.id}" aria-label="מחק">✕</button></div>`).join('') || '<div class="empty">מה הלך טוב היום? גם דבר קטן נחשב</div>'}
       <form id="winForm" class="row" style="margin-top:10px"><input id="winText" placeholder="הצלחה חדשה" autocomplete="off"><button class="btn">הוסף</button></form>
       ${past.length ? `<h2>ימים קודמים</h2>${past.map(pastRow).join('')}` : ''}`;
+  },
+  rhythm() {
+    const items = rhythmSorted();
+    return `<div class="top"><h1>מקצב היום</h1></div>
+     <p class="sub">הפסקות אוכל ומנוחה שאתה קובע בעצמך. הן מופיעות ביום, ואינן פעולות ואינן נספרות בהתקדמות.</p>
+     ${items.map(r => `<div class="card row"><span style="font-size:22px">${r.kind === 'meal' ? '🍽' : '😌'}</span><div class="grow"><div class="t"><b>${esc(r.label)}</b></div><div class="meta"><span>${r.time}</span><span>${r.mins} ד׳</span><span>${r.kind === 'meal' ? 'ארוחה' : 'מנוחה יומית'}</span></div></div><button class="iconbtn" data-act="rhythmDel" data-id="${r.id}" aria-label="מחק">✕</button></div>`).join('') || '<div class="empty">עדיין לא הגדרת הפסקות</div>'}
+     ${items.some(r => r.kind === 'rest') ? '' : '<div class="clarity"><div class="w">⚠ אין מנוחה יומית מוגדרת. מומלץ להוסיף לפחות אחת.</div></div>'}
+     <h2>הפסקה חדשה</h2>
+     <form id="rhForm"><label>שם</label><input name="label" required placeholder="למשל: ארוחת צהריים" autocomplete="off">
+      <label>שעה</label><input type="time" name="time" required value="13:00">
+      <label>משך</label><select name="mins">${[10, 15, 20, 30, 45, 60].map(m => `<option value="${m}" ${m === 30 ? 'selected' : ''}>${m} דקות</option>`).join('')}</select>
+      <label>סוג</label><select name="kind"><option value="meal">ארוחה</option><option value="rest">מנוחה יומית</option></select>
+      <div class="actions"><button class="btn">הוסף</button></div></form>
+     <h2>הפסקה בכל שעה</h2><p class="sub">אחרי כ-50 דקות עבודה (לפי הטיימר ופעולות שסימנת כבוצעו) תופיע הצעה ל-10 דקות הפסקה, בלי חסימה. ההצעה מופיעה כשהאפליקציה פתוחה.</p>
+     <h2>שעות ההתחלה והסיום שלי</h2>${dayHistoryHTML()}`;
   },
   goals() {
     const F = state.goalFilter, all = D().goals.map(g => ({ g, s: goalState(g) }));
@@ -597,12 +928,12 @@ function render() {
   const board = $('#uboard'), boardScroll = board ? board.scrollLeft : null; // keep the board's horizontal position across re-renders
   document.body.classList.toggle('wide', state.tab === 'upcoming');
   $('#view').innerHTML = views[state.tab]();
-  if (MORE_TABS.includes(state.tab) && !(state.tab === 'lists' && state.openList) && !(state.tab === 'projects' && state.openProject)) // back to the "עוד" menu
+  if (MORE_TABS.includes(state.tab) && !(state.tab === 'lists' && state.openList) && !(state.tab === 'projects' && (state.openProject || state.openJob))) // back to the "עוד" menu
     $('#view').insertAdjacentHTML('afterbegin', `<button class="iconbtn backmore" data-act="goTab" data-t="more" aria-label="חזרה לעוד">${chev('r')}<span style="margin-inline-start:6px">עוד</span></button>`);
   if (DEMO) $('#view').insertAdjacentHTML('afterbegin', '<div class="demobar">מצב דמו · נתונים בדויים <button class="lnk" data-act="demoReset">אפס דמו</button></div>');
   if (boardScroll !== null && $('#uboard')) $('#uboard').scrollLeft = boardScroll;
   // Entrance animation (FitMe-style soft rise, staggered) only when the screen changes, not on every re-render.
-  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.openList || '');
+  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.openList || '') + (state.openProject || '') + (state.openJob || '');
   const enter = state.viewKey !== key; state.viewKey = key;
   view.classList.toggle('enter', enter);
   if (enter) {
@@ -621,6 +952,8 @@ function render() {
     weekData(state.weekStart).outcomes.push({ id: uid(), text: txt, done: false });
     Store.save(); render(); $('#outText').focus();
   };
+  const rf = $('#rhForm');
+  if (rf) rf.onsubmit = e => { e.preventDefault(); const f = new FormData(rf); D().rhythm.push({ id: uid(), label: f.get('label').trim(), time: f.get('time'), mins: +f.get('mins'), kind: f.get('kind') }); Store.save(); render(); };
   const wf = $('#winForm');
   if (wf) wf.onsubmit = e => {
     e.preventDefault(); const txt = $('#winText').value.trim(); if (!txt) return;
@@ -650,9 +983,9 @@ function closeSheet() { $('#sheet').hidden = true; $('#sheet').innerHTML = ''; }
 const visionOpts = sel => `<option value="">ללא קישור</option>` + D().visions.map(v => `<option value="${v.id}" ${v.id === sel ? 'selected' : ''}>${esc(v.title)}</option>`).join('');
 
 function taskForm(id, presetDate, presetProject, preset) {
-  const t = id ? D().tasks.find(x => x.id === id) : { title: '', date: presetDate !== undefined ? presetDate : state.date, priority: 0, print: false, visionId: '', projectId: presetProject || '', notes: '', energy: 3, mins: 15, repeat: '', ...preset };
+  const t = id ? D().tasks.find(x => x.id === id) : { title: '', date: presetDate !== undefined ? presetDate : state.date, priority: 0, print: false, visionId: '', projectId: presetProject || '', notes: '', energy: 3, mins: 15, repeat: '', jobId: '', ...preset };
   const mo = [...new Set([5, 10, 15, 20, 30, 45, 60, 90, t.mins || 15])].sort((a, b) => a - b);
-  sheet(`<h1>${id ? 'עריכת משימה' : 'משימה חדשה'}</h1>
+  sheet(`<h1>${id ? 'עריכת פעולה' : 'פעולה חדשה'}</h1>
   <form id="f">
    <label>מה לעשות (פעולה אחת, ברורה ומוחשית)</label><input name="title" required value="${esc(t.title)}" autofocus autocomplete="off">
    <div id="clHint" class="clarity">${id ? '' : clarityHTML('')}</div>
@@ -671,7 +1004,7 @@ function taskForm(id, presetDate, presetProject, preset) {
    <label>משך (עד 15 דקות; ארוך יותר יוצע לפיצול)</label>
    <select name="mins">${mo.map(m => `<option value="${m}" ${m == (t.mins || 15) ? 'selected' : ''}>${m} דקות</option>`).join('')}</select>
    <label>עדיפות</label><select name="priority"><option value="0" ${t.priority == 0 ? 'selected' : ''}>רגילה</option><option value="1" ${t.priority == 1 ? 'selected' : ''}>חשובה</option><option value="2" ${t.priority == 2 ? 'selected' : ''}>דחופה</option></select>
-   <label>פרויקט (אופציונלי): לאגד משימות קשורות</label><select name="projectId">${projectOpts(t.projectId)}</select>
+   <label>שייכת ל... (משימה או פרויקט)</label><select name="owner">${ownerOpts(t.jobId ? 'j:' + t.jobId : t.projectId ? 'p:' + t.projectId : '')}</select>
    <label>קישור לחזון (אופציונלי)</label><select name="visionId">${visionOpts(t.visionId)}</select>
    <label>הערות</label><textarea name="notes">${esc(t.notes || '')}</textarea>
    <label class="row" style="color:var(--ink)"><input type="checkbox" name="brainless" style="width:auto" ${t.brainless ? 'checked' : ''}> ⚡ Brainless (משימה פשוטה שאפשר להעיף ברגע)</label>
@@ -681,10 +1014,10 @@ function taskForm(id, presetDate, presetProject, preset) {
   </form>`);
   // Clarity gate: new tasks (or a changed title) must be confirmed with "זה ברור" before they are saved.
   const form = $('#f'), origTitle = id ? t.title : null;
-  form.projectId.addEventListener('change', () => { // "＋ פרויקט חדש" creates a project on the spot and selects it
-    if (form.projectId.value !== '__new__') return;
-    const p = newProject(); const sel = form.projectId;
-    if (p) { sel.add(new Option(p.title, p.id), sel.options[sel.options.length - 1]); sel.value = p.id; } else sel.value = '';
+  form.owner.addEventListener('change', () => { // "＋ משימה / פרויקט חדש" creates it on the spot and selects it
+    const sel = form.owner, v = sel.value; if (v !== '__new__' && v !== '__newjob__') return;
+    const made = v === '__new__' ? newProject() : newJob('');
+    if (made) { sel.add(new Option((v === '__new__' ? '📁 ' : '🧩 ') + made.title, (v === '__new__' ? 'p:' : 'j:') + made.id), sel.options[sel.options.length - 2]); sel.value = (v === '__new__' ? 'p:' : 'j:') + made.id; } else sel.value = '';
   });
   // A clear-looking title is saved as is; only an unclear one is blocked until the user confirms it.
   const needClear = () => (!id || form.title.value.trim() !== origTitle) && clarity(form.title.value).length > 0;
@@ -697,8 +1030,8 @@ function taskForm(id, presetDate, presetProject, preset) {
   $('#f').onsubmit = e => {
     e.preventDefault();
     if (needClear() && !form.clear.checked) { $('#clMsg').textContent = 'הניסוח לא ברור. תקן אותו, או סמן "זה ברור" כדי להוסיף בכל זאת.'; $('#clRow').hidden = false; return; }
-    const f = new FormData(e.target);
-    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: +f.get('priority'), visionId: f.get('visionId') || '', projectId: f.get('projectId') === '__new__' ? '' : (f.get('projectId') || ''), notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
+    const f = new FormData(e.target), own = f.get('owner') || '', jobId = own.startsWith('j:') ? own.slice(2) : '', projectId = jobId ? ((findJob(jobId) || {}).projectId || '') : (own.startsWith('p:') ? own.slice(2) : '');
+    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: +f.get('priority'), visionId: f.get('visionId') || '', jobId, projectId, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
     let saved = t;
     if (id) Object.assign(t, obj); else { saved = { id: uid(), done: false, subs: [], ...obj }; D().tasks.push(saved); }
     resolveLong([saved]);
@@ -852,7 +1185,7 @@ function orgSuggest() {
     let best = null;
     for (let i = first; i < first + 14 && !best; i++) { const d = addDays(T, i); if (get(d) + m <= DAY_CAP) best = d; }
     if (!best) { let min = Infinity; for (let i = first; i < first + 14; i++) { const d = addDays(T, i); if (get(d) < min) { min = get(d); best = d; } } }
-    t.date = best; load[best] = get(best) + m;
+    deferTo(t, best); load[best] = get(best) + m;
   }
   Store.save(); render(); orgStep1();
 }
@@ -863,6 +1196,7 @@ function orgStep2() {
   if (load > DAY_CAP) warns.push(`מחר עמוס: ${load} דקות (מעל ${DAY_CAP}). כדאי להעביר משהו ליום אחר.`);
   const noEn = ts.filter(t => !t.energy).length; if (noEn) warns.push(noEn === 1 ? 'משימה אחת בלי דירוג אנרגיה.' : `${noEn} משימות בלי דירוג אנרגיה.`);
   const longs = ts.filter(t => (t.mins || 0) > 15 && !(t.subs && t.subs.length)).length; if (longs) warns.push(longs === 1 ? 'משימה אחת ארוכה מ-15 דקות בלי פיצול לתתי-משימות.' : `${longs} משימות ארוכות מ-15 דקות בלי פיצול לתתי-משימות.`);
+  if (!D().rhythm.some(r => r.kind === 'rest')) warns.push('לא הוגדרה מנוחה יומית. כדאי להגדיר ב"מקצב היום".');
   const unclear = ts.filter(t => clarity(t.title).length).length; if (unclear) warns.push(unclear === 1 ? 'משימה אחת בניסוח לא ברור.' : `${unclear} משימות בניסוח לא ברור.`);
   const first = ts.find(t => !t.done);
   const mv = [['מחרתיים', addDays(T, 2)], ['בעוד 3 ימים', addDays(T, 3)], ['ללא תאריך', 'none']];
@@ -915,23 +1249,15 @@ function menuSheet(id) {
   const t = findTask(id); if (!t) return closeSheet();
   const v = t.visionId ? visionName(t.visionId) : '';
   sheet(`<h1>${esc(t.title)}</h1>
-   <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+   <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${t.jobId ? jobChip(t) : projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
    ${t.notes ? `<p class="sub" style="white-space:pre-wrap">${esc(t.notes)}</p>` : ''}
-   ${(t.subs || []).map(s => `<div class="row ${s.done ? 'done' : ''}" style="margin:6px 0"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div><button class="iconbtn" data-act="subDel" data-id="${t.id}" data-sid="${s.id}">✕</button></div>`).join('')}
-   <form id="subForm" class="row" style="margin-top:8px" hidden><input id="subText" placeholder="תת משימה חדשה" autocomplete="off"><button class="btn">הוסף</button></form>
    <div class="grid2">
      ${t.done ? '' : `<button class="btn" data-act="runStart" data-id="${t.id}">▶ התחל עכשיו</button>`}
      <button class="btn ghost" data-act="menuDone" data-id="${t.id}">${t.done ? '↺ בטל ביצוע' : '✓ בוצע'}</button>
      <button class="btn ghost" data-act="moveSheet" data-id="${t.id}">📆 העבר</button>
      <button class="btn ghost" data-act="editTask" data-id="${t.id}">✏️ ערוך</button>
-     <button class="btn ghost" data-act="subShow">➕ הוסף תת משימה</button>
    </div>
    <div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
-  $('#subForm').onsubmit = e => {
-    e.preventDefault(); const txt = $('#subText').value.trim(); if (!txt) return;
-    (t.subs = t.subs || []).push({ id: uid(), title: txt, done: false });
-    Store.save(); render(); menuSheet(id); $('#subForm').hidden = false; $('#subText').focus();
-  };
 }
 function moveSheet(id) {
   const t = findTask(id), T = TODAY();
@@ -945,29 +1271,32 @@ function moveSheet(id) {
 /* ---------- Tasks must be <= 15 min: offer to split longer ones ---------- */
 let splitCtx = null;
 // Splitting keeps the task as the parent (with its total minutes) and creates clearly named subtasks of <= 15 min each.
-function splitNameSheet(t, next) {
-  const n = Math.ceil(t.mins / 15), each = Math.ceil(t.mins / n);
-  sheet(`<h1>שמות לתתי-המשימות</h1>
-   <p>"${esc(t.title)}" תתפצל ל-${n} שלבים של כ-${each} דקות. תן לכל שלב שם ברור, שיגיד מה בדיוק עושים בו.</p>
-   <form id="f">${Array.from({ length: n }, (_, i) => `<label>שלב ${i + 1} (${each} ד׳)</label><input name="s${i}" required autocomplete="off" placeholder="מה עושים בשלב הזה?" ${i === 0 ? 'autofocus' : ''}>`).join('')}
+function splitNameSheet(t, next, forceN) {
+  const n = forceN || Math.ceil(t.mins / 15), each = forceN ? Math.min(15, Math.ceil((t.mins || 15) / n)) : Math.ceil(t.mins / n);
+  sheet(`<h1>שמות לפעולות</h1>
+   <p>"${esc(t.title)}" תהפוך למשימה עם ${n} פעולות של כ-${each} דקות. תן לכל פעולה שם ברור, שיגיד מה בדיוק עושים בה.</p>
+   <form id="f">${Array.from({ length: n }, (_, i) => `<label>פעולה ${i + 1} (${each} ד׳)</label><input name="s${i}" required autocomplete="off" placeholder="מה עושים בפעולה הזאת?" ${i === 0 ? 'autofocus' : ''}>`).join('')}
    <div id="splitMsg" class="sub" style="color:var(--danger);margin-top:8px"></div>
    <div class="actions"><button type="button" class="btn ghost" data-act="keepLong">להשאיר כמו שהיא</button><button class="btn">שמור</button></div></form>`);
   $('#f').onsubmit = e => {
     e.preventDefault(); const f = new FormData(e.target);
     const names = Array.from({ length: n }, (_, i) => f.get('s' + i).trim());
-    if (names.some(x => !x) || new Set(names.map(x => x.toLowerCase())).size !== names.length) { $('#splitMsg').textContent = 'לכל שלב צריך שם ברור, וכל השמות צריכים להיות שונים.'; return; }
-    t.subs = (t.subs || []).concat(names.map(title => ({ id: uid(), title, done: false, mins: each })));
+    if (names.some(x => !x) || new Set(names.map(x => x.toLowerCase())).size !== names.length) { $('#splitMsg').textContent = 'לכל פעולה צריך שם ברור, וכל השמות צריכים להיות שונים.'; return; }
+    let jid = t.jobId; // the long action becomes a task (or, inside a task, several sibling actions)
+    if (!jid) { const j = { id: uid(), title: t.title, projectId: t.projectId || '', notes: t.notes || '', createdAt: TODAY() }; D().jobs.push(j); jid = j.id; t.notes = ''; }
+    t.title = names[0]; t.mins = each; t.jobId = jid; t.subs = [];
+    names.slice(1).forEach(title => D().tasks.push({ ...t, id: uid(), title, mins: each, done: false, spawned: '' }));
     next();
   };
 }
 function resolveLong(list) {
-  const q = list.filter(t => (t.mins || 0) > 15 && !(t.subs && t.subs.length));
+  const q = list.filter(t => (t.mins || 0) > 15);
   const next = () => {
     const t = q.shift();
     if (!t) { Store.save(); closeSheet(); render(); return; }
     const n = Math.ceil(t.mins / 15);
     splitCtx = { t, next };
-    sheet(`<h1>משימה ארוכה</h1><p>"${esc(t.title)}" נמשכת ${t.mins} דקות, ומשימה צריכה להיות עד 15 דקות. לפצל ל-${n} תתי-משימות של כ-${Math.ceil(t.mins / n)} דקות? אבקש ממך לתת שם ברור לכל אחת.</p>
+    sheet(`<h1>פעולה ארוכה</h1><p>"${esc(t.title)}" נמשכת ${t.mins} דקות, ופעולה צריכה להיות עד 15 דקות. לפצל ל-${n} פעולות של כ-${Math.ceil(t.mins / n)} דקות? ${t.jobId ? '' : 'היא תהפוך למשימה שמכילה אותן. '}אבקש ממך לתת שם ברור לכל אחת.</p>
      <div class="actions"><button class="btn ghost" data-act="keepLong">להשאיר כמו שהיא</button><button class="btn" data-act="doSplit">לפצל ל-${n}</button></div>`);
   };
   next();
@@ -1082,8 +1411,9 @@ const A = {
       else if (!t.done && t.spawned) { const n = D().tasks.find(x => x.id === t.spawned); if (n && !n.done) D().tasks = D().tasks.filter(x => x !== n); t.spawned = ''; }
     }
     Store.save(); state.pop = { id: e.id }; render();
-    if (t.done && t.date === TODAY()) showNext(t.id);
+    if (t.done && t.date === TODAY()) afterDone(t);
     if (t.done && t.date) { const day = D().tasks.filter(x => x.date === t.date); if (day.length >= 2 && day.every(x => x.done)) celebrate(); }
+    if (t.done && t.jobId) { const jt = D().tasks.filter(x => x.jobId === t.jobId); if (jt.length >= 2 && jt.every(x => x.done)) { celebrate(); toast(`<span>✓ המשימה "${esc(jobName(t.jobId) || '')}" הושלמה</span><button data-act="toastClose">✕</button>`, 4000); } }
     if (t.done && t.projectId) { const pt = D().tasks.filter(x => x.projectId === t.projectId); if (pt.length >= 2 && pt.every(x => x.done)) celebrate(); }
   },
   toggleHabit: e => { const h = D().habits.find(x => x.id === e.id); if (h.log[e.date]) delete h.log[e.date]; else h.log[e.date] = true; Store.save(); state.pop = { id: e.id, date: e.date }; render(); },
@@ -1126,10 +1456,10 @@ const A = {
   delGoal: e => { if (confirm('למחוק את היעד?')) { D().goals = D().goals.filter(x => x.id !== e.id); Store.save(); closeSheet(); render(); } },
   star: e => { const n = +e.n; document.querySelectorAll('#stars button').forEach((b, i) => b.classList.toggle('on', i < n)); document.querySelector('input[name=energy]').value = n; },
   taskMenu: e => menuSheet(e.id),
-  menuDone: e => { const t = findTask(e.id); t.done = !t.done; Store.save(); closeSheet(); render(); if (t.done && t.date === TODAY()) showNext(t.id); },
+  menuDone: e => { const t = findTask(e.id); t.done = !t.done; Store.save(); closeSheet(); render(); if (t.done && t.date === TODAY()) afterDone(t); },
   moveSheet: e => moveSheet(e.id),
-  moveTo: e => { findTask(e.id).date = e.d === 'none' ? null : e.d; Store.save(); closeSheet(); render(); },
-  moveCustom: e => { const v = $('#moveDate').value; if (!v) return; findTask(e.id).date = v; Store.save(); closeSheet(); render(); },
+  moveTo: e => { const t = findTask(e.id); deferTo(t, e.d === 'none' ? null : e.d); Store.save(); closeSheet(); render(); nudgeAny([t.id]); },
+  moveCustom: e => { const v = $('#moveDate').value; if (!v) return; const t = findTask(e.id); deferTo(t, v); Store.save(); closeSheet(); render(); nudgeAny([t.id]); },
   subShow: () => { const f = $('#subForm'); f.hidden = false; $('#subText').focus(); },
   subToggle: e => { const s = findTask(e.id).subs.find(x => x.id === e.sid); s.done = !s.done; Store.save(); state.pop = { id: e.id, sid: e.sid }; render(); if (!$('#sheet').hidden) menuSheet(e.id); },
   subDel: e => { const t = findTask(e.id); t.subs = t.subs.filter(x => x.id !== e.sid); Store.save(); render(); menuSheet(e.id); },
@@ -1157,13 +1487,20 @@ const A = {
   jPhotoPick: () => $('#jphoto').click(),
   jPhotoDel: () => { jSet(state.jDate).photo = ''; Store.save(); render(); },
   jWinDel: e => { const J = jSet(state.jDate); J.wins = J.wins.filter(w => w.id !== e.id); Store.save(); render(); },
-  goTab: e => { state.tab = e.t; state.openList = null; state.openProject = null; render(); window.scrollTo(0, 0); },
+  goTab: e => { state.tab = e.t; state.openList = null; state.openProject = null; state.openJob = null; render(); window.scrollTo(0, 0); },
   addProject: () => { const p = newProject(); if (p) { state.openProject = p.id; render(); } },
   openProject: e => { state.openProject = e.id; render(); window.scrollTo(0, 0); },
-  backProjects: () => { state.openProject = null; render(); },
+  backProjects: () => { state.openProject = null; state.openJob = null; render(); },
   renameProject: e => { const p = D().projects.find(x => x.id === e.id), n = (prompt('שם הפרויקט', p.title) || '').trim(); if (n) { p.title = n; Store.save(); render(); } },
-  delProject: e => { if (confirm('למחוק את הפרויקט? המשימות שלו יישארו, בלי פרויקט.')) { D().tasks.forEach(t => { if (t.projectId === e.id) t.projectId = ''; }); D().projects = D().projects.filter(p => p.id !== e.id); state.openProject = null; Store.save(); render(); } },
+  delProject: e => { if (confirm('למחוק את הפרויקט? המשימות והפעולות שלו יישארו, בלי פרויקט.')) { D().tasks.forEach(t => { if (t.projectId === e.id) t.projectId = ''; }); D().jobs.forEach(j => { if (j.projectId === e.id) j.projectId = ''; }); D().projects = D().projects.filter(p => p.id !== e.id); state.openProject = null; Store.save(); render(); } },
   projAddTask: e => taskForm(undefined, null, e.id),
+  projNewJob: e => { const j = newJob(e.id); if (j) { state.openJob = j.id; render(); window.scrollTo(0, 0); } },
+  newLooseJob: () => { const j = newJob(''); if (j) { state.openJob = j.id; state.openProject = null; render(); window.scrollTo(0, 0); } },
+  openJob: e => { const j = findJob(e.id); if (!j) return; state.tab = 'projects'; state.openJob = j.id; state.openProject = j.projectId || null; closeSheet(); render(); window.scrollTo(0, 0); },
+  backFromJob: () => { state.openJob = null; render(); },
+  renameJob: e => { const j = findJob(e.id), n = (prompt('שם המשימה', j.title) || '').trim(); if (n) { j.title = n; Store.save(); render(); } },
+  delJob: e => { if (confirm('למחוק את המשימה? הפעולות שלה יישארו כפעולות בודדות.')) { D().tasks.forEach(t => { if (t.jobId === e.id) t.jobId = ''; }); D().jobs = D().jobs.filter(j => j.id !== e.id); state.openJob = null; Store.save(); render(); } },
+  jobAddAction: e => { const j = findJob(e.id); taskForm(undefined, null, j.projectId || '', { jobId: j.id }); },
   projBulk: e => bulkStart(e.id),
   projAssign: e => assignSheet(e.id),
   addHabitBulk: () => habBulkStart(),
@@ -1182,7 +1519,41 @@ const A = {
     habBulk = []; Store.save(); closeSheet(); render();
   },
   capture: () => captureSheet(),
-  setEnergy: e => { const T = TODAY(), f = (D().focus[T] = D().focus[T] || {}); f.energy = f.energy === e.v ? '' : e.v; Store.save(); render(); },
+  nextReminder: () => { state.remShift = (state.remShift || 0) + 1; render(); },
+  setEnergy: e => {
+    $('#toast').hidden = true; const T = TODAY(), f = fo(T), on = f.energy !== e.v;
+    f.energy = on ? e.v : ''; f.energyAt = new Date().toISOString(); Store.save(); render(); if (on) energyHelp(e.v);
+  },
+  runBreakMin: e => runOpen(null, true, +e.m, e.l),
+  focusMethod: e => focusMethod(e.k),
+  noiseOff: () => toggleNoise(),
+  victimSave: e => {
+    const T = TODAY(), el = $(e.k === 'q' ? '#vThought' : '#vResp'), v = el.value.trim(); if (!v) return el.focus();
+    const line = (e.k === 'q' ? '🥀 מחשבה ששאלתי עליה "האם זה באמת נכון?": ' : '🤝 האחריות שלי: ') + v;
+    D().notes[T] = ((D().notes[T] || '') + (D().notes[T] ? '\n' : '') + line); Store.save(); el.value = ''; el.placeholder = 'נשמר ביומן ✓';
+  },
+  victimStep: () => {
+    const v = ($('#vStep').value || '').trim(); if (!v) return $('#vStep').focus();
+    const t = { id: uid(), title: v, date: TODAY(), done: false, priority: 1, energy: 2, mins: 10, brainless: false, print: false, visionId: '', projectId: '', notes: '', subs: [], jobId: '' };
+    D().tasks.push(t); Store.save(); closeSheet(); render(); runOpen(t.id);
+  },
+  run2: e => { runOpen(e.id); Run.total = Run.left = 120; runStartTimer(); },
+  breakLater: () => { const f = fo(TODAY()); f.workNext = (f.work || 0) + 15; Store.save(); $('#toast').hidden = true; },
+  rhythmStart: e => { $('#toast').hidden = true; const r = D().rhythm.find(x => x.id === e.id); if (r) runOpen(null, true, r.mins, (r.kind === 'meal' ? '🍽 ' : '😌 ') + r.label, r.id); },
+  rhythmDone: e => { $('#toast').hidden = true; const T = TODAY(), l = (D().rhythmLog[T] = D().rhythmLog[T] || {}); if (l[e.id]) delete l[e.id]; else l[e.id] = true; Store.save(); render(); },
+  rhythmDel: e => { D().rhythm = D().rhythm.filter(r => r.id !== e.id); Store.save(); render(); },
+  dayStart: () => { D().dayLog[TODAY()] = { start: nowHM(), end: '' }; Store.save(); render(); },
+  dayEnd: () => {
+    const T = TODAY(), L = (D().dayLog[T] = D().dayLog[T] || { start: nowHM(), end: '' }); L.end = nowHM(); Store.save(); render();
+    const ts = tasksOn(T); toast(`<span>🌙 סיימת את היום. משך ${fmtDur(dayDurMin(L))}, ${ts.filter(t => t.done).length}/${ts.length} פעולות בוצעו.</span><button data-act="toastClose" aria-label="סגור">✕</button>`, 8000); celebrate();
+  },
+  dayReopen: () => { const L = D().dayLog[TODAY()]; if (L) { L.end = ''; Store.save(); render(); } },
+  dayEdit: () => dayEditSheet(),
+  reviewLater: () => { reviewSnooze = true; closeSheet(); setTimeout(askFocus, 250); },
+  rewriteEdit: e => { const t = findTask(e.id); t.nudged = t.defers; Store.save(); taskForm(t.id); },
+  rewriteSplit: e => { const t = findTask(e.id); t.nudged = t.defers; splitNameSheet(t, () => { Store.save(); closeSheet(); render(); }, 2); },
+  rewriteDel: e => { if (confirm('למחוק את הפעולה?')) { D().tasks = D().tasks.filter(t => t.id !== e.id); Store.save(); closeSheet(); render(); } },
+  rewriteKeep: e => { const t = findTask(e.id); t.nudged = t.defers; Store.save(); closeSheet(); },
   toggleShowAll: () => { state.showAll = !state.showAll; render(); },
   toastClose: () => { $('#toast').hidden = true; },
   runStart: e => {
@@ -1192,7 +1563,16 @@ const A = {
       D().tasks.push(t); (D().focus[T] = D().focus[T] || {}).mitId = t.id; Store.save(); id = t.id; }
     runOpen(id);
   },
-  runBreak: () => { $('#toast').hidden = true; runOpen(null, true); },
+  runBreak: () => { $('#toast').hidden = true; runOpen(null, true, 10); },
+  visStart: () => visOpen(),
+  visLater: () => { visualSnooze = true; closeSheet(); setTimeout(askMorning, 250); },
+  visClose: () => { visStop(); render(); },
+  visAuto: () => { Vis.auto = !Vis.auto; visRender(); },
+  visSpeak: () => { Vis.speak = !Vis.speak; visRender(); },
+  visPrev: () => { if (Vis.i > 0) { Vis.i--; visRender(); } },
+  visNext: () => { if (Vis.i < VISUALIZATION.length - 1) { Vis.i++; visRender(); } },
+  visDone: () => { D().visual[TODAY()] = new Date().toISOString(); Store.save(); visStop(); render(); celebrate(); setTimeout(askMorning, 600); },
+
   runClose: () => runClose(),
   runMins: e => { if (Run.running) return; Run.total = Run.left = +e.m * 60; runRender(); },
   runToggle: () => {
@@ -1201,10 +1581,10 @@ const A = {
   },
   runMore: () => { Run.ended = false; Run.total = Run.left = 300; runStartTimer(); },
   runDone: () => {
-    const id = Run.id, t = id && findTask(id); runClose();
+    const id = Run.id, t = id && findTask(id), el = Run.running ? Run.total - Math.max(0, (Run.endAt - Date.now()) / 1000) : Run.total - Run.left; if (id && el >= 60 && !Run.ended) { addWork(el / 60); Work.skipId = id; } runClose();
     if (t && !t.done) A.toggleTask({ id }); else showNext(id);
   },
-  runNext: () => { const n = nextTask(Run.id); if (n) runOpen(n.id); else runClose(); },
+  runNext: () => { if (Run.brk) { if (Run.brkStarted || Run.ended) finishBreak(); else runClose(); return; } const n = nextTask(Run.id); if (n) runOpen(n.id); else runClose(); },
   stuck: () => stuckSheet(),
   stuckClose: () => closeSheet(),
   stuckTwo: () => { closeSheet(); Run.ended = false; Run.total = Run.left = 120; runStartTimer(); },
@@ -1223,16 +1603,16 @@ const A = {
     sheet(`<h1>לחזור אליה מתי?</h1><div class="grid2">${[['מחר', 1], ['בעוד יומיים', 2], ['בעוד שבוע', 7]].map(([l, n]) => `<button class="btn ghost" data-act="stuckMove" data-d="${addDays(T, n)}">${l}</button>`).join('')}</div>
      <div class="actions"><button class="btn ghost" data-act="stuckClose">חזרה</button></div>`);
   },
-  stuckMove: e => { const t = findTask(Run.id); if (t) { t.date = e.d; Store.save(); } closeSheet(); runClose(); const n = nextTask(Run.id); if (n) toast(`<span>נדחה. אולי <b>${esc(n.title)}</b>?</span><button class="btn" data-act="runStart" data-id="${n.id}">התחל</button><button data-act="toastClose">✕</button>`); },
-  orgPark: e => { const t = findTask(e.id); t.date = null; t.parked = true; Store.save(); render(); orgStep1(); },
+  stuckMove: e => { const t = findTask(Run.id); if (t) { deferTo(t, e.d); Store.save(); } closeSheet(); runClose(); if (t) setTimeout(() => nudgeAny([t.id]), 300); const n = nextTask(Run.id); if (n) toast(`<span>נדחה. אולי <b>${esc(n.title)}</b>?</span><button class="btn" data-act="runStart" data-id="${n.id}">התחל</button><button data-act="toastClose">✕</button>`); },
+  orgPark: e => { const t = findTask(e.id); deferTo(t, null); t.parked = true; Store.save(); render(); orgStep1(); },
   orgOpen: () => orgOpen(),
   orgSuggest: () => orgSuggest(),
-  orgSet: e => { const t = findTask(e.id); t.date = e.d; classify(t); Store.save(); render(); orgStep1(); },
+  orgSet: e => { const t = findTask(e.id); deferTo(t, e.d); classify(t); Store.save(); render(); orgStep1(); },
   orgNext: () => orgStep2(),
   orgBack: () => orgStep1(),
-  orgMove: e => { const t = findTask(e.id); t.date = e.d === 'none' ? null : e.d; if (t.date) classify(t); Store.save(); render(); orgStep2(); },
+  orgMove: e => { const t = findTask(e.id); deferTo(t, e.d === 'none' ? null : e.d); if (t.date) classify(t); Store.save(); render(); orgStep2(); },
   orgAddTomorrow: () => taskForm(undefined, addDays(TODAY(), 1)),
-  orgFinish: () => { D().org = D().org || {}; D().org[TODAY()] = { at: new Date().toISOString() }; Store.save(); closeSheet(); render(); celebrate(); },
+  orgFinish: () => { D().org = D().org || {}; D().org[TODAY()] = { at: new Date().toISOString() }; Store.save(); closeSheet(); render(); celebrate(); setTimeout(() => nudgeAny(Org.ids), 900); },
   addBulk: () => bulkStart(),
   copyPrompt: async () => {
     const msg = $('#clipMsg');
@@ -1293,7 +1673,7 @@ document.addEventListener('click', ev => {
   const el = ev.target.closest('[data-act]');
   if (el) { const fn = A[el.dataset.act]; if (fn) { ev.preventDefault(); fn({ ...el.dataset }, el); } return; }
   const nav = ev.target.closest('#nav button');
-  if (nav) { state.tab = nav.dataset.tab; state.openList = null; state.openProject = null; render(); window.scrollTo(0, 0); }
+  if (nav) { state.tab = nav.dataset.tab; state.openList = null; state.openProject = null; state.openJob = null; render(); window.scrollTo(0, 0); }
 });
 document.addEventListener('change', ev => {
   if (ev.target.id === 'upMonth') {
@@ -1307,7 +1687,7 @@ document.addEventListener('change', ev => {
     bulkProject = v; bulkRender(); return;
   }
   const od = ev.target.dataset && ev.target.dataset.orgdate;
-  if (od !== undefined) { const t = findTask(od); if (t && ev.target.value) { t.date = ev.target.value; Store.save(); render(); orgStep1(); } return; }
+  if (od !== undefined) { const t = findTask(od); if (t && ev.target.value) { deferTo(t, ev.target.value); Store.save(); render(); orgStep1(); } return; }
   const i = ev.target.dataset && ev.target.dataset.bulkdate;
   if (i !== undefined) { bulk[+i].date = ev.target.value || undefined; bulkRender(); }
 });
@@ -1393,7 +1773,7 @@ function dragEnd(drop) {
   const target = col.dataset.drop, t = findTask(id);
   if (!t || target === 'overdue') return;
   const nd = target === 'none' ? null : target;
-  if (t.date !== nd) { t.date = nd; Store.save(); render(); }
+  if (t.date !== nd) { deferTo(t, nd); Store.save(); render(); nudgeAny([t.id]); }
 }
 document.addEventListener('pointerdown', e => {
   const card = e.target.closest('.ucard');
@@ -1417,7 +1797,7 @@ document.addEventListener('contextmenu', e => { if (Drag.el && e.target.closest(
 /* ---------- Demo mode (?demo): fictional data, own storage key, cloud disabled. The real data is never touched. ---------- */
 function seedDemo() {
   const T = TODAY(), id = uid, ago = n => addDays(T, -n);
-  const v1 = id(), v2 = id(), v3 = id(), p1 = id(), h1 = id(), h2 = id(), h3 = id();
+  const j1 = id(), j2 = id(), v1 = id(), v2 = id(), v3 = id(), p1 = id(), h1 = id(), h2 = id(), h3 = id();
   const task = (title, date, extra = {}) => ({ id: id(), title, date, done: false, priority: 0, energy: 3, mins: 15, brainless: false, print: false, visionId: '', projectId: '', notes: '', subs: [], ...extra });
   const d = empty();
   d.visions = [
@@ -1425,22 +1805,28 @@ function seedDemo() {
     { id: v2, title: 'עסק קטן שמצליח', desc: 'לקוחות מרוצים והכנסה יציבה בלי לחץ.', area: 'קריירה' },
     { id: v3, title: 'זמן איכות עם המשפחה', desc: 'ערבים בלי מסכים וטיול חודשי.', area: 'משפחה' }
   ];
+  d.v = 2;
+  d.rhythm = [{ id: id(), label: 'ארוחת צהריים', time: '13:00', mins: 30, kind: 'meal' }, { id: id(), label: 'מנוחה קצרה', time: '16:00', mins: 20, kind: 'rest' }];
+  d.dayLog[ago(1)] = { start: '08:10', end: '18:40' }; d.dayLog[ago(2)] = { start: '08:30', end: '17:55' };
   d.projects = [{ id: p1, title: 'השקת האתר החדש', createdAt: ago(5) }];
+  d.jobs = [{ id: j1, title: 'להקים את דף הבית', projectId: p1, notes: '', createdAt: ago(5) }, { id: j2, title: 'לפרסם פוסט על הפרויקט', projectId: '', notes: '', createdAt: ago(2) }];
   d.habits = [
     { id: h1, title: 'פעילות גופנית', task: 'ללכת 15 דקות סביב הבלוק', days: [0, 1, 2, 3, 4, 5, 6], mins: 15, energy: 4, visionId: v1, log: { [ago(1)]: true, [ago(2)]: true, [ago(3)]: true, [ago(5)]: true } },
     { id: h2, title: 'קריאה', task: 'לקרוא 10 עמודים בספר', days: [0, 1, 2, 3, 4], mins: 10, energy: 2, visionId: '', log: { [ago(1)]: true, [ago(4)]: true } },
     { id: h3, title: 'סיכום יום', task: 'לכתוב 3 שורות על מה שהצליח היום', days: [0, 1, 2, 3, 4, 5, 6], mins: 5, energy: 1, visionId: '', log: {} }
   ];
   d.tasks = [
-    task('לכתוב הצעת מחיר ללקוח חדש', T, { energy: 5, priority: 2, visionId: v2, projectId: p1 }),
+    task('לכתוב הצעת מחיר ללקוח חדש', T, { energy: 5, priority: 2, visionId: v2 }),
     task('להתקשר לאינסטלטור ולקבוע ביקור', T, { energy: 2, mins: 10, brainless: true }),
     task('לשלוח חשבונית ללקוח דנה', T, { energy: 1, mins: 5, brainless: true, done: true }),
     task('להכין רשימת קניות לשבת', T, { energy: 1, mins: 10, repeat: 'w1' }),
-    task('לבדוק עם המעצבת את דף הבית', addDays(T, 1), { energy: 3, projectId: p1 }),
+    task('לבדוק עם המעצבת את דף הבית', addDays(T, 1), { energy: 3, projectId: p1, jobId: j1 }),
     task('לתאם ארוחת ערב משפחתית', addDays(T, 2), { energy: 2, mins: 10, visionId: v3 }),
-    task('לכתוב 3 נקודות לפוסט על הפרויקט', addDays(T, 3), { energy: 4, visionId: v2, subs: [{ id: id(), title: 'לבחור נושא אחד', done: true, mins: 5 }, { id: id(), title: 'לכתוב טיוטה של 3 משפטים', done: false, mins: 10 }] }),
+    task('לבחור נושא אחד לפוסט', ago(1), { energy: 2, mins: 5, visionId: v2, jobId: j2, done: true }),
+    task('לכתוב טיוטה של 3 משפטים לפוסט', addDays(T, 3), { energy: 4, mins: 10, visionId: v2, jobId: j2 }),
+    task('להעלות את הפוסט ולשלוח קישור לדנה', addDays(T, 4), { energy: 2, mins: 5, jobId: j2 }),
     task('לסרוק ולארגן קבלות החודש', addDays(T, 5), { energy: 2, mins: 15, print: true }),
-    task('לבחור תמונת שער לאתר', ago(1), { energy: 2, projectId: p1, done: true })
+    task('לבחור תמונת שער לאתר', ago(1), { energy: 2, projectId: p1, jobId: j1, done: true })
   ];
   d.goals = [
     { id: id(), title: 'ללכת 20 ימים החודש', type: 'habit', habitId: h1, target: 20, unit: 'ימים', start: T.slice(0, 8) + '01', deadline: '', visionId: v1, reward: 'ארוחה במסעדה', entries: [], claimed: false },
@@ -1456,6 +1842,7 @@ function seedDemo() {
 }
 if (DEMO && !localStorage.getItem(KEY)) seedDemo();
 
+ensureDayStart();
 render();
 Cloud.init();
 { // intro splash, once per session (FitMe-style): the check mark draws itself, then fades out
@@ -1465,5 +1852,5 @@ Cloud.init();
     if (seen) sp.remove(); else { sp.addEventListener('animationend', e => { if (e.animationName === 'splash') sp.remove(); }); setTimeout(() => sp.remove(), 2200); }
   }
 }
-setTimeout(askFocus, 2400); // after the splash and the first cloud sync
+ensureDayStart(); setTimeout(() => { askMorning(); askEnergyToast(); }, 2400); // after the splash and the first cloud sync
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
