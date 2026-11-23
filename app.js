@@ -303,7 +303,7 @@ function runRender() {
     ${Run.ended ? `<div class="sub" style="text-align:center">${Run.brk ? 'ההפסקה נגמרה' : 'הזמן נגמר. איך הלך?'}</div>` : ''}
     <div class="grid2">
       ${Run.ended ? (Run.brk ? '<button class="btn" data-act="runNext">חזרה לעבודה</button>' : '<button class="btn" data-act="runDone">✓ סיימתי</button><button class="btn ghost" data-act="runMore">עוד 5 דקות</button>' + (Run.pomo ? '<button class="btn ghost" data-act="runBreakMin" data-m="5" data-l="🍅 הפסקת פומודורו">☕ הפסקה 5 דקות</button>' : ''))
-        : `<button class="btn" data-act="runToggle">${Run.running ? '⏸ השהה' : '▶ התחל'}</button>${Run.brk ? '<button class="btn ghost" data-act="runNext">דלג</button>' : '<button class="btn ghost" data-act="runDone">✓ סיימתי</button>'}`}
+        : `<button class="btn" data-act="runToggle">${Run.running ? '⏸ השהה' : '▶ התחל'}</button>${Run.brk ? '<button class="btn ghost" data-act="runNext">דלג</button>' + (Run.rhythmId ? '<button class="btn ghost" data-act="rhythmDoneRun">✓ ' + ((D().rhythm.find(x => x.id === Run.rhythmId) || {}).kind === 'rest' ? 'כבר נחתי' : 'כבר אכלתי') + '</button>' : '') : '<button class="btn ghost" data-act="runDone">✓ סיימתי</button>'}`}
       ${Run.brk ? '' : '<button class="btn ghost" data-act="stuck">🤝 נתקעתי</button>'}
     </div></div>`;
   const si = $('#runStep'); if (si) si.oninput = () => { t.first = si.value; Store.save(); };
@@ -473,15 +473,24 @@ function finishBreak() {
   Store.save(); runClose(); askEnergyToast(true);
 }
 
+function estimateEnd(rem) { // when the day's remaining work should end, counting the hourly break and the meals/rest not yet taken
+  const T = TODAY(), log = D().rhythmLog[T] || {}, now = toMin(nowHM());
+  let end = now + rem + Math.floor(rem / 50) * 10;
+  rhythmSorted().filter(r => !log[r.id]).forEach(r => { if (toMin(r.time) < end && toMin(r.time) + r.mins > now) end += r.mins; });
+  return pad(Math.floor(end / 60) % 24) + ':' + pad(end % 60);
+}
 /* Rhythm of the day: meals and rest you define; separate from actions and not counted as progress */
 const rhythmSorted = () => D().rhythm.slice().sort((a, b) => a.time.localeCompare(b.time));
-function rhythmStrip(d) {
+function rhythmStrip(d, mode) {
   if (d !== TODAY()) return '';
-  const items = rhythmSorted(), log = D().rhythmLog[d] || {}, now = nowHM(), noRest = !items.some(r => r.kind === 'rest');
-  const rows = items.map(r => {
+  const items = rhythmSorted(), log = D().rhythmLog[d] || {}, now = nowHM(), nowM = toMin(now), noRest = !items.some(r => r.kind === 'rest');
+  const near = r => !log[r.id] && Math.abs(toMin(r.time) - nowM) <= 30;
+  const row = r => {
     const done = !!log[r.id], due = !done && r.time <= now;
     return `<div class="card row rh ${done ? 'done' : ''} ${due ? 'due' : ''}"><button class="check ${done ? 'on' : ''}" data-act="rhythmDone" data-id="${r.id}" aria-label="סמן">${done ? '✓' : ''}</button><div class="grow"><div class="t">${r.kind === 'meal' ? '🍽' : '😌'} ${esc(r.label)}</div><div class="meta"><span>${r.time}</span><span>${r.mins} ד׳</span>${due ? '<span style="color:var(--accent)">הגיע הזמן</span>' : ''}</div></div>${done ? '' : `<button class="iconbtn" data-act="rhythmStart" data-id="${r.id}">▶ הפסקה</button>`}</div>`;
-  }).join('');
+  };
+  if (mode === 'near') return items.filter(near).map(row).join('');
+  const rows = items.filter(r => !near(r)).map(row).join('');
   if (!rows && !noRest) return '';
   return `<h2>מקצב היום</h2>${rows}${noRest ? '<div class="card" data-act="goTab" data-t="rhythm"><div class="t">😌 עדיין לא הגדרת מנוחה יומית</div><div class="sub">לחץ כדי להגדיר</div></div>' : ''}`;
 }
@@ -493,7 +502,7 @@ function tick() {
     if (!$('#toast').hidden || !$('#sheet').hidden || !$('#run').hidden) return;
     const now = toMin(nowHM()), log = D().rhythmLog[T] || {}, f = D().focus[T] || {};
     const r = rhythmSorted().find(x => !log[x.id] && toMin(x.time) <= now && now < toMin(x.time) + 180 && !tick.shown[T + x.id]);
-    if (r) { tick.shown[T + r.id] = 1; toast(`<span>${r.kind === 'meal' ? '🍽' : '😌'} הגיע הזמן: <b>${esc(r.label)}</b> (${r.mins} ד׳)</span><button class="btn" data-act="rhythmStart" data-id="${r.id}">▶ התחל</button><button class="btn ghost" data-act="rhythmDone" data-id="${r.id}">✓ עשיתי</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000); return; }
+    if (r) { tick.shown[T + r.id] = 1; toast(`<span>${r.kind === 'meal' ? '🍽' : '😌'} הגיע הזמן: <b>${esc(r.label)}</b> (${r.mins} ד׳)</span><button class="btn" data-act="rhythmStart" data-id="${r.id}">▶ התחל</button><button class="btn ghost" data-act="rhythmDone" data-id="${r.id}">✓ ${r.kind === 'rest' ? 'כבר נחתי' : 'כבר אכלתי'}</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000); return; }
     if ((f.work || 0) >= (f.workNext || 50)) { suggestBreak(); return; }
     askEnergyToast();
   } finally { tickBusy = false; }
@@ -501,6 +510,7 @@ function tick() {
 tick.shown = {};
 setInterval(tick, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(tick, 600); });
+document.addEventListener('toggle', e => { if (e.target && e.target.id === 'todayMore') state.moreOpen = e.target.open; }, true);
 
 /* Day start and end: stamped automatically on the first open, end by button; both editable */
 function ensureDayStart() {
@@ -555,7 +565,7 @@ function reviewSheet() {
    <form id="f"><label>עמדת במשימות של אתמול?</label>
    <div class="opt" id="metOpts">${[['yes', '✅ כן'], ['part', '🟡 חלקית'], ['no', '❌ לא']].map(([v, l]) => `<button type="button" onclick="const f=this.closest('form');f.met.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div><input type="hidden" name="met" value="">
    <label>מה הייתי משפר?</label><textarea name="improve" rows="3" placeholder="דבר אחד קטן לשפר היום"></textarea>
-   <div class="actions"><button type="button" class="btn ghost" data-act="reviewLater">אחר כך</button><button class="btn">שמור והמשך</button></div></form>`);
+   <div class="actions"><button type="button" class="btn ghost" data-act="reviewLater">אין צורך</button><button class="btn">שמור והמשך</button></div></form>`);
   $('#f').onsubmit = e => { e.preventDefault(); const f = new FormData(e.target); D().review[y] = { met: f.get('met') || '', improve: f.get('improve').trim(), at: new Date().toISOString() }; Store.save(); closeSheet(); setTimeout(askFocus, 250); };
 }
 function askMorning() {
@@ -705,7 +715,7 @@ function taskRow(t, showDate) {
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${esc(t.title)}</div>
       <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${t.jobId ? jobChip(t) : projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
-    </div></div>${subsHtml}</div>`;
+    </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">▶</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
   const on = habitDone(h, d), v = h.visionId ? visionName(h.visionId) : '';
@@ -735,20 +745,27 @@ const views = {
     const isToday = d === TODAY(); // the daily "ארגון" ritual counts as one item on today's list
     const total = ts.length + hs.length + (isToday ? 1 : 0), done = ts.filter(t => t.done).length + hs.filter(h => habitDone(h, d)).length + (isToday && orgDone(d) ? 1 : 0);
     const pct = total ? Math.round(done / total * 100) : 0;
+    const remaining = ts.filter(t => !t.done).reduce((a, t) => a + (t.mins || 0), 0) + hs.filter(h => !habitDone(h, d)).reduce((a, h) => a + (h.mins || 0), 0);
+    const L0 = isToday ? (D().dayLog[d] || {}) : {}, est = isToday && remaining ? estimateEnd(remaining) : '';
+    const visTop = isToday && !D().visual[d] && new Date().getHours() < 11, rs = isToday ? rewardState(d) : {}, rewardTop = isToday && rs.rule && rs.achieved && !rs.claimed;
+    const hAct = hs.filter(h => !habitDone(h, d)).length;
     return `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
       <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
-      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${(() => { const m = ts.filter(t => !t.done).reduce((s, t) => s + (t.mins || 0), 0) + hs.filter(h => !habitDone(h, d)).reduce((s, h) => s + (h.mins || 0), 0); return m ? ` · נותרו ${m} ד׳` : ''; })()}</b></div><div class="bar"><div style="width:${pct}%"></div></div></div>
-      ${dayCard(d)}
-      ${visualCard(d)}
-      ${focusCard(d)}
-      ${rewardCard(d)}
-      <div class="remind" data-act="nextReminder" title="לחץ להחלפה">💬 ${esc(reminder())}</div>
-      <div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל פעולות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>
+      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b></div><div class="bar"><div style="width:${pct}%"></div></div>
+       ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.start && est ? ' · ' : ''}${est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
+      ${visTop ? visualCard(d) : ''}
+      ${rhythmStrip(d, 'near')}
+      ${rewardTop ? rewardCard(d) : ''}
       ${energyBar(d)}
-      ${rhythmStrip(d)}
+      ${focusCard(d)}
       <h2>פעולות</h2>${isToday ? orgCard() : ''}${tasksBlock(d, ts)}
-      ${hs.length ? `<h2>הרגלים</h2>${hs.map(h => habitRow(h, d)).join('')}` : ''}
-      <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>
+      <details class="todaymore" id="todayMore" ${state.moreOpen ? 'open' : ''}><summary>עוד להיום${hAct ? ` · ${hAct} הרגלים` : ''}</summary>
+       ${dayCard(d)}${visTop ? '' : visualCard(d)}${rewardTop ? '' : rewardCard(d)}${rhythmStrip(d, 'rest')}
+       <div class="remind" data-act="nextReminder" title="לחץ להחלפה">💬 ${esc(reminder())}</div>
+       <div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל פעולות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>
+       ${hs.length ? `<h2>הרגלים</h2>${hs.map(h => habitRow(h, d)).join('')}` : ''}
+       <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>
+      </details>
       <button class="fab" data-act="addTask" aria-label="משימה חדשה">+</button>`;
   },
   upcoming() {
@@ -1036,10 +1053,6 @@ function taskForm(id, presetDate, presetProject, preset) {
   <form id="f">
    <label>מה לעשות (פעולה אחת, ברורה ומוחשית)</label><input name="title" required value="${esc(t.title)}" autofocus autocomplete="off">
    <div id="clHint" class="clarity">${id ? '' : clarityHTML('')}</div>
-   <div id="clRow" hidden>
-     <label class="row" style="color:var(--ink);font-weight:600;margin-top:6px"><input type="checkbox" name="clear" style="width:auto"> ✅ זה ברור: ${CLEAR_LABEL}</label>
-     <div id="clMsg" class="sub" style="color:var(--danger)"></div>${CLARITY_EX}
-   </div>
    <label>מתי?</label>
    <div class="opt" id="dateChips" style="margin-bottom:6px">${[['היום', TODAY()], ['מחר', addDays(TODAY(), 1)], ['ללא תאריך', '']].map(([l, v]) => `<button type="button" class="${(t.date || '') === v ? 'on' : ''}" onclick="const f=this.closest('form');f.elements.date.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div>
    <details class="moreopts" ${id || t.repeat ? 'open' : ''}><summary>אפשרויות נוספות</summary>
@@ -1066,17 +1079,14 @@ function taskForm(id, presetDate, presetProject, preset) {
     const made = v === '__new__' ? newProject() : newJob('');
     if (made) { sel.add(new Option((v === '__new__' ? '📁 ' : '🧩 ') + made.title, (v === '__new__' ? 'p:' : 'j:') + made.id), sel.options[sel.options.length - 2]); sel.value = (v === '__new__' ? 'p:' : 'j:') + made.id; } else sel.value = '';
   });
-  // A clear-looking title is saved as is; only an unclear one is blocked until the user confirms it.
-  const needClear = () => (!id || form.title.value.trim() !== origTitle) && clarity(form.title.value).length > 0;
-  $('#clRow').hidden = true;
   form.title.addEventListener('input', () => {
     $('#clHint').innerHTML = clarityHTML(form.title.value);
-    form.clear.checked = false; $('#clMsg').textContent = '';
-    $('#clRow').hidden = !needClear();
   });
+  // An unclear action (new, or with a changed title) is not saved: an alert explains what to fix.
+  const blocked = () => (!id || form.title.value.trim() !== origTitle) && clarity(form.title.value).length > 0;
   $('#f').onsubmit = e => {
     e.preventDefault();
-    if (needClear() && !form.clear.checked) { $('#clMsg').textContent = 'הניסוח לא ברור. תקן אותו, או סמן "זה ברור" כדי להוסיף בכל זאת.'; $('#clRow').hidden = false; return; }
+    if (blocked()) { const why = clarity(form.title.value)[0]; $('#clHint').innerHTML = clarityHTML(form.title.value); form.title.focus(); alert('לא ניתן לשמור: הפעולה לא כתובה בצורה ברורה.\n' + why); return; }
     const f = new FormData(e.target), own = f.get('owner') || '', jobId = own.startsWith('j:') ? own.slice(2) : '', projectId = jobId ? ((findJob(jobId) || {}).projectId || '') : (own.startsWith('p:') ? own.slice(2) : '');
     const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: +f.get('priority'), visionId: f.get('visionId') || '', jobId, projectId, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
     let saved = t;
@@ -1594,6 +1604,7 @@ const A = {
   breakLater: () => { const f = fo(TODAY()); f.workNext = (f.work || 0) + 15; Store.save(); $('#toast').hidden = true; },
   rhythmStart: e => { $('#toast').hidden = true; const r = D().rhythm.find(x => x.id === e.id); if (r) runOpen(null, true, r.mins, (r.kind === 'meal' ? '🍽 ' : '😌 ') + r.label, r.id); },
   rhythmDone: e => { $('#toast').hidden = true; const T = TODAY(), l = (D().rhythmLog[T] = D().rhythmLog[T] || {}); if (l[e.id]) delete l[e.id]; else l[e.id] = true; Store.save(); render(); },
+  rhythmDoneRun: () => { const T = TODAY(); if (Run.rhythmId) { (D().rhythmLog[T] = D().rhythmLog[T] || {})[Run.rhythmId] = true; Store.save(); } runClose(); },
   rhythmDel: e => { D().rhythm = D().rhythm.filter(r => r.id !== e.id); Store.save(); render(); },
   dayStart: () => { D().dayLog[TODAY()] = { start: nowHM(), end: '' }; Store.save(); render(); },
   dayEnd: () => {
@@ -1602,7 +1613,7 @@ const A = {
   },
   dayReopen: () => { const L = D().dayLog[TODAY()]; if (L) { L.end = ''; Store.save(); render(); } },
   dayEdit: () => dayEditSheet(),
-  reviewLater: () => { reviewSnooze = true; closeSheet(); setTimeout(askFocus, 250); },
+  reviewLater: () => { D().review[addDays(TODAY(), -1)] = { met: '', improve: '', skipped: true, at: new Date().toISOString() }; Store.save(); closeSheet(); setTimeout(askFocus, 250); },
   rewriteEdit: e => { const t = findTask(e.id); t.nudged = t.defers; Store.save(); taskForm(t.id); },
   rewriteSplit: e => { const t = findTask(e.id); t.nudged = t.defers; splitNameSheet(t, () => { Store.save(); closeSheet(); render(); }, 2); },
   rewriteDel: e => { if (confirm('למחוק את הפעולה?')) { D().tasks = D().tasks.filter(t => t.id !== e.id); Store.save(); closeSheet(); render(); } },

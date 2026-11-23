@@ -18,7 +18,7 @@
 <p><a class="cta" href="index.html?demo">פתיחת האפליקציה במצב דמו (נתונים בדויים)</a></p>
 <h2 class="sec">מה יש באפליקציה</h2>
 <div class="feat"><b>מבנה.</b> פרויקט › משימה › פעולה. פרויקט מכיל משימות (תוצאה שרוצים להשיג), וכל משימה מורכבת מפעולות קטנות. הפעולה היא יחידת הביצוע: יש לה תאריך, רמת אנרגיה (1 עד 5 כוכבים), משך של עד 15 דקות, בדיקת בהירות הניסוח, חזרתיות וטיימר. פעולה ארוכה מ-15 דקות מוצעת לפיצול לפעולות עם שמות ברורים.</div>
-<div class="feat"><b>מסך היום.</b> שלוש פעולות להיום (החשובה קודם, ואז לפי מצב האנרגיה) עם כפתור להצגת כולן. כרטיס &quot;הפעולה החשובה&quot; ו&quot;הפאן של היום&quot;, שעת התחלה וסיום של היום, דמיון מודרך בבוקר, תגמול יומי, מקצב היום (ארוחות ומנוחה), פתק יומי ושני משפטים מעצימים.</div>
+<div class="feat"><b>מסך היום.</b> פוקוס נקי: שלוש פעולות להיום (החשובה קודם, ואז לפי מצב האנרגיה) עם כפתור להצגת כולן. כרטיס &quot;הפעולה החשובה&quot; ו&quot;הפאן של היום&quot;, שעת התחלה וסיום של היום, דמיון מודרך בבוקר, תגמול יומי, מקצב היום (ארוחות ומנוחה), פתק יומי ושני משפטים מעצימים.</div>
 <div class="feat"><b>בקרוב.</b> לוח של שלושה ימים, שבוע, חודש וכל הימים, עם גרירת פעולות בין תאריכים. תמיכה מלאה בעברית מימין לשמאל.</div>
 <div class="feat"><b>התחל עכשיו.</b> מסך עבודה נקי עם פעולה אחת, הצעד הראשון וטיימר של 5, 15 או 25 דקות. כפתור &quot;נתקעתי&quot; מציע: לפרק לצעד קטן, שתי דקות בלבד, פעולה קלה יותר, או לחזור אחר כך. אחרי סיום מוצעת הפעולה הבאה או הפסקה.</div>
 <div class="feat"><b>מצבי אנרגיה ורגש.</b> שבעה מצבים: אנרגיה גבוהה, בינונית או נמוכה, עייפות, הצפה, שיפוטיות, חוסר ריכוז ואני קורבן. לכל מצב האפליקציה מציעה פתרון קונקרטי (למשל פומודורו, רעש רקע, דקת נשימה, ארבעה צעדים ליציאה ממצב קורבן), ומסדרת את הפעולות בהתאם.</div>
@@ -28,37 +28,39 @@
 <div class="feat"><b>יומן.</b> מחשבות, תמונה של היום והצלחות.</div>
 <div class="feat"><b>טכנולוגיה.</b> אפליקציית ווב (PWA) ללא שרת, JavaScript נקי. נתונים נשמרים בטלפון, ובסנכרון אופציונלי לענן (Supabase) עם מיזוג לפי פריט. עובדת במובייל ובמחשב, כולל מצב כהה והדפסה.</div>
 <h2 class="sec">המסכים (צילום של הדמו כטקסט)</h2>
-<section id="today"><h2 class="sec">מסך היום</h2><p>הלב של האפליקציה: סרגל התקדמות, שעת התחלה וסיום, דמיון מודרך, הפעולה החשובה והפאן של היום, תגמול יומי, אנרגיה, הפסקות, והפעולות להיום (שלוש בכל פעם).</p><div class="phone"><div class="top"><div class="brand"><svg class="logo" width="36" height="36" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"></rect><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="390" cy="170" r="36" fill="#e8a33d"></circle></svg><div><h1>היום</h1><div class="sub">יום שני, 23 נובמבר 2026</div></div></div>
+<section id="today"><h2 class="sec">מסך היום (פוקוס נקי)</h2><p>למעלה רק מה שחשוב: סרגל התקדמות עם סיום משוער, בורר האנרגיה, הפעולה החשובה והפאן, ושלוש הפעולות עם כפתור ▶. השאר (שעות היום, תגמול, הרגלים, פתק יומי) באקורדיון &quot;עוד להיום&quot;.</p><div class="phone"><div class="top"><div class="brand"><svg class="logo" width="36" height="36" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"></rect><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="390" cy="170" r="36" fill="#e8a33d"></circle></svg><div><h1>היום</h1><div class="sub">יום שני, 23 נובמבר 2026</div></div></div>
       <div class="sw"><button class="iconbtn" title="סנכרון וחשבון">👤</button><button class="iconbtn" aria-label="היום הקודם"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="iconbtn">היום</button><button class="iconbtn" aria-label="היום הבא"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></div></div>
-      <div class="card"><div class="row"><b class="grow">1/8 הושלמו · נותרו 65 ד׳</b></div><div class="bar"><div style="width:13%"></div></div></div>
-      <div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow"><div class="t">התחלת ב-13:53</div><div class="meta"><span>עד עכשיו: 0 דק׳</span></div></div><button class="iconbtn">🌙 סיימתי יום</button></div>
-      <div class="card row "><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>עוד לא בוצע</span></div></div><button class="iconbtn">▶ להתחיל</button></div>
+      <div class="card"><div class="row"><b class="grow">1/8 הושלמו · נותרו 65 ד׳</b></div><div class="bar"><div style="width:13%"></div></div>
+       <div class="sub" style="margin-top:6px">התחלת ב-14:44 · סיום משוער 15:59 (כולל הפסקות)</div></div>
+      
+      
+      
+      <div class="ebar"><span class="sub">האנרגיה שלי עכשיו:</span><button class="">⚡ אנרגיה גבוהה</button><button class="on">🙂 בינונית או נמוכה</button><button class="">😴 עייפות</button><button class="">🌊 הצפה</button><button class="">🪞 שיפוטיות</button><button class="">🎯 חוסר ריכוז</button><button class="">🥀 אני קורבן</button></div>
       <div class="card focus"><div class="frow"><span>⭐</span><div class="grow"><div class="sub">הפעולה החשובה של היום</div><div class="t">לכתוב הצעת מחיר ללקוח חדש</div></div></div>
     <div class="frow"><span>🎉</span><div class="grow"><div class="sub">הפאן של היום</div><div class="t">קפה עם חברה בערב</div></div></div>
     <button class="btn startnow">▶ התחל עכשיו</button></div>
-      <div class="card focus"><div class="t"><b>🎁 תגמול יומי</b></div><div class="sub">לחץ כדי לקבוע תנאי לתגמול של היום</div></div>
-      <div class="remind" title="לחץ להחלפה">💬 האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.</div>
-      <div class="opt" style="margin-bottom:6px"><button>🖨 הדפס את כל פעולות היום</button><button>🖨 רק פתוחות/מסומנות</button><button>📋 הזנה מרוכזת</button></div>
-      <div class="ebar"><span class="sub">האנרגיה שלי עכשיו:</span><button class="">⚡ אנרגיה גבוהה</button><button class="on">🙂 בינונית או נמוכה</button><button class="">😴 עייפות</button><button class="">🌊 הצפה</button><button class="">🪞 שיפוטיות</button><button class="">🎯 חוסר ריכוז</button><button class="">🥀 אני קורבן</button></div>
-      <h2>מקצב היום</h2><div class="card row rh  due"><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">🍽 ארוחת צהריים</div><div class="meta"><span>13:00</span><span>30 ד׳</span><span style="color:var(--accent)">הגיע הזמן</span></div></div><button class="iconbtn">▶ הפסקה</button></div><div class="card row rh  "><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">😌 מנוחה קצרה</div><div class="meta"><span>16:00</span><span>20 ד׳</span></div></div><button class="iconbtn">▶ הפסקה</button></div>
       <h2>פעולות</h2><div class="card row org "><button class="check " aria-label="ארגון"></button>
     <div class="grow"><div class="t">🗂 ארגון</div><div class="meta"><span>0 ללא תאריך</span><span>0 באיחור</span><span>מחר: 1 משימות · 15 ד׳</span></div></div></div><div class="grp"><div class="card row p2 ">
     <button class="check "></button>
     <div class="grow">
       <div class="t">לכתוב הצעת מחיר ללקוח חדש</div>
       <div class="meta"><span style="color:var(--accent)">★★★★★</span><span>15 ד׳</span><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span><span class="chip">עסק קטן שמצליח</span></div>
-    </div></div></div><div class="grp"><div class="card row p0 ">
+    </div><button class="playbtn" aria-label="התחל עכשיו">▶</button></div></div><div class="grp"><div class="card row p0 ">
     <button class="check "></button>
     <div class="grow">
       <div class="t">להכין רשימת קניות לשבת</div>
       <div class="meta"><span style="color:var(--accent)">★</span><span>10 ד׳</span><span title="כל שבוע">🔁 כל שבוע</span></div>
-    </div></div></div><div class="grp"><div class="card row p0 ">
+    </div><button class="playbtn" aria-label="התחל עכשיו">▶</button></div></div><div class="grp"><div class="card row p0 ">
     <button class="check "></button>
     <div class="grow">
       <div class="t">להתקשר לאינסטלטור ולקבוע ביקור</div>
       <div class="meta"><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div>
-    </div></div></div><button class="btn ghost more3">הצג את כל הפעולות (1 נוספות)</button>
-      <h2>הרגלים</h2><div class="card row ">
+    </div><button class="playbtn" aria-label="התחל עכשיו">▶</button></div></div><button class="btn ghost more3">הצג את כל הפעולות (1 נוספות)</button>
+      <details class="todaymore" id="todayMore"><summary>עוד להיום · 3 הרגלים</summary>
+       <div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow"><div class="t">התחלת ב-14:44</div><div class="meta"><span>עד עכשיו: 0 דק׳</span></div></div><button class="iconbtn">🌙 סיימתי יום</button></div><div class="card row "><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>עוד לא בוצע</span></div></div><button class="iconbtn">▶ להתחיל</button></div><div class="card focus"><div class="frow"><span>🎁</span><div class="grow"><div class="sub">תגמול יומי · תנאי: הפעולה החשובה</div><div class="t">הפעולה החשובה עוד לא בוצעה</div></div></div></div><h2>מקצב היום</h2><div class="card row rh  due"><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">🍽 ארוחת צהריים</div><div class="meta"><span>13:00</span><span>30 ד׳</span><span style="color:var(--accent)">הגיע הזמן</span></div></div><button class="iconbtn">▶ הפסקה</button></div><div class="card row rh  "><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">😌 מנוחה קצרה</div><div class="meta"><span>16:00</span><span>20 ד׳</span></div></div><button class="iconbtn">▶ הפסקה</button></div>
+       <div class="remind" title="לחץ להחלפה">💬 האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.</div>
+       <div class="opt" style="margin-bottom:6px"><button>🖨 הדפס את כל פעולות היום</button><button>🖨 רק פתוחות/מסומנות</button><button>📋 הזנה מרוכזת</button></div>
+       <h2>הרגלים</h2><div class="card row ">
     <button class="check "></button>
     <div class="grow"><div class="t">ללכת 15 דקות סביב הבלוק</div>
     <div class="meta"><span class="chip">🔁 פעילות גופנית</span><span>🔥 3</span><span style="color:var(--accent)">★★★★</span><span>15 ד׳</span><span class="chip">בריאות ואנרגיה לאורך היום</span></div></div></div><div class="card row ">
@@ -68,21 +70,65 @@
     <button class="check "></button>
     <div class="grow"><div class="t">לכתוב 3 שורות על מה שהצליח היום</div>
     <div class="meta"><span class="chip">🔁 סיכום יום</span><span>🔥 0</span><span style="color:var(--accent)">★</span><span>5 ד׳</span></div></div></div>
-      <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">הבוקר התחלתי עם הליכה, ההרגשה טובה.</textarea>
+       <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">הבוקר התחלתי עם הליכה, ההרגשה טובה.</textarea>
+      </details>
       </div></section>
-<section id="today-all"><h2 class="sec">מסך היום עם כל הפעולות</h2><p>אחרי לחיצה על &quot;הצג את כל הפעולות&quot;.</p><div class="phone"><div class="top"><div class="brand"><svg class="logo" width="36" height="36" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"></rect><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="390" cy="170" r="36" fill="#e8a33d"></circle></svg><div><h1>היום</h1><div class="sub">יום שני, 23 נובמבר 2026</div></div></div>
+<section id="today-open"><h2 class="sec">מסך היום עם &quot;עוד להיום&quot; פתוח</h2><p>אחרי פתיחת האקורדיון: שעות היום, דמיון מודרך, תגמול יומי, מקצב היום, משפט מעצים, הרגלים ופתק יומי.</p><div class="phone"><div class="top"><div class="brand"><svg class="logo" width="36" height="36" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"></rect><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="390" cy="170" r="36" fill="#e8a33d"></circle></svg><div><h1>היום</h1><div class="sub">יום שני, 23 נובמבר 2026</div></div></div>
       <div class="sw"><button class="iconbtn" title="סנכרון וחשבון">👤</button><button class="iconbtn" aria-label="היום הקודם"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="iconbtn">היום</button><button class="iconbtn" aria-label="היום הבא"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></div></div>
-      <div class="card"><div class="row"><b class="grow">1/8 הושלמו · נותרו 65 ד׳</b></div><div class="bar"><div style="width:13%"></div></div></div>
-      <div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow"><div class="t">התחלת ב-13:53</div><div class="meta"><span>עד עכשיו: 0 דק׳</span></div></div><button class="iconbtn">🌙 סיימתי יום</button></div>
-      <div class="card row "><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>עוד לא בוצע</span></div></div><button class="iconbtn">▶ להתחיל</button></div>
+      <div class="card"><div class="row"><b class="grow">1/8 הושלמו · נותרו 65 ד׳</b></div><div class="bar"><div style="width:13%"></div></div>
+       <div class="sub" style="margin-top:6px">התחלת ב-14:44 · סיום משוער 15:59 (כולל הפסקות)</div></div>
+      
+      
+      
+      <div class="ebar"><span class="sub">האנרגיה שלי עכשיו:</span><button class="">⚡ אנרגיה גבוהה</button><button class="on">🙂 בינונית או נמוכה</button><button class="">😴 עייפות</button><button class="">🌊 הצפה</button><button class="">🪞 שיפוטיות</button><button class="">🎯 חוסר ריכוז</button><button class="">🥀 אני קורבן</button></div>
       <div class="card focus"><div class="frow"><span>⭐</span><div class="grow"><div class="sub">הפעולה החשובה של היום</div><div class="t">לכתוב הצעת מחיר ללקוח חדש</div></div></div>
     <div class="frow"><span>🎉</span><div class="grow"><div class="sub">הפאן של היום</div><div class="t">קפה עם חברה בערב</div></div></div>
     <button class="btn startnow">▶ התחל עכשיו</button></div>
-      <div class="card focus"><div class="t"><b>🎁 תגמול יומי</b></div><div class="sub">לחץ כדי לקבוע תנאי לתגמול של היום</div></div>
-      <div class="remind" title="לחץ להחלפה">💬 האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.</div>
-      <div class="opt" style="margin-bottom:6px"><button>🖨 הדפס את כל פעולות היום</button><button>🖨 רק פתוחות/מסומנות</button><button>📋 הזנה מרוכזת</button></div>
+      <h2>פעולות</h2><div class="card row org "><button class="check " aria-label="ארגון"></button>
+    <div class="grow"><div class="t">🗂 ארגון</div><div class="meta"><span>0 ללא תאריך</span><span>0 באיחור</span><span>מחר: 1 משימות · 15 ד׳</span></div></div></div><div class="grp"><div class="card row p2 ">
+    <button class="check "></button>
+    <div class="grow">
+      <div class="t">לכתוב הצעת מחיר ללקוח חדש</div>
+      <div class="meta"><span style="color:var(--accent)">★★★★★</span><span>15 ד׳</span><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span><span class="chip">עסק קטן שמצליח</span></div>
+    </div><button class="playbtn" aria-label="התחל עכשיו">▶</button></div></div><div class="grp"><div class="card row p0 ">
+    <button class="check "></button>
+    <div class="grow">
+      <div class="t">להכין רשימת קניות לשבת</div>
+      <div class="meta"><span style="color:var(--accent)">★</span><span>10 ד׳</span><span title="כל שבוע">🔁 כל שבוע</span></div>
+    </div><button class="playbtn" aria-label="התחל עכשיו">▶</button></div></div><div class="grp"><div class="card row p0 ">
+    <button class="check "></button>
+    <div class="grow">
+      <div class="t">להתקשר לאינסטלטור ולקבוע ביקור</div>
+      <div class="meta"><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div>
+    </div><button class="playbtn" aria-label="התחל עכשיו">▶</button></div></div><button class="btn ghost more3">הצג את כל הפעולות (1 נוספות)</button>
+      <details class="todaymore" id="todayMore" open=""><summary>עוד להיום · 3 הרגלים</summary>
+       <div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow"><div class="t">התחלת ב-14:44</div><div class="meta"><span>עד עכשיו: 0 דק׳</span></div></div><button class="iconbtn">🌙 סיימתי יום</button></div><div class="card row "><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>עוד לא בוצע</span></div></div><button class="iconbtn">▶ להתחיל</button></div><div class="card focus"><div class="frow"><span>🎁</span><div class="grow"><div class="sub">תגמול יומי · תנאי: הפעולה החשובה</div><div class="t">הפעולה החשובה עוד לא בוצעה</div></div></div></div><h2>מקצב היום</h2><div class="card row rh  due"><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">🍽 ארוחת צהריים</div><div class="meta"><span>13:00</span><span>30 ד׳</span><span style="color:var(--accent)">הגיע הזמן</span></div></div><button class="iconbtn">▶ הפסקה</button></div><div class="card row rh  "><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">😌 מנוחה קצרה</div><div class="meta"><span>16:00</span><span>20 ד׳</span></div></div><button class="iconbtn">▶ הפסקה</button></div>
+       <div class="remind" title="לחץ להחלפה">💬 האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.</div>
+       <div class="opt" style="margin-bottom:6px"><button>🖨 הדפס את כל פעולות היום</button><button>🖨 רק פתוחות/מסומנות</button><button>📋 הזנה מרוכזת</button></div>
+       <h2>הרגלים</h2><div class="card row ">
+    <button class="check "></button>
+    <div class="grow"><div class="t">ללכת 15 דקות סביב הבלוק</div>
+    <div class="meta"><span class="chip">🔁 פעילות גופנית</span><span>🔥 3</span><span style="color:var(--accent)">★★★★</span><span>15 ד׳</span><span class="chip">בריאות ואנרגיה לאורך היום</span></div></div></div><div class="card row ">
+    <button class="check "></button>
+    <div class="grow"><div class="t">לקרוא 10 עמודים בספר</div>
+    <div class="meta"><span class="chip">🔁 קריאה</span><span>🔥 2</span><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div></div></div><div class="card row ">
+    <button class="check "></button>
+    <div class="grow"><div class="t">לכתוב 3 שורות על מה שהצליח היום</div>
+    <div class="meta"><span class="chip">🔁 סיכום יום</span><span>🔥 0</span><span style="color:var(--accent)">★</span><span>5 ד׳</span></div></div></div>
+       <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">הבוקר התחלתי עם הליכה, ההרגשה טובה.</textarea>
+      </details>
+      </div></section>
+<section id="today-all"><h2 class="sec">מסך היום עם כל הפעולות</h2><p>אחרי לחיצה על &quot;הצג את כל הפעולות&quot;.</p><div class="phone"><div class="top"><div class="brand"><svg class="logo" width="36" height="36" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"></rect><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="390" cy="170" r="36" fill="#e8a33d"></circle></svg><div><h1>היום</h1><div class="sub">יום שני, 23 נובמבר 2026</div></div></div>
+      <div class="sw"><button class="iconbtn" title="סנכרון וחשבון">👤</button><button class="iconbtn" aria-label="היום הקודם"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="iconbtn">היום</button><button class="iconbtn" aria-label="היום הבא"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></div></div>
+      <div class="card"><div class="row"><b class="grow">1/8 הושלמו · נותרו 65 ד׳</b></div><div class="bar"><div style="width:13%"></div></div>
+       <div class="sub" style="margin-top:6px">התחלת ב-14:44 · סיום משוער 15:59 (כולל הפסקות)</div></div>
+      
+      
+      
       <div class="ebar"><span class="sub">האנרגיה שלי עכשיו:</span><button class="">⚡ אנרגיה גבוהה</button><button class="on">🙂 בינונית או נמוכה</button><button class="">😴 עייפות</button><button class="">🌊 הצפה</button><button class="">🪞 שיפוטיות</button><button class="">🎯 חוסר ריכוז</button><button class="">🥀 אני קורבן</button></div>
-      <h2>מקצב היום</h2><div class="card row rh  due"><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">🍽 ארוחת צהריים</div><div class="meta"><span>13:00</span><span>30 ד׳</span><span style="color:var(--accent)">הגיע הזמן</span></div></div><button class="iconbtn">▶ הפסקה</button></div><div class="card row rh  "><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">😌 מנוחה קצרה</div><div class="meta"><span>16:00</span><span>20 ד׳</span></div></div><button class="iconbtn">▶ הפסקה</button></div>
+      <div class="card focus"><div class="frow"><span>⭐</span><div class="grow"><div class="sub">הפעולה החשובה של היום</div><div class="t">לכתוב הצעת מחיר ללקוח חדש</div></div></div>
+    <div class="frow"><span>🎉</span><div class="grow"><div class="sub">הפאן של היום</div><div class="t">קפה עם חברה בערב</div></div></div>
+    <button class="btn startnow">▶ התחל עכשיו</button></div>
       <h2>פעולות</h2><div class="card row org "><button class="check " aria-label="ארגון"></button>
     <div class="grow"><div class="t">🗂 ארגון</div><div class="meta"><span>0 ללא תאריך</span><span>0 באיחור</span><span>מחר: 1 משימות · 15 ד׳</span></div></div></div><div class="grp"><div class="card row p0 done">
     <button class="check on">✓</button>
@@ -94,18 +140,22 @@
     <div class="grow">
       <div class="t">להכין רשימת קניות לשבת</div>
       <div class="meta"><span style="color:var(--accent)">★</span><span>10 ד׳</span><span title="כל שבוע">🔁 כל שבוע</span></div>
-    </div></div></div><div class="grp"><div class="card row p0 ">
+    </div><button class="playbtn" aria-label="התחל עכשיו">▶</button></div></div><div class="grp"><div class="card row p0 ">
     <button class="check "></button>
     <div class="grow">
       <div class="t">להתקשר לאינסטלטור ולקבוע ביקור</div>
       <div class="meta"><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span><span style="color:var(--accent)">★★</span><span>10 ד׳</span></div>
-    </div></div></div><div class="grp"><div class="card row p2 ">
+    </div><button class="playbtn" aria-label="התחל עכשיו">▶</button></div></div><div class="grp"><div class="card row p2 ">
     <button class="check "></button>
     <div class="grow">
       <div class="t">לכתוב הצעת מחיר ללקוח חדש</div>
       <div class="meta"><span style="color:var(--accent)">★★★★★</span><span>15 ד׳</span><span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span><span class="chip">עסק קטן שמצליח</span></div>
-    </div></div></div>
-      <h2>הרגלים</h2><div class="card row ">
+    </div><button class="playbtn" aria-label="התחל עכשיו">▶</button></div></div>
+      <details class="todaymore" id="todayMore"><summary>עוד להיום · 3 הרגלים</summary>
+       <div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow"><div class="t">התחלת ב-14:44</div><div class="meta"><span>עד עכשיו: 0 דק׳</span></div></div><button class="iconbtn">🌙 סיימתי יום</button></div><div class="card row "><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>עוד לא בוצע</span></div></div><button class="iconbtn">▶ להתחיל</button></div><div class="card focus"><div class="frow"><span>🎁</span><div class="grow"><div class="sub">תגמול יומי · תנאי: הפעולה החשובה</div><div class="t">הפעולה החשובה עוד לא בוצעה</div></div></div></div><h2>מקצב היום</h2><div class="card row rh  due"><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">🍽 ארוחת צהריים</div><div class="meta"><span>13:00</span><span>30 ד׳</span><span style="color:var(--accent)">הגיע הזמן</span></div></div><button class="iconbtn">▶ הפסקה</button></div><div class="card row rh  "><button class="check " aria-label="סמן"></button><div class="grow"><div class="t">😌 מנוחה קצרה</div><div class="meta"><span>16:00</span><span>20 ד׳</span></div></div><button class="iconbtn">▶ הפסקה</button></div>
+       <div class="remind" title="לחץ להחלפה">💬 האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.</div>
+       <div class="opt" style="margin-bottom:6px"><button>🖨 הדפס את כל פעולות היום</button><button>🖨 רק פתוחות/מסומנות</button><button>📋 הזנה מרוכזת</button></div>
+       <h2>הרגלים</h2><div class="card row ">
     <button class="check "></button>
     <div class="grow"><div class="t">ללכת 15 דקות סביב הבלוק</div>
     <div class="meta"><span class="chip">🔁 פעילות גופנית</span><span>🔥 3</span><span style="color:var(--accent)">★★★★</span><span>15 ד׳</span><span class="chip">בריאות ואנרגיה לאורך היום</span></div></div></div><div class="card row ">
@@ -115,7 +165,8 @@
     <button class="check "></button>
     <div class="grow"><div class="t">לכתוב 3 שורות על מה שהצליח היום</div>
     <div class="meta"><span class="chip">🔁 סיכום יום</span><span>🔥 0</span><span style="color:var(--accent)">★</span><span>5 ד׳</span></div></div></div>
-      <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">הבוקר התחלתי עם הליכה, ההרגשה טובה.</textarea>
+       <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">הבוקר התחלתי עם הליכה, ההרגשה טובה.</textarea>
+      </details>
       </div></section>
 <section id="upcoming"><h2 class="sec">בקרוב: שלושה ימים</h2><p>לוח בסגנון Todoist עם גרירת פעולות לתאריך. יש גם תצוגה שבועית, חודשית וכל הימים.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 1;"><h1>בקרוב</h1><div class="sw"><button class="iconbtn">🖨 שבוע</button></div></div>
       <div class="seg" style="--i: 2;"><button class="on">3 ימים</button><button class="">שבוע</button><button class="">חודש</button><button class="">כל הימים</button></div>
@@ -204,7 +255,7 @@
     <div class="grow">
       <div class="t">לבדוק עם המעצבת את דף הבית</div>
       <div class="meta"><span>24/11</span><span style="color:var(--accent)">★★★</span><span>15 ד׳</span><span class="chip">🧩 להקים את דף הבית</span></div>
-    </div></div></div>
+    </div><button class="playbtn" aria-label="התחל עכשיו">▶</button></div></div>
     <h2 style="--i: 7;">הושלמו (1)</h2><div class="grp" style="--i: 8;"><div class="card row p0 done">
     <button class="check on">✓</button>
     <div class="grow">
@@ -232,7 +283,7 @@
       <label>סוג</label><select name="kind"><option value="meal">ארוחה</option><option value="rest">מנוחה יומית</option></select>
       <div class="actions"><button class="btn">הוסף</button></div></form>
      <h2 style="--i: 8;">הפסקה בכל שעה</h2><p class="sub" style="--i: 9;">אחרי כ-50 דקות עבודה (לפי הטיימר ופעולות שסימנת כבוצעו) תופיע הצעה ל-10 דקות הפסקה, בלי חסימה. ההצעה מופיעה כשהאפליקציה פתוחה.</p>
-     <h2 style="--i: 10;">שעות ההתחלה והסיום שלי</h2><div class="card row" style="--i: 10;"><div class="grow"><div class="t"><b>23/11</b></div><div class="meta"><span>התחלה 13:53</span><span>סיום —</span></div></div></div><div class="card row" style="--i: 10;"><div class="grow"><div class="t"><b>22/11</b></div><div class="meta"><span>התחלה 08:10</span><span>סיום 18:40</span><span>10 שעות ו-30 דק׳</span></div></div></div><div class="card row" style="--i: 10;"><div class="grow"><div class="t"><b>21/11</b></div><div class="meta"><span>התחלה 08:30</span><span>סיום 17:55</span><span>9 שעות ו-25 דק׳</span></div></div></div><div class="sub" style="margin-top: 6px; --i: 10;">ממוצע ימים שהסתיימו: 9 שעות ו-58 דק׳</div></div></section>
+     <h2 style="--i: 10;">שעות ההתחלה והסיום שלי</h2><div class="card row" style="--i: 10;"><div class="grow"><div class="t"><b>23/11</b></div><div class="meta"><span>התחלה 14:44</span><span>סיום —</span></div></div></div><div class="card row" style="--i: 10;"><div class="grow"><div class="t"><b>22/11</b></div><div class="meta"><span>התחלה 08:10</span><span>סיום 18:40</span><span>10 שעות ו-30 דק׳</span></div></div></div><div class="card row" style="--i: 10;"><div class="grow"><div class="t"><b>21/11</b></div><div class="meta"><span>התחלה 08:30</span><span>סיום 17:55</span><span>9 שעות ו-25 דק׳</span></div></div></div><div class="sub" style="margin-top: 6px; --i: 10;">ממוצע ימים שהסתיימו: 9 שעות ו-58 דק׳</div></div></section>
 <section id="dayrewards"><h2 class="sec">תגמולים יומיים</h2><p>רשימת התגמולים שמהם בוחרים כשעומדים בתנאי היום.</p><div class="phone"><div class="demobar" style="--i: 0;">מצב דמו · נתונים בדויים <button class="lnk">אפס דמו</button></div><div class="top" style="--i: 2;"><h1>תגמולים יומיים</h1></div><p class="sub" style="--i: 3;">רשימה של תגמולים קטנים. כשאתה עומד בתנאי של היום, תבחר אחד מהם או תגריל.</p>
      <div class="card row" style="--i: 4;"><span style="font-size:22px">🎁</span><div class="t grow">קפה בבית קפה</div><button class="iconbtn" aria-label="מחק">✕</button></div><div class="card row" style="--i: 5;"><span style="font-size:22px">🎁</span><div class="t grow">פרק שוקולד</div><button class="iconbtn" aria-label="מחק">✕</button></div><div class="card row" style="--i: 6;"><span style="font-size:22px">🎁</span><div class="t grow">סרט בערב</div><button class="iconbtn" aria-label="מחק">✕</button></div>
      <form id="rwForm" class="row" style="margin-top: 10px; --i: 7;"><input name="title" placeholder="תגמול חדש" required="" autocomplete="off"><button class="btn">הוסף</button></form></div></section>

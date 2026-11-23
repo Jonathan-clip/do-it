@@ -39,9 +39,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 #nav button.on{color:var(--brand);font-weight:700}
 #nav button.on i{filter:none;opacity:1}
 .fab{position:fixed;bottom:calc(76px + env(safe-area-inset-bottom));inset-inline-start:20px;width:56px;height:56px;border-radius:50%;border:0;background:var(--brand);color:var(--brand-ink);font-size:30px;box-shadow:0 4px 14px #0004;z-index:4}
-.sheet{position:fixed;inset:0;background:#0007;z-index:10;display:flex;align-items:flex-end;justify-content:center}
+.sheet{position:fixed;inset:0;height:100vh;height:100dvh;background:#0007;z-index:10;display:flex;align-items:flex-end;justify-content:center}
 .sheet[hidden]{display:none}
-.panel{background:var(--card);width:100%;max-width:640px;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+.panel{background:var(--card);width:100%;max-width:640px;border-radius:20px 20px 0 0;padding:18px 16px calc(28px + env(safe-area-inset-bottom));max-height:88vh;max-height:88dvh;overflow:auto;overscroll-behavior:contain}
+@media (min-width:700px),(pointer:fine){.sheet{align-items:center;padding:16px}.panel{border-radius:20px;max-height:84vh;max-height:84dvh}}
 label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
 input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
 textarea{min-height:90px;resize:vertical}
@@ -233,3 +234,6 @@ body.running #capture{display:none}
 .vistext{min-height:220px;display:flex;flex-direction:column;justify-content:center;gap:6px;animation:rise .6s ease both}
 .vistext p{margin:0;font-size:19px;line-height:1.65;text-align:center}
 @media (prefers-reduced-motion:reduce){.vistext{animation:none}}
+.playbtn{border:0;background:var(--soft);color:var(--brand);width:36px;height:36px;border-radius:50%;flex:none;font-size:14px}
+.todaymore{margin-top:14px}
+.todaymore>summary{cursor:pointer;font-weight:600;color:var(--muted);padding:10px 0;border-top:1px solid var(--line)}
