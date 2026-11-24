@@ -294,3 +294,10 @@ body.miniRun #view{padding-bottom:170px}
 .stepbar i.on{background:var(--brand)}
 .stepbar .sub{flex:1;margin-inline-start:6px}
 .hearts button{padding:5px 7px}
+/* planning assistant */
+.chatbox{display:flex;flex-direction:column;gap:8px;margin:8px 0 10px}
+.bub{max-width:88%;padding:10px 14px;border-radius:16px;line-height:1.55;font-size:16px}
+.bub.bot{align-self:flex-start;background:var(--soft);color:var(--ink);border-end-start-radius:4px}
+.bub.me{align-self:flex-end;background:var(--brand);color:var(--brand-ink);border-end-end-radius:4px}
+.devnote{background:var(--warn-bg);color:var(--warn-ink);border-radius:10px;padding:8px 12px;font-size:13px;margin:6px 0 10px;line-height:1.5}
+.pickrow{cursor:pointer}

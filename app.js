@@ -1,9 +1,9 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-24.5'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-25.2'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
-const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
+const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
 const TS_KEY = DEMO ? 'doit-demo-updated-v1' : 'doit-updated-v1';
 const SYNC_KEY = DEMO ? 'doit-demo-synced-v1' : 'doit-synced-v1';
 // v2 structure: a task that had subtasks becomes a "job" (task) and each subtask an action; every other old task is already an action.
@@ -21,7 +21,7 @@ function migrate(d) {
   });
   d.tasks = keep; d.v = 2; return d;
 }
-const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm', 'dayRewards', 'breakIdeas'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual'];
+const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm', 'dayRewards', 'breakIdeas', 'topics', 'sessions'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual', 'assist'];
 const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return h + ':' + str.length; };
 function itemHashes(d) { // one entry per collection item / per dated entry, so changes and deletions can be tracked
   const o = {};
@@ -149,7 +149,7 @@ function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in lo
   }; im.src = r.result; };
   r.readAsDataURL(file);
 }
-const MORE_TABS = ['journal', 'rhythm', 'dayrewards', 'matrix', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
+const MORE_TABS = ['journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
 const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
 state.mode = (() => { try { const m = localStorage.getItem('doit-mode'); if (m === 'plan' || m === 'do') return m; } catch (e) {} return window.matchMedia && matchMedia('(max-width: 700px)').matches ? 'do' : 'plan'; })();
 // Weekly vision data lives in D().weeks[<Sunday date>]; created lazily on first edit.
@@ -286,9 +286,10 @@ function showNext(doneId) {
 /* Quick capture: one field, no date/energy/priority; classified later in the daily "ארגון" */
 let captured = 0;
 function captureSheet() {
-  sheet(`<h1>💭 זרוק מחשבה</h1><p class="sub">רק לכתוב. תארגן אחר כך בתהליך "ארגון".</p>
+  sheet(`<h1>💭 מה עובר לי בראש?</h1><p class="sub">שורה מהירה לרשימה, ותארגן אחר כך בתהליך "ארגון". או לפרוק הכל ולעשות סדר עם העוזר.</p>
    <form id="capForm" class="row"><input id="capText" placeholder="מה עולה לך?" autocomplete="off" autofocus><button class="btn">הוסף</button></form>
    <div id="capDone" class="sub" style="margin-top:8px">${captured ? `נקלטו ${captured} ✓` : ''}</div>
+   <button class="btn" style="width:100%;margin-top:12px" data-act="asstFromCapture">🧠 לפרוק ולעשות סדר עם העוזר</button>
    <div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
   $('#capForm').onsubmit = e => {
     e.preventDefault(); const txt = $('#capText').value.trim(); if (!txt) return;
@@ -804,6 +805,267 @@ function returnToast() { // after a break: remind what I was doing, back to it w
 const DEFAULT_IDEAS = ['לצאת להליכה קצרה', 'לעשות ספורט קצר', 'לסדר קצת את הבית', 'לשתות מים ולהתמתח'];
 const ideaList = () => D().breakIdeas.length ? D().breakIdeas.map(x => x.title) : DEFAULT_IDEAS;
 const pickIdea = prev => { const l = ideaList().filter(x => x !== prev); return l[Math.floor(Math.random() * l.length)] || ''; };
+/* ---------- Planning assistant ("עוזר התכנון שלי") ----------
+   The screen, the conversation flow and the memory live here. The "engine" that produces the next question and the understanding of free text
+   is replaceable: right now it is a clearly labelled development stub (no AI); the real model plugs in behind Engine.turn / Engine.start. */
+const AREAS = [['work', '💼 עבודה ועסקים'], ['money', '💰 כסף וכלכלה'], ['health', '💪 בריאות וכושר'], ['couple', '❤️ זוגיות'], ['family', '👨‍👩‍👧 משפחה וחברים'], ['home', '🏠 בית וסידורים'], ['growth', '📚 למידה והתפתחות'], ['fun', '🎨 פנאי והנאה']];
+const GROUPS = [['urgent', '🔴 דחוף'], ['project', '📁 פרויקט לקדם'], ['small', '✅ משימה קטנה'], ['long', '🎯 חשוב לטווח ארוך'], ['idea', '💡 רעיון לשמור'], ['worry', '💭 מעסיק, בלי פעולה כרגע']];
+const A_MODES = [['order', '🧹', 'לעשות סדר בראש', 'כשיש הרבה על הפרק ואני רוצה להבין מה חשוב'], ['weekly', '🗓', 'תכנון שבועי קצר', 'אני כבר יודע מה חשוב, רק להחליט איך מתקדמים'], ['today', '☀️', 'מה מעסיק אותי היום', 'לעדכן את הרשימה של היום לפי מה שקורה']];
+const aGroup = k => (GROUPS.find(g => g[0] === k) || GROUPS[2])[1];
+const aArea = k => (AREAS.find(a => a[0] === k) || [0, ''])[1];
+const asstPrefs = () => Object.assign({ areas: [], consent: false, shareTitles: false }, D().assist.prefs);
+const asstFocus = () => Object.assign({ month: [], week: [] }, D().assist.focus);
+const asstSess = () => D().assist.session || null;
+const asstSave = s => { D().assist.session = s; Store.save(); };
+const norm = t => String(t || '').toLowerCase().replace(/["'׳״.,!?():;\-]/g, ' ').replace(/\s+/g, ' ').trim();
+const toks = t => norm(t).split(' ').filter(w => w.length > 1 && !['את', 'של', 'עם', 'על', 'אל', 'לא', 'גם', 'או', 'כל', 'זה', 'זו', 'הוא', 'היא'].includes(w));
+function similar(a, b) { // a loose check so the assistant does not add something that already exists
+  const x = norm(a), y = norm(b); if (!x || !y) return false; if (x === y || x.includes(y) || y.includes(x)) return true;
+  const A1 = new Set(toks(a)), B1 = toks(b); if (!A1.size || !B1.length) return false; const inter = B1.filter(w => A1.has(w)).length; return inter / Math.max(A1.size, B1.length) >= 0.6;
+}
+const findSimilarAction = title => D().tasks.find(t => !t.done && similar(t.title, title));
+
+/* ---- Engine: development stub. Same contract the real model will follow: it reads the session + the user's text, and updates
+   session.items (classified things the user mentioned), session.question/chips (ONE next question), session.phase, session.summary/priorities, session.proposals. */
+const AREA_WORDS = { work: ['עבודה', 'לקוח', 'הצעה', 'עסק', 'פגישה', 'קמפיין', 'אתר', 'פרויקט', 'משכורת'], money: ['חשבון', 'תשלום', 'מס', 'כסף', 'משכנתא', 'הלוואה', 'תקציב', 'חוב'], health: ['ספורט', 'רופא', 'כושר', 'שינה', 'דיאטה', 'בדיקה', 'הליכה', 'בריאות'], couple: ['זוגיות', 'אשתי', 'בעלי', 'בן זוג', 'בת זוג'], family: ['ילדים', 'אמא', 'אבא', 'אחי', 'אחותי', 'חברים', 'משפחה'], home: ['בית', 'ניקיון', 'תיקון', 'קניות', 'דירה', 'סידור'], growth: ['ללמוד', 'קורס', 'ספר', 'ללמוד', 'התפתחות'], fun: ['טיול', 'סרט', 'חופשה', 'הנאה', 'תחביב'] };
+const guessArea = t => { for (const [k, ws] of Object.entries(AREA_WORDS)) if (ws.some(w => t.includes(w))) return k; return ''; };
+function guessGroup(t) {
+  if (/דחוף|מיד|היום|עד מחר|בהקדם|אזהרה|קנס|דד.?ליין/.test(t)) return 'urgent';
+  if (/אולי|רעיון|יום אחד|היה נחמד/.test(t)) return 'idea';
+  if (/דואג|מפחד|מרגיש|מלחיץ|מטריד|לחץ|חשש/.test(t)) return 'worry';
+  if (/פרויקט|לקדם|להקים|לבנות|להשיק|עסק|מערכת/.test(t)) return 'project';
+  if (/^(לקנות|לשלוח|להתקשר|לשלם|לתאם|לסדר|לבדוק|לענות|להזמין)/.test(t)) return 'small';
+  return 'long';
+}
+function mockItems(text) { // split free text into separate things, without turning every thought into a task
+  return String(text || '').split(/[\n.,;]| וגם | ובנוסף /).map(x => x.trim()).filter(x => x.length >= 3 && !/^(כן|לא|לא יודע|אני לא יודע)$/.test(x)).map(x => ({ id: uid(), text: x, group: guessGroup(x), area: guessArea(x), delayed: false, calm: false }));
+}
+const Engine = {
+  get kind() { return AI.on() && !AI.fell ? 'ai' : 'dev'; }, // 'dev' = scripted stub (no AI)
+  start(s) {
+    const f = asstFocus(), topics = D().topics, names = f.month.map(id => (topics.find(t => t.id === id) || {}).title).filter(Boolean);
+    if (s.mode === 'overwhelm') { s.question = 'מה הכי מטריד אותך עכשיו? מספיקה מילה או שתיים.'; s.chips = ['כסף', 'עבודה', 'משהו אישי', 'הכל ביחד']; }
+    else if (s.mode === 'today') { s.question = 'מה מעסיק אותך היום?'; s.chips = ['יש לי יותר מדי', 'אין לי כוח', 'משהו דחוף צץ']; }
+    else if (s.mode === 'weekly') { if (topics.length) { s.phase = 'weekpick'; s.question = ''; } else { s.question = 'מה היית רוצה לקדם השבוע?'; s.chips = []; } }
+    else if (names.length) { s.question = 'בפעם הקודמת החלטת להתמקד ב: ' + names.join(', ') + '. האם זה עדיין בעדיפות?'; s.chips = ['כן, ממשיכים', 'משהו השתנה']; s.recall = true; }
+    else { s.question = 'מה הכי מעסיק אותך כרגע?'; s.chips = ['עבודה', 'כסף', 'בריאות', 'דברים בבית', 'אני לא יודע']; }
+    return s;
+  },
+  async devTurn(s, text) {
+    text = (text || '').trim(); s.turns++; if (text === '__skip__') text = '';
+    if (s.mode === 'today') {
+      const open = tasksOn(TODAY()).filter(t => !t.done), P = [], lines = mockItems(text);
+      if (/עמוס|מוצף|יותר מדי|אין לי כוח|עייף|לא מספיק/.test(text)) open.slice().sort((a, b) => (effQuad(a) === 'q4' ? 0 : 1) - (effQuad(b) === 'q4' ? 0 : 1) || (a.want || 0) - (b.want || 0)).slice(0, 2).forEach(t => P.push({ id: uid(), type: 'postpone', title: t.title, taskId: t.id, reason: 'אמרת שהיום עמוס, וזו אחת הפחות חשובות או פחות רצויות', on: true }));
+      lines.filter(l => !/עמוס|מוצף|יותר מדי|אין לי כוח|עייף|לא מספיק/.test(l.text)).forEach(l => { if (!findSimilarAction(l.text)) P.push({ id: uid(), type: 'add', title: l.text, reason: 'ציינת את זה כמשהו שמעסיק אותך היום', on: l.group === 'urgent' }); });
+      s.proposals = P; s.phase = 'proposals'; s.question = ''; s.summary = P.length ? 'הנה מה שהצעתי לעדכן, לפי מה שכתבת בלבד. סמן מה מתאים לך.' : 'לא מצאתי מה לעדכן ברשימה של היום לפי מה שכתבת. אפשר לכתוב עוד.'; return s;
+    }
+    if (s.mode === 'overwhelm') {
+      const it = mockItems(text)[0]; if (it) s.items.push(it);
+      s.focusIds = []; s.steps = [{ id: uid(), topic: (it && it.text) || text, title: '', mins: 10, on: true }]; s.phase = 'steps'; s.stepIdx = 0; s.question = ''; return s;
+    }
+    if (s.recall && s.turns === 1) { s.recall = false; if (/^כן/.test(text)) { s.phase = 'weekpick'; s.question = ''; s.items = D().topics.filter(t => t.status === 'active').map(t => ({ id: t.id, text: t.title, group: t.group, area: t.area, delayed: false, calm: false })); return s; } s.question = 'מה הכי מעסיק אותך כרגע?'; s.chips = ['עבודה', 'כסף', 'בריאות', 'דברים בבית']; s.turns = 0; return s; }
+    if (s.stage === 'delay') { const it = mockItems(text); it.forEach(x => { x.delayed = true; if (x.group !== 'worry') x.group = 'urgent'; s.items.push(x); }); }
+    else if (s.stage === 'block') s.blockNote = text;
+    else if (s.stage === 'calm') { s.items.forEach(x => { if (similar(x.text, text) || toks(text).some(w => toks(x.text).includes(w))) x.calm = true; }); }
+    else { const it = mockItems(text); it.forEach(x => { if (!s.items.some(y => similar(y.text, x.text))) s.items.push(x); }); }
+    const next = { undefined: 'delay', first: 'delay', delay: 'block', block: 'calm' }[s.stage] ;
+    if (!s.stage || s.stage === 'first') s.stage = 'delay'; else if (s.stage === 'delay') s.stage = 'block'; else if (s.stage === 'block') s.stage = 'calm'; else s.stage = 'done';
+    if (s.stage === 'delay') { s.question = 'האם יש משהו דחוף שאתה דוחה כבר הרבה זמן?'; s.chips = ['לא', 'כן, אכתוב']; }
+    else if (s.stage === 'block') { s.question = 'מה הכי מפריע לך להתקדם?'; s.chips = ['חוסר זמן', 'אין לי כוח', 'לא יודע איפה להתחיל']; }
+    else if (s.stage === 'calm') { s.question = 'איזה נושא ייתן לך הכי הרבה שקט אם תטפל בו?'; s.chips = []; }
+    else Engine.summarize(s);
+    return s;
+  },
+  summarize(s) {
+    const score = x => ({ urgent: 5, project: 3, long: 3, small: 2, worry: 1, idea: 0 }[x.group] || 0) + (x.delayed ? 2 : 0) + (x.calm ? 2 : 0);
+    const why = x => x.delayed ? 'אתה דוחה את זה כבר זמן' : x.calm ? 'ציינת שזה ייתן לך שקט' : x.group === 'urgent' ? 'נשמע דחוף לפי מה שכתבת' : x.group === 'project' ? 'פרויקט שמקדם משהו' : x.group === 'small' ? 'קטן ואפשר לסגור מהר' : x.group === 'worry' ? 'מעסיק אותך, בלי פעולה כרגע' : x.group === 'idea' ? 'רעיון לשמור להמשך' : 'חשוב לטווח ארוך';
+    s.priorities = s.items.slice().sort((a, b) => score(b) - score(a)).map(x => ({ id: x.id, text: x.text, group: x.group, area: x.area, reason: why(x) }));
+    const top = s.priorities.slice(0, 3).map(p => p.text);
+    s.summary = s.priorities.length ? 'כרגע עולים ' + s.priorities.length + ' נושאים. המרכזיים לפי מה שכתבת: ' + top.join(' · ') + '.' : 'עוד לא כתבת נושאים. אפשר לחזור לשיחה ולכתוב מה מעסיק אותך.';
+    s.phase = 'summary'; s.question = ''; s.chips = [];
+  },
+  suggestSteps(topic, s) { const c = s && s.sugg && s.sugg[topic]; if (c && c.length) return c; return ['לכתוב בשורה אחת מה התוצאה שאני רוצה', 'לפתוח את הקובץ או המסמך הרלוונטי', 'להתקשר או לשלוח הודעה אחת בנושא']; }
+};
+
+/* ---- Real AI (stage 2). The app talks only to our own Supabase Edge Function "doit-assistant" (it holds the Anthropic key; the key is never in the app).
+   Used only when: signed in + the user gave consent. Any failure falls back to the dev stub, and the banner says so. ---- */
+const AI = {
+  fell: false, last: null, status: '',
+  on() { return !!(Cloud.user && Cloud.sb && asstPrefs().consent); },
+  async invoke(body) {
+    const { data, error } = await Cloud.sb.functions.invoke('doit-assistant', { body });
+    if (error) { let code = 'error'; try { const j = await error.context.json(); code = j.error || code; } catch (e) {} throw new Error(code); }
+    if (!data || !data.ok) throw new Error('no_answer');
+    return data;
+  },
+  async call(context) { this.last = context; return (await this.invoke({ context })).result; },
+  ctx(s, text, task) { // the minimum needed: the conversation so far, what was sorted, and (only if allowed) titles from the user's lists
+    const pf = asstPrefs(), T = TODAY(), h = s.history.slice(); if (h.length && h[h.length - 1].role === 'u') h.pop();
+    const c = { task: task || 'turn', mode: s.mode, today: T, turnNumber: s.turns, areasOfInterest: pf.areas, newMessage: String(text || '').slice(0, 1500),
+      transcript: h.slice(-12).map(x => ({ who: x.role === 'u' ? 'user' : 'assistant', text: String(x.text).slice(0, 500) })), knownItems: s.items.slice(0, 30).map(x => ({ text: x.text, group: x.group })) };
+    if (pf.shareTitles) { c.memoryTopics = D().topics.slice(0, 20).map(t => ({ title: t.title, status: t.status })); if (s.mode === 'today') c.todayActions = tasksOn(T).filter(t => !t.done).slice(0, 25).map(t => ({ taskId: t.id, title: t.title, mins: t.mins })); }
+    return c;
+  },
+  apply(s, r) { // validate everything the model returned before it touches the session
+    const G = GROUPS.map(g => g[0]), AR = AREAS.map(a => a[0]), grp = g => G.includes(g) ? g : 'long', ar = a => AR.includes(a) ? a : '';
+    const str = (v, n) => typeof v === 'string' ? v.trim().slice(0, n) : '', arr = v => Array.isArray(v) ? v : [];
+    s.turns++; s.sugg = s.sugg || {};
+    arr(r.items).slice(0, 12).forEach(x => { const t = str(x && x.text, 120); if (t && !s.items.some(y => similar(y.text, t))) s.items.push({ id: uid(), text: t, group: grp(x.group), area: ar(x.area), delayed: false, calm: false }); });
+    const reply = str(r.reply, 500), q = str(r.question, 300); let phase = r.phase;
+    s.chips = arr(r.chips).map(c => str(c, 40)).filter(Boolean).slice(0, 4); s.question = [reply, q].filter(Boolean).join('\n');
+    if (phase === 'summary' && s.mode === 'order') {
+      const pr = arr(r.priorities).slice(0, 12).map(p => { const t = str(p && p.text, 120); if (!t) return null; let it = s.items.find(y => similar(y.text, t)); if (!it) { it = { id: uid(), text: t, group: grp(p.group), area: ar(p.area) }; s.items.push(it); } return { id: it.id, text: t, group: grp(p.group), area: ar(p.area), reason: str(p.reason, 160) || 'לפי מה שכתבת' }; }).filter(Boolean);
+      if (pr.length) { s.priorities = pr; s.summary = str(r.summary, 600) || reply; s.phase = 'summary'; s.question = ''; s.chips = []; } else Engine.summarize(s);
+      return;
+    }
+    if (phase === 'steps' && s.mode === 'overwhelm') {
+      const topic = (s.items[s.items.length - 1] || {}).text || str(r.summary, 80) || 'מה שמטריד אותי'; const sg = arr(r.stepSuggestions).map(x => str(x, 80)).filter(Boolean).slice(0, 3);
+      if (sg.length) s.sugg[topic] = sg; s.focusIds = []; s.steps = [{ id: uid(), topic, title: '', mins: 10, on: true }]; s.stepIdx = 0; s.phase = 'steps'; s.reassure = reply; s.question = ''; s.chips = []; return;
+    }
+    if (phase === 'proposals' && s.mode === 'today') {
+      const open = tasksOn(TODAY()).filter(t => !t.done), P = [];
+      arr(r.proposals).slice(0, 4).forEach(p => { const type = p && p.type, reason = str(p.reason, 160) || 'לפי מה שכתבת';
+        if (type === 'add') { const t = str(p.title, 120); if (t && !findSimilarAction(t)) P.push({ id: uid(), type, title: t, reason, on: true }); }
+        else if (type === 'postpone' || type === 'drop') { const t = open.find(x => x.id === p.taskId); if (t) P.push({ id: uid(), type, title: t.title, taskId: t.id, reason, on: false }); } });
+      s.proposals = P; s.phase = 'proposals'; s.summary = reply || (P.length ? 'הנה מה שהצעתי לעדכן, לפי מה שכתבת בלבד. סמן מה מתאים לך.' : 'לא מצאתי מה לעדכן. אפשר לכתוב עוד.'); s.question = ''; s.chips = []; return;
+    }
+    if (!s.question) s.question = 'ספר לי עוד, מה עוד מעסיק אותך?';
+  }
+};
+
+Engine.turnAI = async function (s, text) {
+  const t = text === '__sum__' ? 'בבקשה לסכם עכשיו: החזר phase summary לפי מה שנאמר עד כה' : text === '__skip__' ? '(המשתמש דילג על השאלה)' : text;
+  AI.apply(s, await AI.call(AI.ctx(s, t, 'turn')));
+};
+const devTurnOnly = Engine.devTurn;
+Engine.turn = async function (s, text) {
+  if (AI.on()) { try { await Engine.turnAI(s, text); AI.fell = false; return s; } catch (e) { AI.fell = true; } }
+  if (text === '__sum__') { Engine.summarize(s); return s; }
+  return devTurnOnly.call(Engine, s, text);
+};
+
+/* ---- session control ---- */
+function asstBegin(mode) {
+  const s = { id: uid(), mode, phase: 'chat', history: [], items: [], priorities: [], proposals: [], steps: [], focusIds: [], question: '', chips: [], summary: '', turns: 0, stage: 'first', status: 'active', startedAt: new Date().toISOString() };
+  Engine.start(s); if (s.question) s.history.push({ role: 'a', text: s.question }); asstSave(s); state.tab = 'assistant'; render(); window.scrollTo(0, 0);
+}
+async function asstSend(text, shown) {
+  const s = asstSess(); if (!s) return; text = (text || '').trim(); if (!text) return;
+  s.history.push({ role: 'u', text: shown || text }); s.pending = true; asstSave(s); render();
+  try { await Engine.turn(s, text); } catch (e) { s.error = 'משהו השתבש. אפשר לנסות שוב.'; }
+  s.pending = false; if (s.question) s.history.push({ role: 'a', text: s.question }); asstSave(s); render(); window.scrollTo(0, document.body.scrollHeight);
+  if (s.phase === 'steps') asstFetchSteps();
+}
+async function asstFetchSteps() {
+  const s = asstSess(); if (!s || !AI.on() || s.phase !== 'steps') return;
+  const topic = s.mode === 'overwhelm' ? (s.steps[0] || {}).topic : (stepsPerTopic(s)[s.stepIdx] || {}).text; s.sugg = s.sugg || {}; if (!topic || s.sugg[topic]) return;
+  try { const r = await AI.call(AI.ctx(s, topic, 'suggest_steps')), a = (Array.isArray(r.stepSuggestions) ? r.stepSuggestions : []).map(x => String(x).trim().slice(0, 80)).filter(Boolean).slice(0, 3); AI.fell = false; if (a.length) { s.sugg[topic] = a; asstSave(s); if (state.tab === 'assistant') render(); } } catch (e) { AI.fell = true; if (state.tab === 'assistant') render(); }
+}
+function asstEnd(toast_) { const s = asstSess(); if (s && s.history.length > 1) { D().sessions.push({ id: s.id, date: TODAY(), mode: s.mode, summary: s.summary || (s.history.find(h => h.role === 'u') || {}).text || '' }); } delete D().assist.session; Store.save(); state.tab = 'assistant'; render(); if (toast_) toast('<span>' + toast_ + '</span><button data-act="toastClose" aria-label="סגור">✕</button>', 6000); }
+function stepsPerTopic(s) { return s.focusIds.map(id => s.priorities.find(p => p.id === id)).filter(Boolean); }
+function asstCommit(s) { // turn the approved steps into real actions, avoiding duplicates; nothing happens without the user's approval
+  const T = TODAY(); let added = 0, skipped = 0; const mem = D().topics;
+  s.focusIds.forEach(id => { const p = s.priorities.find(x => x.id === id); if (p && !mem.some(t => t.id === id)) mem.push({ id, title: p.text, area: p.area || '', group: p.group, status: 'active', createdAt: T }); });
+  s.priorities.forEach(p => { if (!mem.some(t => t.id === p.id) && p.group !== 'idea' && p.group !== 'worry') return; if (!mem.some(t => t.id === p.id)) mem.push({ id: p.id, title: p.text, area: p.area || '', group: p.group, status: 'parked', createdAt: T }); });
+  const f = asstFocus(); if (s.mode === 'weekly') f.week = s.focusIds.slice(); else f.month = s.focusIds.slice(); D().assist.focus = f;
+  s.steps.filter(x => x.on && x.title.trim()).forEach(st => {
+    if (findSimilarAction(st.title) && !st.force) { skipped++; return; }
+    const p = s.priorities.find(x => x.text === st.topic || x.id === st.topicId); let pid = '';
+    if (p && p.group === 'project') { const ex = D().projects.find(pr => similar(pr.title, p.text)); if (ex) pid = ex.id; else { const np = { id: uid(), title: p.text, createdAt: T, quad: 'q2' }; D().projects.push(np); pid = np.id; } }
+    D().tasks.push({ id: uid(), title: st.title.trim(), date: st.date === 'today' ? T : st.date === 'tomorrow' ? addDays(T, 1) : null, done: false, priority: 0, energy: 3, mins: st.mins || 15, brainless: false, print: false, visionId: '', projectId: pid, notes: p ? 'מתוך עוזר התכנון: ' + p.text : '', subs: [], jobId: '', quad: p && p.group === 'urgent' ? 'q1' : (p && (p.group === 'project' || p.group === 'long')) ? 'q2' : '', parked: !st.date || st.date === 'none' });
+    added++;
+  });
+  return { added, skipped };
+}
+
+/* ---- views ---- */
+const bubble = h => '<div class="bub ' + (h.role === 'u' ? 'me' : 'bot') + '">' + esc(h.text).replace(/\n/g, '<br>') + '</div>';
+const devBanner = () => !AI.on() ? '<div class="devnote">🛠 מצב ללא AI: השאלות והסיווג כאן הם דוגמה מתוכנתת. כדי לחבר עוזר AI אמיתי, היכנס לחשבון והפעל אותו במסך הראשי של העוזר.</div>' : AI.fell ? '<div class="devnote">⚠ לא הצלחתי להתחבר ל-AI כרגע, ולכן התשובה האחרונה היא דוגמה מתוכנתת ולא AI. אפשר לנסות שוב.</div>' : '';
+function aiCard() {
+  const pf = asstPrefs(), head = '<div class="t"><b>🤖 עוזר AI אמיתי</b></div>';
+  if (!Cloud.sb) return '<div class="card">' + head + '<div class="sub">לא זמין במצב דמו או בלי חיבור לענן.</div></div>';
+  if (!Cloud.user) return '<div class="card">' + head + '<div class="sub">כדי להפעיל AI צריך להיכנס לחשבון.</div><div class="opt" style="margin-top:8px"><button data-act="account">כניסה</button></div></div>';
+  if (!pf.consent) return '<div class="card">' + head + '<div class="sub">כרגע העוזר עובד בלי AI. אפשר להפעיל AI, אחרי שתראה בדיוק מה נשלח.</div><div class="opt" style="margin-top:8px"><button class="on" data-act="aiConsent">להפעיל עוזר AI</button></div></div>';
+  const st = { ok: '✅ העוזר האמיתי מחובר ופעיל.', nokey: '⚠ השרת עוד לא קיבל מפתח AI (ראה הוראות).', login: '⚠ צריך להיכנס מחדש לחשבון.', error: '⚠ אין חיבור לפונקציית ה-AI (אולי עוד לא הותקנה).', busy: 'בודק חיבור...' }[AI.status] || 'מופעל. אפשר לבדוק שהחיבור עובד.';
+  return '<div class="card">' + head + '<div class="sub">' + st + '</div><div class="opt" style="margin-top:8px"><button data-act="aiPing">בדוק חיבור</button><button data-act="aiWhat">מה נשלח?</button><button data-act="aiOff">כבה AI</button></div></div>';
+}
+function asstHome() {
+  const s = asstSess(), pf = asstPrefs(), f = asstFocus(), tn = id => (D().topics.find(t => t.id === id) || {}).title;
+  const mo = f.month.map(tn).filter(Boolean), wk = f.week.map(tn).filter(Boolean);
+  return '<div class="top"><div class="row"><button class="iconbtn" data-act="goTab" data-t="more" aria-label="חזרה">' + chev('r') + '</button><div><h1>עוזר התכנון שלי</h1><div class="sub">בוא נעשה סדר במה שעל הפרק</div></div></div></div>' + devBanner() + aiCard()
+    + (s ? '<div class="card focus"><div class="t"><b>שיחה שהתחלנו (' + esc((A_MODES.find(m => m[0] === s.mode) || [0, 0, ''])[2] || 'עוזר') + ')</b></div><div class="sub">אפשר להמשיך מאותו מקום</div><div class="opt" style="margin-top:8px"><button class="on" data-act="asstResume">◀ להמשיך</button><button data-act="asstDrop">להתחיל מחדש</button></div></div>' : '')
+    + '<h2>במה נתמקד?</h2>' + A_MODES.map(m => '<div class="card row" data-act="asstBegin" data-m="' + m[0] + '"><span style="font-size:26px">' + m[1] + '</span><div class="grow"><div class="t"><b>' + m[2] + '</b></div><div class="sub">' + m[3] + '</div></div>' + chev('l') + '</div>').join('')
+    + '<div class="card row" data-act="asstBegin" data-m="overwhelm"><span style="font-size:26px">🌊</span><div class="grow"><div class="t"><b>אני מוצף. תעזור לי לעשות סדר</b></div><div class="sub">פחות שאלות, וצעד קטן אחד</div></div>' + chev('l') + '</div>'
+    + '<h2>הטווחים שלי</h2><div class="card"><div class="sub">🎯 מיקוד החודש</div><div class="t">' + (mo.length ? mo.map(esc).join(' · ') : 'עוד לא נבחר') + '</div><div class="sub" style="margin-top:8px">🗓 מיקוד השבוע</div><div class="t">' + (wk.length ? wk.map(esc).join(' · ') : 'עוד לא נבחר') + '</div></div>'
+    + '<h2>תחומי חיים שרלוונטיים עכשיו</h2><div class="opt">' + AREAS.map(a => '<button class="' + (pf.areas.includes(a[0]) ? 'on' : '') + '" data-act="asstArea" data-a="' + a[0] + '">' + a[1] + '</button>').join('') + '</div>'
+    + '<div class="card row" data-act="goTab" data-t="assistmem" style="margin-top:14px"><span style="font-size:24px">🧠</span><div class="grow"><div class="t"><b>הזיכרון של העוזר</b></div><div class="sub">' + D().topics.length + ' נושאים שמורים · לראות, לערוך ולמחוק</div></div>' + chev('l') + '</div>';
+}
+function asstChat(s) {
+  const modeName = (A_MODES.find(m => m[0] === s.mode) || [0, '🌊', 'אני מוצף'])[2];
+  return '<div class="top"><div class="row"><button class="iconbtn" data-act="asstExit" aria-label="חזרה">' + chev('r') + '</button><h1 style="font-size:19px">' + modeName + '</h1></div></div>' + devBanner()
+    + '<div class="chatbox">' + s.history.map(bubble).join('') + (s.pending ? '<div class="bub bot">…</div>' : '') + '</div>'
+    + (s.error ? '<div class="sub" style="color:var(--danger)">' + esc(s.error) + '</div>' : '')
+    + (s.chips && s.chips.length && !s.pending ? '<div class="opt" style="margin:8px 0">' + s.chips.map(c => '<button data-act="asstChip" data-c="' + esc(c) + '">' + esc(c) + '</button>').join('') + '</div>' : '')
+    + '<textarea id="asstInput" rows="3" placeholder="כתוב בחופשיות. שורה, משפט או כמה דברים ברצף" ' + (s.pending ? 'disabled' : '') + '></textarea>'
+    + '<div class="grid2" style="margin-top:8px"><button class="btn" data-act="asstSendBtn" ' + (s.pending ? 'disabled' : '') + '>שלח ◀</button><button class="btn ghost" data-act="asstSkip">דלג על השאלה</button></div>'
+    + '<div class="opt" style="margin-top:10px"><button data-act="asstPause">⏸ עצור והמשך אחר כך</button>' + (s.mode === 'order' && s.items.length ? '<button data-act="asstSummarize">מספיק, בוא נסכם</button>' : '') + (s.mode !== 'overwhelm' ? '<button data-act="asstBegin" data-m="overwhelm">🌊 אני מוצף</button>' : '') + '</div>';
+}
+function asstSummary(s) {
+  return '<div class="top"><div class="row"><button class="iconbtn" data-act="asstBack" aria-label="חזרה לשיחה">' + chev('r') + '</button><h1 style="font-size:19px">מה הבנתי</h1></div></div>' + devBanner()
+    + '<div class="card focus"><div class="t">' + esc(s.summary) + '</div><div class="sub" style="margin-top:4px">זה מבוסס רק על מה שכתבת. אפשר לתקן.</div></div>'
+    + s.priorities.map((p, i) => '<div class="card"><div class="row"><div class="grow"><div class="t">' + (i + 1) + '. ' + esc(p.text) + '</div><div class="meta"><span class="chip">' + esc(aGroup(p.group)) + '</span>' + (p.area ? '<span>' + esc(aArea(p.area)) + '</span>' : '') + '<span>' + esc(p.reason) + '</span></div></div>'
+      + '<button class="iconbtn" data-act="asstUp" data-i="' + i + '" aria-label="למעלה">▲</button><button class="iconbtn" data-act="asstDown" data-i="' + i + '" aria-label="למטה">▼</button></div>'
+      + '<div class="opt" style="margin-top:6px"><button data-act="asstGroup" data-i="' + i + '">שנה סוג</button><button data-act="asstEditP" data-i="' + i + '">✏️ ערוך</button><button data-act="asstDelP" data-i="' + i + '">✕ הסר</button></div></div>').join('')
+    + '<form id="asstAdd" class="row" style="margin-top:8px"><input name="t" placeholder="הוסף נושא שפספסתי" autocomplete="off"><button class="btn">הוסף</button></form>'
+    + '<div class="grid2" style="margin-top:12px"><button class="btn" data-act="asstToFocus">✓ זה נכון. לבחור מיקוד ◀</button><button class="btn ghost" data-act="asstBack">↩ לתקן בשיחה</button></div>';
+}
+function asstFocusPick(s) {
+  const cand = s.priorities.filter(p => p.group !== 'idea' && p.group !== 'worry');
+  return '<div class="top"><div class="row"><button class="iconbtn" data-act="asstToSummary" aria-label="חזרה">' + chev('r') + '</button><h1 style="font-size:19px">במה נתמקד?</h1></div></div>' + devBanner()
+    + '<p class="sub">בחר עד שלושה נושאים לתקופה הקרובה. ההחלטה שלך, וזו רק המלצה לפי הסדר.</p>'
+    + cand.map(p => '<label class="card row pickrow"><input type="checkbox" data-act="asstPick" data-id="' + p.id + '" ' + (s.focusIds.includes(p.id) ? 'checked' : '') + ' style="width:22px;height:22px"><div class="grow"><div class="t">' + esc(p.text) + '</div><div class="meta"><span class="chip">' + esc(aGroup(p.group)) + '</span><span>' + esc(p.reason) + '</span></div></div></label>').join('')
+    + '<div class="sub" style="margin:8px 0">נבחרו ' + s.focusIds.length + ' מתוך 3</div>'
+    + '<button class="btn" style="width:100%" data-act="asstBuild" ' + (s.focusIds.length ? '' : 'disabled') + '>בנה לי תוכנית ◀</button>';
+}
+function asstSteps(s) {
+  const tops = stepsPerTopic(s); if (s.mode === 'overwhelm') { const st = s.steps[0]; return '<div class="top"><h1 style="font-size:19px">צעד קטן אחד</h1></div>' + devBanner() + '<div class="card focus"><div class="t">מה שהכי מטריד: ' + esc(st.topic) + '</div>' + (s.reassure ? '<div class="sub">' + esc(s.reassure) + '</div>' : '') + '</div><label>מה הדבר הקטן ביותר שאפשר לעשות עכשיו?</label><input id="stepText" value="' + esc(st.title) + '" autocomplete="off" placeholder="צעד קטן וברור"><div class="opt" style="margin:8px 0">' + Engine.suggestSteps(st.topic, s).map(x => '<button data-act="asstStepChip" data-c="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div><div class="grid2"><button class="btn" data-act="asstStepSave">➕ להוסיף להיום ולהתחיל</button><button class="btn ghost" data-act="asstExit">לא עכשיו</button></div>'; }
+  if (s.stepIdx < tops.length) { const p = tops[s.stepIdx]; return '<div class="top"><h1 style="font-size:19px">צעד ראשון ' + (s.stepIdx + 1) + ' מתוך ' + tops.length + '</h1></div>' + devBanner() + '<div class="card focus"><div class="t">' + esc(p.text) + '</div></div><label>מה הדבר הראשון שצריך לקרות כדי להתקדם בנושא הזה?</label><input id="stepText" autocomplete="off" placeholder="צעד קטן וברור"><div class="opt" style="margin:8px 0">' + Engine.suggestSteps(p.text, s).map(x => '<button data-act="asstStepChip" data-c="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div><div class="grid2"><button class="btn" data-act="asstStepNext">הבא ◀</button><button class="btn ghost" data-act="asstStepSkip">דלג על הנושא</button></div>'; }
+  return '<div class="top"><h1 style="font-size:19px">התוכנית שלך</h1></div>' + devBanner() + '<p class="sub">סמן אילו צעדים להוסיף לרשימה. שום דבר לא נוסף בלי אישור.</p>'
+    + (s.steps.length ? s.steps.map((st, i) => { const dup = findSimilarAction(st.title); return '<div class="card"><label class="row" style="color:var(--ink)"><input type="checkbox" data-act="asstStepOn" data-i="' + i + '" ' + (st.on && !dup ? 'checked' : (st.on && st.force ? 'checked' : '')) + ' style="width:22px;height:22px"><div class="grow"><div class="t">' + esc(st.title) + '</div><div class="sub">' + esc(st.topic) + '</div></div></label>' + (dup ? '<div class="sub" style="color:var(--warn-ink)">⚠ דומה לפעולה קיימת: ' + esc(dup.title) + ' <button class="lnk" data-act="asstForce" data-i="' + i + '">הוסף בכל זאת</button></div>' : '')
+      + '<div class="opt" style="margin-top:6px">' + [['today', 'היום'], ['tomorrow', 'מחר'], ['none', 'בלי תאריך']].map(([v, l]) => '<button class="' + ((st.date || 'none') === v ? 'on' : '') + '" data-act="asstDate" data-i="' + i + '" data-d="' + v + '">' + l + '</button>').join('') + '</div></div>'; }).join('') : '<div class="empty">לא נוספו צעדים.</div>')
+    + '<button class="btn" style="width:100%;margin-top:10px" data-act="asstCommit">✓ הוסף לרשימה שלי</button>';
+}
+function asstProposals(s) {
+  return '<div class="top"><div class="row"><button class="iconbtn" data-act="asstExit" aria-label="חזרה">' + chev('r') + '</button><h1 style="font-size:19px">עדכון להיום</h1></div></div>' + devBanner()
+    + '<div class="card focus"><div class="t">' + esc(s.summary) + '</div></div>'
+    + s.proposals.map((p, i) => '<label class="card row pickrow"><input type="checkbox" data-act="asstProp" data-i="' + i + '" ' + (p.on ? 'checked' : '') + ' style="width:22px;height:22px"><div class="grow"><div class="t">' + ({ add: '➕ להוסיף: ', postpone: '⏭ לדחות למחר: ', drop: '↩ להחזיר למאגר: ' }[p.type]) + esc(p.title) + '</div><div class="sub">' + esc(p.reason) + '</div></div></label>').join('')
+    + '<div class="grid2" style="margin-top:10px"><button class="btn" data-act="asstApply" ' + (s.proposals.length ? '' : 'disabled') + '>✓ עדכן את מה שסימנתי</button><button class="btn ghost" data-act="asstBack">↩ לכתוב עוד</button></div>';
+}
+function asstView() {
+  const s = asstSess(); if (!s || s.status === 'paused' || state.asstHome) return asstHome();
+  if (s.phase === 'summary') return asstSummary(s);
+  if (s.phase === 'focus') return asstFocusPick(s);
+  if (s.phase === 'steps') return asstSteps(s);
+  if (s.phase === 'proposals') return asstProposals(s);
+  if (s.phase === 'weekpick') return asstWeekPick(s);
+  return asstChat(s);
+}
+function asstWeekPick(s) {
+  const act = D().topics.filter(t => t.status === 'active'), f = asstFocus();
+  return '<div class="top"><div class="row"><button class="iconbtn" data-act="asstExit" aria-label="חזרה">' + chev('r') + '</button><h1 style="font-size:19px">תכנון שבועי קצר</h1></div></div>' + devBanner()
+    + '<p class="sub">מתוך הנושאים שלך, אילו נראה לך לקדם השבוע? בחר אחד עד שלושה.</p>'
+    + act.map(t => '<label class="card row pickrow"><input type="checkbox" data-act="asstWeek" data-id="' + t.id + '" ' + (s.focusIds.includes(t.id) ? 'checked' : (f.week.includes(t.id) && !s.touched ? 'checked' : '')) + ' style="width:22px;height:22px"><div class="grow"><div class="t">' + esc(t.title) + '</div><div class="meta"><span class="chip">' + esc(aGroup(t.group)) + '</span>' + (f.month.includes(t.id) ? '<span>🎯 מיקוד החודש</span>' : '') + '</div></div></label>').join('')
+    + (act.length ? '' : '<div class="empty">עוד אין נושאים שמורים. התחל ב"לעשות סדר בראש".</div>')
+    + '<button class="btn" style="width:100%;margin-top:10px" data-act="asstWeekGo" ' + (act.length ? '' : 'disabled') + '>בנה לי תוכנית לשבוע ◀</button>';
+}
+function asstMemView() {
+  const f = asstFocus();
+  return '<div class="top"><h1>הזיכרון של העוזר</h1></div><p class="sub">כאן נשמר מה שסיפרת לעוזר. אפשר לערוך ולמחוק הכל.</p>'
+    + '<h2>נושאים (' + D().topics.length + ')</h2>' + (D().topics.map(t => '<div class="card"><div class="row"><div class="grow"><div class="t">' + esc(t.title) + (f.month.includes(t.id) ? ' 🎯' : '') + (f.week.includes(t.id) ? ' 🗓' : '') + '</div><div class="meta"><span class="chip">' + esc(aGroup(t.group)) + '</span>' + (t.area ? '<span>' + esc(aArea(t.area)) + '</span>' : '') + '<span>' + ({ active: 'פעיל', parked: 'שמור להמשך', done: 'הושלם', dropped: 'ויתרתי' }[t.status] || '') + '</span></div></div></div>'
+      + '<div class="opt" style="margin-top:6px">' + [['active', 'פעיל'], ['done', 'הושלם'], ['dropped', 'ויתרתי']].map(([v, l]) => '<button class="' + (t.status === v ? 'on' : '') + '" data-act="memStatus" data-id="' + t.id + '" data-s="' + v + '">' + l + '</button>').join('') + '<button data-act="memEdit" data-id="' + t.id + '">✏️</button><button data-act="memDel" data-id="' + t.id + '">🗑</button></div></div>').join('') || '<div class="empty">עוד לא נשמר כלום.</div>')
+    + '<h2>שיחות קודמות (' + D().sessions.length + ')</h2>' + (D().sessions.slice().reverse().map(x => '<div class="card row"><div class="grow"><div class="t">' + esc(shortDate(x.date)) + ' · ' + esc((A_MODES.find(m => m[0] === x.mode) || [0, 0, 'אני מוצף'])[2]) + '</div><div class="sub">' + esc(x.summary) + '</div></div><button class="iconbtn" data-act="memDelSess" data-id="' + x.id + '" aria-label="מחק">🗑</button></div>').join('') || '<div class="sub">אין עדיין.</div>')
+    + '<button class="btn danger" style="width:100%;margin-top:14px" data-act="memClear">🗑 מחק את כל הזיכרון</button>';
+}
 /* ---------- Personal reminders: two sentences shown on the daily screen and while working ---------- */
 const REMINDERS = ['להרגיש את הכאב של הצמיחה, לצאת מאזור הנוחות.', 'האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.'];
 const remIndex = () => { const n = Math.floor(parse(TODAY()).getTime() / 864e5) + (state.remShift || 0); return ((n % REMINDERS.length) + REMINDERS.length) % REMINDERS.length; };
@@ -921,6 +1183,7 @@ const views = {
       <h2>פעולות</h2>${isToday && yesterdayLeft().length ? '<button class="btn ghost more3" style="margin:0 0 8px" data-act="carryOver">⏩ העבר להיום את מה שלא בוצע אתמול (' + yesterdayLeft().length + ')</button>' : ''}${isToday && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
       ${doneSection(d, ts, hs)}
       <details class="todaymore" id="todayMore" ${state.moreOpen ? 'open' : ''}><summary>עוד להיום${hAct ? ` · ${hAct} הרגלים` : ''}</summary>
+       <div class="opt" style="margin:6px 0"><button data-act="asstToday">💬 מה מעסיק אותי היום?</button></div>
        ${dayCard(d)}${visTop ? '' : visualCard(d)}${rewardTop ? '' : rewardCard(d)}${rhythmStrip(d, 'rest')}
        <div class="remind" data-act="nextReminder" title="לחץ להחלפה">💬 ${esc(reminder())}</div>
        <div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל פעולות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>
@@ -1078,6 +1341,7 @@ const views = {
       <h2>תכנון</h2>
       ${item('tasks', '✅', 'כל הפעולות', `${D().tasks.filter(t => !t.done).length} פתוחות`)}
       ${item('projects', '📁', 'פרויקטים', `${D().projects.filter(p => projState(p).done < projState(p).total).length} פעילים`)}
+      ${item('assistant', '🧠', 'עוזר התכנון שלי', `${D().topics.length} נושאים בזיכרון`)}
       ${item('matrix', '🧭', 'מטריצת עדיפויות', `${D().tasks.filter(t => !t.done && !effQuad(t)).length} פעולות לא מסווגות`)}
       <h2>אישי</h2>
       ${item('habits', '🔁', 'הרגלים', `${D().habits.length} הרגלים`)}
@@ -1142,6 +1406,8 @@ const views = {
      ${QUADS.map(q => '<div class="card quadcard"><div class="t"><b>' + q[1] + '</b> <span class="sub">(' + by(q[0]).length + ' פעולות)</span></div><div class="sub" style="margin:4px 0">' + esc(q[2]) + '</div><div class="sub" style="opacity:.8">דוגמאות: ' + esc(q[3]) + '</div>' + items(q[0]) + '</div>' + by(q[0]).map(t => taskRow(t, true)).join('')).join('')}
      ${none.length ? '<h2>עוד לא סווגו (' + none.length + ')</h2>' + none.slice(0, 40).map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div>' + quadChips(t.id, '', '') + '</div>').join('') : '<div class="empty">כל הפעולות הפתוחות סווגו</div>'}`;
   },
+  assistant() { return asstView(); },
+  assistmem() { return asstMemView(); },
   goals() {
     const F = state.goalFilter, all = D().goals.map(g => ({ g, s: goalState(g) }));
     const active = all.filter(x => !x.s.achieved && !x.s.missed), done = all.filter(x => x.s.achieved), missed = all.filter(x => x.s.missed);
@@ -1185,7 +1451,7 @@ function render() {
   const board = $('#uboard'), boardScroll = board ? board.scrollLeft : null; // keep the board's horizontal position across re-renders
   document.body.classList.toggle('wide', state.tab === 'upcoming');
   $('#view').innerHTML = views[state.tab]();
-  if (MORE_TABS.includes(state.tab) && !(state.tab === 'lists' && state.openList) && !(state.tab === 'projects' && (state.openProject || state.openJob))) // back to the "עוד" menu
+  if (MORE_TABS.includes(state.tab) && state.tab !== 'assistant' && !(state.tab === 'lists' && state.openList) && !(state.tab === 'projects' && (state.openProject || state.openJob))) // back to the "עוד" menu
     $('#view').insertAdjacentHTML('afterbegin', `<button class="iconbtn backmore" data-act="goTab" data-t="more" aria-label="חזרה לעוד">${chev('r')}<span style="margin-inline-start:6px">עוד</span></button>`);
   if (DEMO) $('#view').insertAdjacentHTML('afterbegin', '<div class="demobar">מצב דמו · נתונים בדויים <button class="lnk" data-act="demoReset">אפס דמו</button></div>');
   if (boardScroll === null && $('#uboard') && state.tab === 'upcoming' && state.upMode !== 'month') { const b = $('#uboard'), c = [...b.querySelectorAll('.ucol[data-drop]')].find(x => /^[0-9]{4}-/.test(x.dataset.drop)); if (c) b.scrollLeft += c.getBoundingClientRect().right - b.getBoundingClientRect().right + 16; }
@@ -1216,6 +1482,8 @@ function render() {
     weekData(state.weekStart).outcomes.push({ id: uid(), text: txt, done: false });
     e.target.reset(); Store.save(); render(); $('#outText').focus();
   };
+  const af = $('#asstAdd');
+  if (af) af.onsubmit = e => { e.preventDefault(); const t = new FormData(af).get('t').trim(), ss = asstSess(); if (!t || !ss) return; ss.priorities.push({ id: uid(), text: t, group: guessGroup(t), area: guessArea(t), reason: 'הוספת בעצמך' }); asstSave(ss); render(); };
   const idf = $('#ideaForm');
   if (idf) idf.onsubmit = e => { e.preventDefault(); const t = new FormData(idf).get('title').trim(); if (!t) return; D().breakIdeas.push({ id: uid(), title: t }); idf.reset(); Store.save(); render(); };
   const rf = $('#rhForm');
@@ -1798,6 +2066,69 @@ const A = {
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
   noiseOff: () => toggleNoise(),
+  aiConsent: () => {
+    sheet(`<h1>🤖 הפעלת עוזר AI</h1>
+      <p class="sub">כשתפעיל, מה שאתה כותב בשיחה עם העוזר נשלח דרך השרת של Do It למודל AI של Anthropic, כדי שיענה לך. אין שליחה כשהעוזר כבוי.</p>
+      <ul class="sub" style="padding-inline-start:18px;line-height:1.6"><li>נשלח: ההודעות שלך בשיחה, והנושאים שכבר מיינת בה.</li><li>לא נשלח: שמך, האימייל, הנתונים האחרים באפליקציה.</li><li>המפתח של ה-AI נשמר רק בשרת ולא בטלפון. השרת לא שומר את השיחה.</li><li>לא משנה כלום ברשימות שלך בלי האישור שלך.</li><li>אין תחליף לאיש מקצוע במצוקה נפשית.</li></ul>
+      <label class="row" style="color:var(--ink);margin:10px 0"><input type="checkbox" id="aiShare" style="width:22px;height:22px"><span>לשלוח גם שמות של הפעולות להיום ושל הנושאים השמורים בזיכרון (כדי שיציע עדכונים מדויקים. בלי זה, בעדכון להיום יוצעו רק פעולות חדשות)</span></label>
+      <div class="actions"><button class="btn" data-act="aiConsentOn">אני מסכים, להפעיל</button><button class="btn ghost" data-act="close">לא עכשיו</button></div>`);
+  },
+  aiConsentOn: () => { const pf = asstPrefs(); pf.consent = true; pf.shareTitles = !!($('#aiShare') && $('#aiShare').checked); D().assist.prefs = pf; Store.save(); AI.status = ''; AI.fell = false; closeSheet(); render(); A.aiPing(); },
+  aiOff: () => { const pf = asstPrefs(); pf.consent = false; D().assist.prefs = pf; Store.save(); AI.status = ''; render(); },
+  aiPing: async () => { AI.status = 'busy'; render(); try { const r = await AI.invoke({ ping: true }); AI.status = r.configured ? 'ok' : 'nokey'; } catch (e) { AI.status = e.message === 'login' ? 'login' : 'error'; } render(); },
+  aiWhat: () => {
+    const c = AI.last, pf = asstPrefs();
+    sheet(`<h1>מה נשלח ל-AI?</h1><p class="sub">בכל הודעה נשלחים: מצב השיחה, ההודעה שלך, עד 12 ההודעות האחרונות בשיחה, והנושאים שמיינת. ${pf.shareTitles ? 'בנוסף, שמות הפעולות להיום והנושאים השמורים.' : 'שמות הפעולות והנושאים השמורים לא נשלחים.'}</p>
+      <p class="sub">הדוגמה האחרונה שנשלחה:</p><pre style="white-space:pre-wrap;direction:ltr;text-align:left;font-size:12px;max-height:40vh;overflow:auto">${c ? esc(JSON.stringify(c, null, 1)) : 'עוד לא נשלח כלום בסשן הזה.'}</pre>
+      <div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
+  },
+  asstBegin: e => { state.asstHome = false; asstBegin(e.m); },
+  asstToday: () => { state.asstHome = false; asstBegin('today'); },
+  asstFromCapture: () => { closeSheet(); state.asstHome = false; asstBegin('order'); },
+  asstResume: () => { const s = asstSess(); if (!s) return; s.status = 'active'; state.asstHome = false; asstSave(s); render(); window.scrollTo(0, 0); },
+  asstDrop: () => { delete D().assist.session; Store.save(); render(); },
+  asstArea: e => { const pf = asstPrefs(), i = pf.areas.indexOf(e.a); if (i >= 0) pf.areas.splice(i, 1); else pf.areas.push(e.a); D().assist.prefs = pf; Store.save(); render(); },
+  asstChip: e => asstSend(e.c),
+  asstSendBtn: () => asstSend($('#asstInput').value),
+  asstSkip: () => asstSend('__skip__', '(דילגתי על השאלה)'),
+  asstPause: () => { const s = asstSess(); if (s) { s.status = 'paused'; asstSave(s); } state.asstHome = true; render(); window.scrollTo(0, 0); },
+  asstExit: () => { state.asstHome = true; render(); window.scrollTo(0, 0); },
+  asstSummarize: () => { if (AI.on()) return asstSend('__sum__', '(ביקשתי לסכם)'); const s = asstSess(); Engine.summarize(s); asstSave(s); render(); window.scrollTo(0, 0); },
+  asstBack: () => { const s = asstSess(); s.phase = 'chat'; s.stage = 'free'; s.question = 'מה עוד היית רוצה להוסיף או לתקן?'; s.chips = []; s.history.push({ role: 'a', text: s.question }); asstSave(s); render(); window.scrollTo(0, 0); },
+  asstUp: e => { const s = asstSess(), i = +e.i; if (i > 0) { [s.priorities[i - 1], s.priorities[i]] = [s.priorities[i], s.priorities[i - 1]]; asstSave(s); render(); } },
+  asstDown: e => { const s = asstSess(), i = +e.i; if (i < s.priorities.length - 1) { [s.priorities[i + 1], s.priorities[i]] = [s.priorities[i], s.priorities[i + 1]]; asstSave(s); render(); } },
+  asstGroup: e => { const s = asstSess(), p = s.priorities[+e.i], k = GROUPS.findIndex(g => g[0] === p.group); p.group = GROUPS[(k + 1) % GROUPS.length][0]; asstSave(s); render(); },
+  asstEditP: e => { const s = asstSess(), p = s.priorities[+e.i], t = (prompt('נסח את הנושא', p.text) || '').trim(); if (t) { p.text = t; asstSave(s); render(); } },
+  asstDelP: e => { const s = asstSess(); s.priorities.splice(+e.i, 1); asstSave(s); render(); },
+  asstToFocus: () => { const s = asstSess(); s.phase = 'focus'; s.focusIds = s.priorities.filter(p => p.group !== 'idea' && p.group !== 'worry').slice(0, 3).map(p => p.id); asstSave(s); render(); window.scrollTo(0, 0); },
+  asstToSummary: () => { const s = asstSess(); s.phase = 'summary'; asstSave(s); render(); },
+  asstPick: e => { const s = asstSess(), i = s.focusIds.indexOf(e.id); if (i >= 0) s.focusIds.splice(i, 1); else if (s.focusIds.length < 3) s.focusIds.push(e.id); asstSave(s); render(); },
+  asstBuild: () => { const s = asstSess(); s.phase = 'steps'; s.stepIdx = 0; s.steps = []; asstSave(s); render(); window.scrollTo(0, 0); asstFetchSteps(); },
+  asstStepChip: e => { const f = $('#stepText'); if (f) { f.value = e.c; f.focus(); } },
+  asstStepNext: () => { const s = asstSess(), tops = stepsPerTopic(s), p = tops[s.stepIdx], t = ($('#stepText').value || '').trim(); if (t) s.steps.push({ id: uid(), topic: p.text, topicId: p.id, title: t, mins: 15, on: true, date: 'none' }); s.stepIdx++; asstSave(s); render(); window.scrollTo(0, 0); asstFetchSteps(); },
+  asstStepSkip: () => { const s = asstSess(); s.stepIdx++; asstSave(s); render(); asstFetchSteps(); },
+  asstStepOn: e => { const s = asstSess(), st = s.steps[+e.i]; st.on = !st.on; if (!st.on) st.force = false; asstSave(s); render(); },
+  asstForce: e => { const s = asstSess(), st = s.steps[+e.i]; st.force = true; st.on = true; asstSave(s); render(); },
+  asstDate: e => { const s = asstSess(); s.steps[+e.i].date = e.d; asstSave(s); render(); },
+  asstCommit: () => { const s = asstSess(), r = asstCommit(s); asstEnd('נוספו ' + r.added + ' פעולות' + (r.skipped ? ', ' + r.skipped + ' דומות לקיימות לא נוספו' : '')); },
+  asstStepSave: () => { const s = asstSess(), t = ($('#stepText').value || '').trim(); if (!t) return $('#stepText').focus(); const a = { id: uid(), title: t, date: TODAY(), done: false, priority: 0, energy: 2, mins: 10, brainless: false, print: false, visionId: '', projectId: '', notes: '', subs: [], jobId: '' }; D().tasks.push(a); asstEnd('נוספה פעולה להיום'); runOpen(a.id); },
+  asstProp: e => { const s = asstSess(), p = s.proposals[+e.i]; p.on = !p.on; asstSave(s); render(); },
+  asstApply: () => {
+    const s = asstSess(), T = TODAY(); let n = 0;
+    s.proposals.filter(p => p.on).forEach(p => {
+      if (p.type === 'add') { D().tasks.push({ id: uid(), title: p.title, date: T, done: false, priority: 0, energy: 3, mins: 15, brainless: false, print: false, visionId: '', projectId: '', notes: '', subs: [], jobId: '' }); n++; }
+      else { const t = findTask(p.taskId); if (!t) return; if (p.type === 'postpone') deferTo(t, addDays(T, 1)); else { t.date = null; t.parked = true; delete t.ord; } n++; }
+    });
+    asstEnd('עודכנו ' + n + ' פעולות');
+  },
+  asstWeek: e => { const s = asstSess(), i = s.focusIds.indexOf(e.id); s.touched = true; if (i >= 0) s.focusIds.splice(i, 1); else if (s.focusIds.length < 3) s.focusIds.push(e.id); asstSave(s); render(); },
+  asstWeekGo: () => { const s = asstSess(), f = asstFocus(), ids = s.touched ? s.focusIds : (s.focusIds.length ? s.focusIds : f.week.slice()); s.focusIds = ids.slice(0, 3); s.priorities = s.focusIds.map(id => { const t = D().topics.find(x => x.id === id) || {}; return { id, text: t.title || '', group: t.group || 'long', area: t.area || '', reason: 'נבחר לשבוע' }; }); s.phase = 'steps'; s.stepIdx = 0; s.steps = []; asstSave(s); render(); window.scrollTo(0, 0); asstFetchSteps(); },
+  memStatus: e => { const t = D().topics.find(x => x.id === e.id); if (t) { t.status = e.s; Store.save(); render(); } },
+  memEdit: e => { const t = D().topics.find(x => x.id === e.id), n = (prompt('נסח את הנושא', t.title) || '').trim(); if (n) { t.title = n; Store.save(); render(); } },
+  memDel: e => { D().topics = D().topics.filter(x => x.id !== e.id); const f = asstFocus(); f.month = f.month.filter(i => i !== e.id); f.week = f.week.filter(i => i !== e.id); D().assist.focus = f; Store.save(); render(); },
+  memDelSess: e => { D().sessions = D().sessions.filter(x => x.id !== e.id); Store.save(); render(); },
+  memClear: () => { if (confirm('למחוק את כל הזיכרון של העוזר (נושאים, מיקוד ושיחות)? הפעולות והפרויקטים שנוצרו נשארים.')) { D().topics = []; D().sessions = []; D().assist = {}; Store.save(); render(); } },
+
   upJump: e => { const c = document.querySelector('#uboard .ucol[data-drop="' + e.c + '"]'); if (c) c.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); },
   runMinimize: () => { Run.mini = true; runRender(); },
   runExpand: () => { Run.mini = false; runRender(); },
