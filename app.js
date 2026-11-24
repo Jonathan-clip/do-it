@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-23.7'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-24.1'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -635,6 +635,11 @@ function visualOffer() {
    <div class="actions"><button class="btn ghost" data-act="visLater">אחר כך</button><button class="btn" data-act="visStart">◀ להתחיל</button></div>`);
 }
 const workedToday = () => { const T = TODAY(); return tasksOn(T).some(t => t.done) || ((D().focus[T] || {}).work || 0) > 0; }; // started working: the morning visualization no longer matters today
+function syncHint() { // data lives only on this device until the user signs in
+  let off = false; try { off = !!localStorage.getItem('doit-sync-hint-off'); } catch (e) {}
+  if (DEMO || Cloud.user || off) return '';
+  return '<div class="card focus synchint" data-act="account"><div class="row"><span style="font-size:22px">☁️</span><div class="grow"><div class="t">הנתונים שמורים רק במכשיר הזה</div><div class="sub">לחץ כדי להתחבר ולראות אותם גם בטלפון ובמחשב</div></div><button class="iconbtn" data-act="hideSyncHint" aria-label="הסתר">✕</button></div></div>';
+}
 function visualCard(d) {
   if (d !== TODAY()) return '';
   const done = !!D().visual[d];
@@ -806,6 +811,7 @@ const views = {
       <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
       <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 סיום יום</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
        ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
+      ${isToday ? syncHint() : ''}
       ${visTop ? visualCard(d) : ''}
       ${rhythmStrip(d, 'near')}
       ${rewardTop ? rewardCard(d) : ''}
@@ -1480,6 +1486,7 @@ function bulkRender(showMiss) {
   $('#sheet .panel').scrollTop = st;
 }
 
+const authErr = m => /not allowed|disabled/i.test(m) ? 'ההרשמה סגורה בפרויקט הזה. אם כבר יש לך חשבון (למשל מ-FitMe), היכנס עם אותו אימייל וסיסמה בכפתור "כניסה".' : /invalid login/i.test(m) ? 'אימייל או סיסמה שגויים. אם נרשמת ב-FitMe, השתמש באותה סיסמה.' : /already|registered/i.test(m) ? 'כבר קיים חשבון עם האימייל הזה. היכנס בכפתור "כניסה".' : /confirm/i.test(m) ? 'צריך לאשר את האימייל לפני הכניסה.' : m;
 function accountSheet() {
   if (DEMO) { sheet(`<h1>מצב דמו</h1><p class="sub">זו גרסת הדגמה עם נתונים בדויים. אין כאן כניסה או סנכרון, והנתונים נשמרים רק בדפדפן הזה.</p><div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`); return; }
   if (!Cloud.sb) { sheet(`<h1>סנכרון</h1><p class="sub">לא ניתן לטעון את שירות הענן (בדוק חיבור לאינטרנט). הנתונים נשמרים בינתיים בטלפון.</p><div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`); return; }
@@ -1499,7 +1506,7 @@ function accountSheet() {
   $('#f').onsubmit = async e => {
     e.preventDefault(); const f = new FormData(e.target);
     const { error } = await Cloud.sb.auth.signInWithPassword({ email: f.get('email'), password: f.get('password') });
-    if (error) $('#authMsg').textContent = 'הכניסה נכשלה: ' + error.message; else closeSheet();
+    if (error) $('#authMsg').textContent = authErr(error.message); else closeSheet();
   };
 }
 
@@ -1664,6 +1671,7 @@ const A = {
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
   noiseOff: () => toggleNoise(),
+  hideSyncHint: () => { try { localStorage.setItem('doit-sync-hint-off', '1'); } catch (e) {} render(); },
   refreshApp: async () => { try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); for (const k of await caches.keys()) await caches.delete(k); } catch (e) {} location.href = location.pathname + '?' + (DEMO ? 'demo&' : '') + 'r=' + Date.now(); },
   clearOk: () => { const f = $('#f'); if (!f) return; f.dataset.ok = '1'; $('#clHint').innerHTML = '<div class="ok">✓ אישרת את הניסוח. אפשר לשמור.</div>'; },
   useSuggest: e => { const f = $('#f'); if (!f || !f.title) return; f.title.value = e.s; f.title.dispatchEvent(new Event('input')); f.title.focus(); },
@@ -1805,7 +1813,7 @@ const A = {
     const f = $('#f'); if (!f.reportValidity()) return;
     const { data, error } = await Cloud.sb.auth.signUp({ email: f.email.value, password: f.password.value });
     $('#authMsg').style.color = error ? 'var(--danger)' : 'var(--brand)';
-    $('#authMsg').textContent = error ? 'ההרשמה נכשלה: ' + error.message : (data.session ? 'נרשמת בהצלחה' : 'נשלח אימייל אימות. אשר אותו ואז היכנס.');
+    $('#authMsg').textContent = error ? authErr(error.message) : (data.session ? 'נרשמת בהצלחה' : 'נשלח אימייל אימות. אשר אותו ואז היכנס.');
     if (data && data.session) closeSheet();
   },
   dayTog: (e, el) => el.classList.toggle('on'),
