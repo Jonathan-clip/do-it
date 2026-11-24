@@ -248,3 +248,20 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .esel option{background:var(--card);color:var(--ink);font-weight:400}
 .okbtn{width:100%;margin-top:6px;padding:8px}
 .endday{white-space:nowrap}
+.donesec{margin-top:14px}
+.donesec>summary{cursor:pointer;font-weight:600;color:var(--brand);padding:10px 0;border-top:1px solid var(--line)}
+.quadopts button{font-size:13px;padding:5px 10px}
+.chip.quad{background:var(--soft);color:var(--ink)}
+.chip.quad.q1{background:var(--bad-bg)}
+.chip.quad.q2{background:var(--info-bg);color:var(--info-ink)}
+.chip.quad.q3{background:var(--warn-bg);color:var(--warn-ink)}
+.quadcard{background:var(--soft);margin-top:12px}
+.hearts{display:flex;gap:2px}
+.hearts button{border:0;background:none;font-size:26px;line-height:1;color:var(--line);padding:2px 4px}
+.hearts button.on{color:#d9534f}
+.chip.quad.inh{opacity:.65}
+.fq{margin:6px 0;flex-wrap:wrap}
+.fq button{font-size:13px;padding:5px 10px}
+#dropbar{position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));display:flex;gap:10px;z-index:30;pointer-events:none}
+#dropbar>div{flex:1;text-align:center;padding:18px 8px;border-radius:16px;background:var(--card);border:2px dashed var(--brand);color:var(--brand);font-weight:700;font-size:16px;box-shadow:0 6px 18px #0004}
+#dropbar>div.over{background:var(--brand);color:var(--brand-ink);border-style:solid}

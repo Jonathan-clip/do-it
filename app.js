@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-24.1'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-24.2'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -149,7 +149,7 @@ function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in lo
   }; im.src = r.result; };
   r.readAsDataURL(file);
 }
-const MORE_TABS = ['journal', 'rhythm', 'dayrewards', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
+const MORE_TABS = ['journal', 'rhythm', 'dayrewards', 'matrix', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
 const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
 // Weekly vision data lives in D().weeks[<Sunday date>]; created lazily on first edit.
 const weekData = ws => (D().weeks[ws] = D().weeks[ws] || { vision: '', outcomes: [], visionIds: [], worked: '', improve: '' });
@@ -160,11 +160,11 @@ const taskOrder = (d, a, b) => { // a manual drag order wins; otherwise today's 
   if (a.ord !== undefined && b.ord !== undefined) return a.ord - b.ord;
   if (a.ord !== undefined) return -1;
   if (b.ord !== undefined) return 1;
-  const m = d === TODAY() ? normEnergy((D().focus[d] || {}).energy) : '', e = x => x.energy || 3, p = x => x.priority || 0;
+  const m = d === TODAY() ? normEnergy((D().focus[d] || {}).energy) : '', e = x => x.energy || 3, p = x => { const q = effQuad(x); return q ? quadRank[q] + 1 : (x.priority || 0); };
   if (m === 'midlow' || m === 'tired' || m === 'flood' || m === 'focus') return e(a) - e(b) || p(b) - p(a); // gentler states: easy actions first
   return (b.energy || 0) - (a.energy || 0) || p(b) - p(a);
 };
-const tasksOn = d => D().tasks.filter(t => t.date === d).sort((a, b) => taskOrder(d, a, b));
+const tasksOn = d => D().tasks.filter(t => t.date === d).sort((a, b) => taskOrder(d, a, b) || (b.want || 0) - (a.want || 0));
 const stars = n => '★'.repeat(n || 0);
 const logoMark = (s = 32) => `<svg class="logo" width="${s}" height="${s}" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"/><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/><circle cx="390" cy="170" r="36" fill="#e8a33d"/></svg>`;
 /* Projects: a project groups several tasks (task.projectId). Deleting a project keeps its tasks. */
@@ -240,13 +240,28 @@ function energyBar(d) {
   const cur = focusOn(d).energy;
   return `<div class="ebar"><label class="sub" for="energySel" style="margin:0">האנרגיה שלי עכשיו:</label><select id="energySel" class="esel ${cur ? 'set' : ''}"><option value="">בחר מצב...</option>${ENERGY_MODES.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}</select>${cur ? '<button class="iconbtn" data-act="energyHelpOpen" aria-label="הצעות למצב הנוכחי">💡</button>' : ''}</div>`;
 }
+const yesterdayLeft = () => { const y = addDays(TODAY(), -1); return D().tasks.filter(t => t.date === y && !t.done); };
+function doneSection(d, ts, hs) {
+  const rows = [], isToday = d === TODAY();
+  ts.filter(t => t.done).forEach(t => rows.push(taskRow(t)));
+  hs.filter(h => habitDone(h, d)).forEach(h => rows.push(habitRow(h, d)));
+  if (isToday) {
+    const log = D().rhythmLog[d] || {};
+    rhythmSorted().filter(r => log[r.id]).forEach(r => rows.push('<div class="card row done"><button class="check on" data-act="rhythmDone" data-id="' + r.id + '" aria-label="בטל">✓</button><div class="grow"><div class="t">' + (r.kind === 'meal' ? '🍽' : '😌') + ' ' + esc(r.label) + '</div><div class="meta"><span>' + r.time + '</span></div></div></div>'));
+    if (D().visual[d]) rows.push('<div class="card row done"><span style="font-size:20px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div></div><button class="iconbtn" data-act="visStart">↺ שוב</button></div>');
+    const rs = rewardState(d); if (rs.rule && rs.claimed) rows.push('<div class="card row done"><span style="font-size:20px">🎁</span><div class="grow"><div class="t">מימשת: ' + esc(rs.picked) + '</div></div></div>');
+    if (orgDone(d)) rows.push('<div class="card row done"><span style="font-size:20px">🗂</span><div class="grow"><div class="t">ארגון</div></div></div>');
+  }
+  if (!rows.length) return '';
+  return '<details class="donesec" id="doneSec" ' + (state.doneOpen ? 'open' : '') + '><summary>✓ בוצע (' + rows.length + ')</summary>' + rows.join('') + '</details>';
+}
 function tasksBlock(d, ts) {
   const open = ts.filter(t => !t.done), f = focusOn(d);
   const rows = list => list.map(t => taskRow(t)).join('');
   if (!ts.length) return d === TODAY() ? '' : '<div class="empty">אין פעולות ליום הזה</div>';
-  if (state.showAll) return rows(state.showDone ? ts : open) + (ts.length > open.length ? '<button class="lnk" data-act="toggleShowDone">' + (state.showDone ? 'הסתר פעולות שבוצעו' : 'הצג פעולות שבוצעו (' + (ts.length - open.length) + ')') + '</button>' : '') + (open.length > 3 ? '<button class="btn ghost more3" data-act="toggleShowAll">הצג רק שלוש</button>' : '') + (ts.some(t => t.ord !== undefined) ? '<button class="lnk" data-act="resetOrder">↺ חזרה לסדר אוטומטי</button>' : '');
+  if (state.showAll) return rows(open) + (open.length > 3 ? '<button class="btn ghost more3" data-act="toggleShowAll">הצג רק שלוש</button>' : '') + (ts.some(t => t.ord !== undefined) ? '<button class="lnk" data-act="resetOrder">↺ חזרה לסדר אוטומטי</button>' : '');
   const manual = ts.some(t => t.ord !== undefined), first = open.filter(t => t.id === f.mitId), pick = (manual ? open : [...first, ...open.filter(t => t.id !== f.mitId)]).slice(0, f.energy === 'flood' ? 1 : 3);
-  const hidden = ts.length - pick.length;
+  const hidden = open.length - pick.length;
   return (pick.length ? rows(pick) : '<div class="empty">🎉 סיימת את כל הפעולות להיום</div>')
     + (manual ? '<button class="lnk" data-act="resetOrder">↺ חזרה לסדר אוטומטי</button>' : '')
     + (hidden > 0 ? `<button class="btn ghost more3" data-act="toggleShowAll">הצג את כל הפעולות (${hidden} נוספות)</button>` : '');
@@ -357,11 +372,12 @@ function jobView(j) {
   return `<div class="top"><div class="row"><button class="iconbtn" data-act="backFromJob" aria-label="חזרה">${chev('r')}</button><h1>🧩 ${esc(j.title)}</h1></div><div class="sw"><button class="iconbtn" data-act="renameJob" data-id="${j.id}" aria-label="שנה שם">✏️</button><button class="iconbtn" data-act="delJob" data-id="${j.id}" aria-label="מחק">🗑</button></div></div>
     ${j.projectId && projectName(j.projectId) ? `<div class="sub" style="margin-bottom:8px">📁 ${esc(projectName(j.projectId))}</div>` : ''}
     <div class="card"><div class="row"><b class="grow">${s.done}/${s.total} פעולות הושלמו</b><span class="sub">${s.mins} ד׳ נותרו</span></div><div class="bar"><div style="width:${s.pct}%"></div></div></div>
+    ${prioBox('job', j)}
     <div class="opt" style="margin-bottom:10px"><button data-act="jobAddAction" data-id="${j.id}">＋ פעולה</button></div>
     <h2>פתוחות (${open.length})</h2>${open.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות פתוחות. פרק את המשימה לפעולות קטנות של עד 15 דקות</div>'}
     ${done.length ? `<h2>הושלמו (${done.length})</h2>${done.map(t => taskRow(t, true)).join('')}` : ''}`;
 }
-const jobCard = j => { const s = jobState(j); return `<div class="card" data-act="openJob" data-id="${j.id}"><div class="row"><div class="grow"><div class="t"><b>🧩 ${esc(j.title)}</b></div><div class="meta"><span>${s.done}/${s.total} פעולות</span>${s.total && s.done === s.total ? '<span class="chip">✓ הושלמה</span>' : ''}${s.mins ? `<span>${s.mins} ד׳ נותרו</span>` : ''}</div></div>${chev('l')}</div><div class="bar"><div style="width:${s.pct}%"></div></div></div>`; };
+const jobCard = j => { const s = jobState(j); return `<div class="card" data-act="openJob" data-id="${j.id}"><div class="row"><div class="grow"><div class="t"><b>🧩 ${esc(j.title)}</b></div><div class="meta">${itemChips(j)}<span>${s.done}/${s.total} פעולות</span>${s.total && s.done === s.total ? '<span class="chip">✓ הושלמה</span>' : ''}${s.mins ? `<span>${s.mins} ד׳ נותרו</span>` : ''}</div></div>${chev('l')}</div><div class="bar"><div style="width:${s.pct}%"></div></div></div>`; };
 /* ---------- Wellbeing: energy states with suggestions, rhythm (meals / rest / hourly break), day start & end, deferral nudge, morning review ---------- */
 const normEnergy = v => (v === 'low' || v === 'mid') ? 'midlow' : (v || '');
 const fo = d => (D().focus[d] = D().focus[d] || {});
@@ -496,7 +512,7 @@ function rhythmStrip(d, mode) {
     return `<div class="card row rh ${done ? 'done' : ''} ${due ? 'due' : ''}"><button class="check ${done ? 'on' : ''}" data-act="rhythmDone" data-id="${r.id}" aria-label="סמן">${done ? '✓' : ''}</button><div class="grow"><div class="t">${r.kind === 'meal' ? '🍽' : '😌'} ${esc(r.label)}</div><div class="meta"><span>${r.time}</span><span>${r.mins} ד׳</span>${due ? '<span style="color:var(--accent)">הגיע הזמן</span>' : ''}</div></div>${done ? '' : `<button class="iconbtn" data-act="rhythmStart" data-id="${r.id}">◀ הפסקה</button>`}</div>`;
   };
   if (mode === 'near') return items.filter(near).map(row).join('');
-  const rows = items.filter(r => !near(r)).map(row).join('');
+  const rows = items.filter(r => !near(r) && !log[r.id]).map(row).join('');
   if (!rows && !noRest) return '';
   return `<h2>מקצב היום</h2>${rows}${noRest ? '<div class="card" data-act="goTab" data-t="rhythm"><div class="t">😌 עדיין לא הגדרת מנוחה יומית</div><div class="sub">לחץ כדי להגדיר</div></div>' : ''}`;
 }
@@ -516,13 +532,10 @@ function tick() {
 tick.shown = {};
 setInterval(tick, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(tick, 600); });
-document.addEventListener('toggle', e => { if (e.target && e.target.id === 'todayMore') state.moreOpen = e.target.open; }, true);
+document.addEventListener('toggle', e => { if (e.target && e.target.id === 'todayMore') state.moreOpen = e.target.open; if (e.target && e.target.id === 'doneSec') state.doneOpen = e.target.open; }, true);
 
 /* Day start and end: stamped automatically on the first open, end by button; both editable */
-function ensureDayStart() {
-  const T = TODAY(), L = (D().dayLog[T] = D().dayLog[T] || null);
-  if (!L) { D().dayLog[T] = { start: nowHM(), end: '' }; Store.save(); }
-}
+function ensureDayStart() { /* the day start is marked by the user (button), never stamped automatically */ }
 const dayDurMin = L => L && L.start && L.end ? Math.max(0, toMin(L.end) - toMin(L.start)) : (L && L.start ? Math.max(0, toMin(nowHM()) - toMin(L.start)) : 0);
 function dayCard(d) {
   if (d !== TODAY()) return '';
@@ -537,10 +550,10 @@ function dayEditSheet() {
   $('#f').onsubmit = e => { e.preventDefault(); const f = new FormData(e.target); D().dayLog[T] = { start: f.get('start') || '', end: f.get('end') || '' }; Store.save(); closeSheet(); render(); };
 }
 function dayHistoryHTML() {
-  const days = Object.keys(D().dayLog).filter(k => D().dayLog[k] && D().dayLog[k].start).sort().reverse().slice(0, 7);
+  const days = Object.keys(D().dayLog).filter(k => D().dayLog[k] && (D().dayLog[k].start || D().dayLog[k].end)).sort().reverse().slice(0, 7);
   if (!days.length) return '<div class="empty">עדיין אין נתוני שעות</div>';
   const done = days.filter(k => D().dayLog[k].end), avg = done.length ? Math.round(done.reduce((s, k) => s + dayDurMin(D().dayLog[k]), 0) / done.length) : 0;
-  return days.map(k => { const L = D().dayLog[k]; return `<div class="card row"><div class="grow"><div class="t"><b>${shortDate(k)}</b></div><div class="meta"><span>התחלה ${L.start}</span><span>סיום ${L.end || '—'}</span>${L.end ? `<span>${fmtDur(dayDurMin(L))}</span>` : ''}${((D().focus[k] || {}).workTotal || 0) >= 1 ? `<span>עבודה בפועל ${fmtDur(Math.round(D().focus[k].workTotal))}</span>` : ''}</div></div></div>`; }).join('')
+  return days.map(k => { const L = D().dayLog[k]; return `<div class="card row"><div class="grow"><div class="t"><b>${shortDate(k)}</b></div><div class="meta"><span>התחלה ${L.start || '—'}</span><span>סיום ${L.end || '—'}</span>${L.end ? `<span>${fmtDur(dayDurMin(L))}</span>` : ''}${((D().focus[k] || {}).workTotal || 0) >= 1 ? `<span>עבודה בפועל ${fmtDur(Math.round(D().focus[k].workTotal))}</span>` : ''}</div></div></div>`; }).join('')
     + (avg ? `<div class="sub" style="margin-top:6px">ממוצע ימים שהסתיימו: ${fmtDur(avg)}</div>` : '');
 }
 
@@ -577,7 +590,7 @@ function reviewSheet() {
    <div class="meta" style="margin:4px 0 8px"><span>✅ ${done}/${ts.length} פעולות (${pct}%)</span>${doneMin ? '<span>⏱ ' + doneMin + ' ד׳ הושלמו</span>' : ''}${wt ? '<span>💼 עבודה בפועל ' + fmtDur(wt) + '</span>' : ''}${L.start ? '<span>🕗 ' + L.start + (L.end ? '–' + L.end + ' (' + fmtDur(dayDurMin(L)) + ')' : ' (בלי סיום)') + '</span>' : ''}${rItems.length ? '<span>☕ ' + rDone + '/' + rItems.length + ' הפסקות</span>' : ''}${energyL ? '<span>' + energyL + '</span>' : ''}</div>
    ${mit ? '<div class="sub">⭐ הפעולה החשובה: <b>' + esc(mit.title) + '</b> ' + (mit.done ? '✓ בוצעה' : '✗ לא בוצעה') + '</div>' : ''}
    ${doneL.length ? '<h2 style="margin:12px 0 4px">הספקת</h2>' + list(doneL, '✅') : ''}
-   ${left.length ? '<h2 style="margin:12px 0 4px">לא הספקת</h2>' + list(left, '⏳') : ''}
+   ${left.length ? '<h2 style="margin:12px 0 4px">לא הספקת</h2>' + list(left, '⏳') + '<button type="button" class="btn ghost" id="carryBtn" style="width:100%;margin-top:8px" data-act="carryOver">⏩ העבר את כולן להיום (' + left.length + ')</button>' : ''}
    ${tips.length ? '<h2 style="margin:12px 0 4px">ניתוח</h2><div class="clarity">' + tips.map(x => '<div class="ok">💡 ' + esc(x) + '</div>').join('') + '</div>' : ''}
    <form id="f"><label>עמדת במשימות של אתמול?</label>
    <div class="opt" id="metOpts">${[['yes', '✅ כן'], ['part', '🟡 חלקית'], ['no', '❌ לא']].map(([v, l]) => `<button type="button" onclick="const f=this.closest('form');f.met.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div><input type="hidden" name="met" value="">
@@ -643,7 +656,7 @@ function syncHint() { // data lives only on this device until the user signs in
 function visualCard(d) {
   if (d !== TODAY()) return '';
   const done = !!D().visual[d];
-  if (!done && workedToday()) return '';
+  if (done || workedToday()) return ''; // a finished visualization moves to the "בוצע" section
   return `<div class="card row ${done ? 'done' : ''}"><span style="font-size:22px">🧘</span><div class="grow"><div class="t">דמיון מודרך של הבוקר</div><div class="meta"><span>${done ? 'בוצע היום ✓' : 'עוד לא בוצע'}</span></div></div><button class="iconbtn" data-act="visStart">${done ? '↺ שוב' : '◀ להתחיל'}</button></div>`;
 }
 /* ---------- Daily reward: you set the condition for each day; the reward comes from your own list ---------- */
@@ -661,7 +674,8 @@ function rewardCard(d) {
   const s = rewardState(d);
   if (!s.rule) return '<div class="card focus" data-act="focusEdit"><div class="t"><b>🎁 תגמול יומי</b></div><div class="sub">לחץ כדי לקבוע תנאי לתגמול של היום</div></div>';
   const label = REWARD_RULES.find(r => r[0] === s.rule)[1];
-  const body = s.claimed ? `<div class="t">מימשת: ${esc(s.picked)} ✓</div>`
+  if (s.claimed) return ''; // claimed rewards are listed under "בוצע"
+  const body = s.claimed ? ''
     : s.achieved ? (s.picked ? `<div class="t">התגמול שלך: ${esc(s.picked)}</div><button class="btn startnow" data-act="rewardClaim">✓ מימשתי</button>` : '<button class="btn startnow" data-act="rewardOpen">🎉 עמדת! לבחור תגמול</button>')
     : `<div class="t">${esc(s.text)}</div>`;
   return `<div class="card focus"><div class="frow"><span>🎁</span><div class="grow"><div class="sub">תגמול יומי · תנאי: ${esc(label)}</div>${body}</div></div></div>`;
@@ -688,10 +702,11 @@ function projectForm() {
   <form id="f"><label>שם הפרויקט</label><input name="title" required autocomplete="off" placeholder="למשל: השקת האתר החדש" autofocus>
    <label>משימות בפרויקט (אופציונלי, שורה לכל משימה)</label><textarea name="jobs" rows="4" placeholder="להקים את דף הבית&#10;לכתוב את הטקסטים&#10;להשיק קמפיין פתיחה"></textarea>
    <div class="sub">את הפעולות של כל משימה מוסיפים אחר כך, בדף המשימה.</div>
+   ${prioFields({})}
    <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
   $('#f').onsubmit = e => {
     e.preventDefault(); const f = new FormData(e.target), title = f.get('title').trim(); if (!title) return;
-    const p = { id: uid(), title, createdAt: TODAY() }; D().projects.push(p);
+    const p = { id: uid(), title, createdAt: TODAY(), quad: f.get('quad') || '', want: +f.get('want') || 0 }; D().projects.push(p);
     f.get('jobs').split('\n').map(x => x.trim()).filter(Boolean).forEach(t => D().jobs.push({ id: uid(), title: t, projectId: p.id, notes: '', createdAt: TODAY() }));
     Store.save(); closeSheet(); state.tab = 'projects'; state.openJob = null; state.openProject = p.id; render(); window.scrollTo(0, 0);
   };
@@ -702,17 +717,35 @@ function jobForm(projectId) {
    <label>פעולות (שורה לכל פעולה, כל אחת קטנה וברורה)</label><textarea name="actions" rows="5" placeholder="לכתוב רשימה של כל הכרטיסים&#10;להתקשר לבנק ולבקש חידוש&#10;לעדכן את הכרטיס החדש באתר החשבונות"></textarea>
    <label>מתי לשבץ את הפעולות?</label><div class="opt" id="jdChips">${[['היום', TODAY()], ['מחר', addDays(TODAY(), 1)], ['ללא תאריך', '']].map(([l, v], i) => `<button type="button" class="${i === 2 ? 'on' : ''}" onclick="document.getElementById('jdate').value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div><input type="hidden" id="jdate" name="date" value="">
    <label>פרויקט (אופציונלי)</label><select name="projectId"><option value="">ללא פרויקט</option>${D().projects.map(p => `<option value="${p.id}" ${p.id === projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select>
+   ${prioFields({})}
    <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
   $('#f').onsubmit = e => {
     e.preventDefault(); const f = new FormData(e.target), title = f.get('title').trim(), lines = f.get('actions').split('\n').map(x => x.trim()).filter(Boolean);
     const bad = lines.map(l => ({ l, why: clarity(l)[0] })).filter(x => x.why);
     if (bad.length) { alert('לא ניתן לשמור: פעולה אחת או יותר לא כתובות בצורה ברורה.\n"' + bad[0].l + '"\n' + bad[0].why); return; }
-    const pid = f.get('projectId') || '', j = { id: uid(), title, projectId: pid, notes: '', createdAt: TODAY() };
+    const pid = f.get('projectId') || '', j = { id: uid(), title, projectId: pid, notes: '', createdAt: TODAY(), quad: f.get('quad') || '', want: +f.get('want') || 0 };
     D().jobs.push(j);
     lines.forEach(l => D().tasks.push({ id: uid(), title: l, date: f.get('date') || null, done: false, priority: 0, energy: 3, mins: 15, brainless: false, print: false, visionId: '', projectId: pid, notes: '', subs: [], jobId: j.id }));
     Store.save(); closeSheet(); state.tab = 'projects'; state.openJob = j.id; state.openProject = pid || null; render(); window.scrollTo(0, 0);
   };
 }
+/* ---------- Eisenhower matrix: prioritize actions by urgent / important ---------- */
+const QUADS = [
+  ['q1', '🔴 דחוף וחשוב', 'לבצע ראשון. המוח שלך כבר ייצר לזה אדרנלין טבעי.', 'דד-ליין להיום, משבר, חשבון שחייבים לשלם עכשיו.'],
+  ['q2', '🔵 חשוב אבל לא דחוף', 'המוקש של ADHD. חובה לתזמן לזה דד-ליין מלאכותי, לשבץ ביומן בשעה קבועה או לקבוע עם חבר או שותף ללמידה (Body Doubling).', 'פרויקטים גדולים, ספורט, למידה, סדר בבית.'],
+  ['q3', '🟡 דחוף אבל לא חשוב', 'להגביל בזמן או להאציל. אל תיתן לזה לגזול לך את שעות השיא.', 'הודעות ווטסאפ, מיילים שגרתיים, בקשות של אחרים.'],
+  ['q4', '⚪ לא דחוף ולא חשוב', 'למחוק מהרשימה או להשאיר כפרס רק אחרי סיום משימה.', 'גלילה ברשתות, סידור אובססיבי של שולחן העבודה במקום ללמוד.']
+];
+const quadOf = k => QUADS.find(q => q[0] === k);
+const quadRank = { q1: 3, q2: 2, q3: 1, q4: 0 }, quadPri = { q1: 2, q2: 1, q3: 1, q4: 0 }; // order of work, and the old priority value kept in step
+const effQuad = t => t.quad || (t.jobId && (findJob(t.jobId) || {}).quad) || (t.projectId && (D().projects.find(p => p.id === t.projectId) || {}).quad) || '';
+const quadChip = t => { const k = effQuad(t), q = quadOf(k); return q ? '<span class="chip quad ' + k + (t.quad ? '' : ' inh') + '" title="' + (t.quad ? '' : 'עדיפות שעברה בירושה') + '">' + q[1] + '</span>' : ''; };
+const itemChips = x => quadChip({ quad: x.quad }) + (x.want ? '<span title="כמה בא לי">💗' + x.want + '</span>' : '');
+const itemOf = (kind, id) => kind === 'job' ? findJob(id) : kind === 'project' ? D().projects.find(p => p.id === id) : findTask(id);
+const wantStars = (id, cur, kind) => '<div class="hearts">' + [1, 2, 3, 4, 5].map(n => '<button type="button" class="' + (n <= cur ? 'on' : '') + '" data-act="setWant" data-id="' + id + '" data-k="' + (kind || '') + '" data-n="' + n + '" aria-label="' + n + '">♥</button>').join('') + '</div>';
+const prioBox = (kind, x) => '<div class="card"><div class="sub">🧭 עדיפות (דחוף / חשוב)</div>' + quadChips(x.id, x.quad || '', kind) + '<div class="sub" style="margin-top:10px">💗 כמה בא לי לעשות את זה?</div>' + wantStars(x.id, x.want || 0, kind) + '</div>';
+const prioFields = x => '<label>🧭 עדיפות (מטריצת אייזנהאואר)</label><div id="quadBox">' + quadChips('', x.quad || '', '') + '</div><input type="hidden" name="quad" value="' + (x.quad || '') + '"><label>💗 כמה בא לי לעשות את זה? (1 = בכלל לא, 5 = מאוד)</label><div id="wantBox">' + wantStars('', x.want || 0, '') + '</div><input type="hidden" name="want" value="' + (x.want || 0) + '">';
+const quadChips = (id, cur, kind) => '<div class="opt quadopts">' + QUADS.map(q => '<button type="button" class="' + (cur === q[0] ? 'on' : '') + '" data-act="setQuad" data-id="' + id + '" data-k="' + (kind || '') + '" data-q="' + q[0] + '">' + q[1] + '</button>').join('') + '</div>' + (quadOf(cur) ? '<div class="sub" style="margin-top:6px">' + esc(quadOf(cur)[2]) + '</div>' : '');
 /* ---------- Personal reminders: two sentences shown on the daily screen and while working ---------- */
 const REMINDERS = ['להרגיש את הכאב של הצמיחה, לצאת מאזור הנוחות.', 'האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.'];
 const remIndex = () => { const n = Math.floor(parse(TODAY()).getTime() / 864e5) + (state.remShift || 0); return ((n % REMINDERS.length) + REMINDERS.length) % REMINDERS.length; };
@@ -772,7 +805,7 @@ function taskRow(t, showDate) {
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${esc(t.title)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.notes ? '<span title="יש תיאור">📝</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${t.jobId ? jobChip(t) : projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${quadChip(t)}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.notes ? '<span title="יש תיאור">📝</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${t.jobId ? jobChip(t) : projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -809,7 +842,7 @@ const views = {
     const hAct = hs.filter(h => !habitDone(h, d)).length;
     return `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
       <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
-      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 סיום יום</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
+      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 סיום יום</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
        ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
       ${isToday ? syncHint() : ''}
       ${visTop ? visualCard(d) : ''}
@@ -817,12 +850,13 @@ const views = {
       ${rewardTop ? rewardCard(d) : ''}
       ${energyBar(d)}
       ${focusCard(d)}
-      <h2>פעולות</h2>${isToday && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
+      <h2>פעולות</h2>${isToday && yesterdayLeft().length ? '<button class="btn ghost more3" style="margin:0 0 8px" data-act="carryOver">⏩ העבר להיום את מה שלא בוצע אתמול (' + yesterdayLeft().length + ')</button>' : ''}${isToday && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
+      ${doneSection(d, ts, hs)}
       <details class="todaymore" id="todayMore" ${state.moreOpen ? 'open' : ''}><summary>עוד להיום${hAct ? ` · ${hAct} הרגלים` : ''}</summary>
        ${dayCard(d)}${visTop ? '' : visualCard(d)}${rewardTop ? '' : rewardCard(d)}${rhythmStrip(d, 'rest')}
        <div class="remind" data-act="nextReminder" title="לחץ להחלפה">💬 ${esc(reminder())}</div>
        <div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל פעולות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>
-       ${hs.length ? `<h2>הרגלים</h2>${hs.map(h => habitRow(h, d)).join('')}` : ''}
+       ${hs.some(h => !habitDone(h, d)) ? `<h2>הרגלים</h2>${hs.filter(h => !habitDone(h, d)).map(h => habitRow(h, d)).join('')}` : ''}
        <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>
       </details>
       <button class="fab" data-act="addTask" aria-label="משימה חדשה">+</button>`;
@@ -879,11 +913,16 @@ const views = {
     if (f === 'done') list = list.filter(t => t.done);
     if (f === 'nodate') list = list.filter(t => !t.date && !t.done);
     if (f === 'brainless') list = list.filter(t => t.brainless && !t.done);
+    if (state.fQuad) list = list.filter(t => state.fQuad === 'none' ? !effQuad(t) : effQuad(t) === state.fQuad); // by the matrix
+    if (state.fWant) list = list.filter(t => (t.want || 0) >= state.fWant); // by how much I feel like doing it
     list.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || b.priority - a.priority);
     const F = [['open', 'פתוחות'], ['brainless', '⚡ Brainless'], ['nodate', 'ללא תאריך'], ['done', 'הושלמו'], ['all', 'הכל']];
-    return `<div class="top"><h1>משימות</h1><div class="sw"><button class="iconbtn" data-act="addBulk">📋 הזנה מרוכזת</button><button class="iconbtn" data-act="printSel">🖨 נבחרות</button></div></div>
+    return `<div class="top"><h1>כל הפעולות</h1><div class="sw"><button class="iconbtn" data-act="addBulk">📋 הזנה מרוכזת</button><button class="iconbtn" data-act="printSel">🖨 נבחרות</button></div></div>
       <div class="seg">${F.map(([k, l]) => `<button class="${f === k ? 'on' : ''}" data-act="filter" data-f="${k}">${l}</button>`).join('')}</div>
-      ${list.map(t => taskRow(t, true)).join('') || '<div class="empty">אין משימות</div>'}
+      <div class="opt fq"><span class="sub">🧭</span>${[['', 'הכל']].concat(QUADS.map(q => [q[0], q[1]]), [['none', 'ללא סיווג']]).map(([k, l]) => `<button class="${(state.fQuad || '') === k ? 'on' : ''}" data-act="filterQuad" data-q="${k}">${l}</button>`).join('')}</div>
+      <div class="opt fq"><span class="sub">💗</span>${[[0, 'הכל'], [3, '3 ומעלה'], [4, '4 ומעלה'], [5, '5']].map(([n, l]) => `<button class="${(state.fWant || 0) === n ? 'on' : ''}" data-act="filterWant" data-n="${n}">${l}</button>`).join('')}</div>
+      <div class="sub" style="margin:6px 0">${list.length} פעולות${state.fQuad || state.fWant ? ' <button class="lnk" data-act="filterReset">נקה סינון</button>' : ''}</div>
+      ${list.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות שמתאימות לסינון</div>'}
       <button class="fab" data-act="addTask">+</button>`;
   },
   habits() {
@@ -944,6 +983,7 @@ const views = {
         const s = projState(p), loose = s.ts.filter(t => !t.jobId), open = loose.filter(t => !t.done), done = loose.filter(t => t.done), jobs = D().jobs.filter(j => j.projectId === p.id);
         return `<div class="top"><div class="row"><button class="iconbtn" data-act="backProjects" aria-label="חזרה">${chev('r')}</button><h1>${esc(p.title)}</h1></div><div class="sw"><button class="iconbtn" data-act="renameProject" data-id="${p.id}" aria-label="שנה שם">✏️</button><button class="iconbtn" data-act="delProject" data-id="${p.id}" aria-label="מחק">🗑</button></div></div>
          <div class="card"><div class="row"><b class="grow">${s.done}/${s.total} פעולות הושלמו</b><span class="sub">${s.mins} ד׳ נותרו</span></div><div class="bar"><div style="width:${s.pct}%"></div></div></div>
+         ${prioBox('project', p)}
          <div class="opt" style="margin-bottom:10px"><button data-act="projNewJob" data-id="${p.id}">＋ משימה</button><button data-act="projAddTask" data-id="${p.id}">＋ פעולה</button><button data-act="projBulk" data-id="${p.id}">📋 הזנה מרוכזת</button><button data-act="projAssign" data-id="${p.id}">🔗 שייך פעולות קיימות</button></div>
          ${jobs.length ? `<h2>משימות (${jobs.length})</h2>${jobs.map(jobCard).join('')}` : ''}
          <h2>פעולות ישירות בפרויקט (${open.length})</h2>${open.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות פתוחות. הוסף משימה ופרק אותה לפעולות</div>'}
@@ -953,7 +993,7 @@ const views = {
     }
     const ps = D().projects.map(p => ({ p, s: projState(p) }));
     return `<div class="top"><h1>פרויקטים</h1></div>
-      ${ps.map(({ p, s }) => `<div class="card" data-act="openProject" data-id="${p.id}"><div class="row"><div class="grow"><div class="t"><b>📁 ${esc(p.title)}</b></div><div class="meta"><span>${D().jobs.filter(j => j.projectId === p.id).length} משימות · ${s.done}/${s.total} פעולות</span>${s.total && s.done === s.total ? '<span class="chip">✓ הושלם</span>' : ''}${s.mins ? `<span>${s.mins} ד׳ נותרו</span>` : ''}</div></div>${chev('l')}</div><div class="bar"><div style="width:${s.pct}%"></div></div></div>`).join('') || '<div class="empty">פרויקט מכיל משימות, וכל משימה מורכבת מפעולות קטנות של עד 15 דקות</div>'}
+      ${ps.map(({ p, s }) => `<div class="card" data-act="openProject" data-id="${p.id}"><div class="row"><div class="grow"><div class="t"><b>📁 ${esc(p.title)}</b></div><div class="meta">${itemChips(p)}<span>${D().jobs.filter(j => j.projectId === p.id).length} משימות · ${s.done}/${s.total} פעולות</span>${s.total && s.done === s.total ? '<span class="chip">✓ הושלם</span>' : ''}${s.mins ? `<span>${s.mins} ד׳ נותרו</span>` : ''}</div></div>${chev('l')}</div><div class="bar"><div style="width:${s.pct}%"></div></div></div>`).join('') || '<div class="empty">פרויקט מכיל משימות, וכל משימה מורכבת מפעולות קטנות של עד 15 דקות</div>'}
       ${D().jobs.some(j => !j.projectId) ? `<h2>משימות ללא פרויקט</h2>${D().jobs.filter(j => !j.projectId).map(jobCard).join('')}` : ''}
       <div class="opt" style="margin-top:10px"><button data-act="newLooseJob">＋ משימה ללא פרויקט</button></div>
       <button class="fab" data-act="addProject">+</button>`;
@@ -963,6 +1003,7 @@ const views = {
     const wait = D().goals.filter(g => g.reward && !g.claimed && goalState(g).achieved).length;
     const item = (t, icon, title, sub) => `<div class="card row" data-act="goTab" data-t="${t}"><span style="font-size:26px">${icon}</span><div class="grow"><div class="t"><b>${title}</b></div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
     return `<div class="top"><div class="brand">${logoMark(40)}<h1>Do It</h1></div></div>
+      ${item('matrix', '🧭', 'מטריצת עדיפויות', `${D().tasks.filter(t => !t.done && !t.quad).length} פעולות לא מסווגות`)}
       ${item('dayrewards', '🎁', 'תגמולים יומיים', `${D().dayRewards.length} תגמולים ברשימה`)}
       ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
       ${item('journal', '📓', 'יומן', `${journalDays().length} ימים עם רישום`)}
@@ -1015,6 +1056,16 @@ const views = {
     return `<div class="top"><h1>תגמולים יומיים</h1></div><p class="sub">רשימה של תגמולים קטנים. כשאתה עומד בתנאי של היום, תבחר אחד מהם או תגריל.</p>
      ${L.map(r => `<div class="card row"><span style="font-size:22px">🎁</span><div class="t grow">${esc(r.title)}</div><button class="iconbtn" data-act="rewardDel" data-id="${r.id}" aria-label="מחק">✕</button></div>`).join('') || '<div class="empty">עדיין אין תגמולים. הוסף קפה, פרק שוקולד, סרט בערב...</div>'}
      <form id="rwForm" class="row" style="margin-top:10px"><input name="title" placeholder="תגמול חדש" required autocomplete="off"><button class="btn">הוסף</button></form>`;
+  },
+  matrix() {
+    const open = D().tasks.filter(t => !t.done), by = k => open.filter(t => effQuad(t) === k).sort((a, b) => (b.want || 0) - (a.want || 0) || (a.date || '9999').localeCompare(b.date || '9999')), none = open.filter(t => !effQuad(t));
+    const items = k => D().projects.filter(p => p.quad === k).map(p => '<div class="sub">📁 ' + esc(p.title) + '</div>').join('') + D().jobs.filter(j => j.quad === k).map(j => '<div class="sub">🧩 ' + esc(j.title) + '</div>').join('');
+    const fav = open.filter(t => (t.want || 0) >= 4).sort((a, b) => (b.want || 0) - (a.want || 0)).slice(0, 8);
+    return `<div class="top"><h1>מטריצת עדיפויות</h1></div>
+     <p class="sub">כל פרויקט, משימה ופעולה נבחנים לפי שאלות: האם זה דחוף, האם זה חשוב, וכמה בא לי לעשות את זה. פעולה בלי עדיפות משלה יורשת את זו של המשימה או הפרויקט שלה.</p>
+     ${fav.length ? '<h2>💗 מה הכי בא לי (4 עד 5)</h2>' + fav.map(t => taskRow(t, true)).join('') : ''}
+     ${QUADS.map(q => '<div class="card quadcard"><div class="t"><b>' + q[1] + '</b> <span class="sub">(' + by(q[0]).length + ' פעולות)</span></div><div class="sub" style="margin:4px 0">' + esc(q[2]) + '</div><div class="sub" style="opacity:.8">דוגמאות: ' + esc(q[3]) + '</div>' + items(q[0]) + '</div>' + by(q[0]).map(t => taskRow(t, true)).join('')).join('')}
+     ${none.length ? '<h2>עוד לא סווגו (' + none.length + ')</h2>' + none.slice(0, 40).map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div>' + quadChips(t.id, '', '') + '</div>').join('') : '<div class="empty">כל הפעולות הפתוחות סווגו</div>'}`;
   },
   goals() {
     const F = state.goalFilter, all = D().goals.map(g => ({ g, s: goalState(g) }));
@@ -1140,7 +1191,7 @@ function taskForm(id, presetDate, presetProject, preset) {
    <input type="hidden" name="energy" value="${t.energy || 0}">
    <label>משך (עד 15 דקות; ארוך יותר יוצע לפיצול)</label>
    <select name="mins">${mo.map(m => `<option value="${m}" ${m == (t.mins || 15) ? 'selected' : ''}>${m} דקות</option>`).join('')}</select>
-   <label>עדיפות</label><select name="priority"><option value="0" ${t.priority == 0 ? 'selected' : ''}>רגילה</option><option value="1" ${t.priority == 1 ? 'selected' : ''}>חשובה</option><option value="2" ${t.priority == 2 ? 'selected' : ''}>דחופה</option></select>
+   ${prioFields(t)}
    <label>שייכת ל... (משימה או פרויקט)</label><select name="owner">${ownerOpts(t.jobId ? 'j:' + t.jobId : t.projectId ? 'p:' + t.projectId : '')}</select>
    <label>קישור לחזון (אופציונלי)</label><select name="visionId">${visionOpts(t.visionId)}</select>
    <label class="row" style="color:var(--ink)"><input type="checkbox" name="brainless" style="width:auto" ${t.brainless ? 'checked' : ''}> ⚡ Brainless (משימה פשוטה שאפשר להעיף ברגע)</label>
@@ -1164,7 +1215,7 @@ function taskForm(id, presetDate, presetProject, preset) {
     e.preventDefault();
     if (blocked()) { const why = clarity(form.title.value)[0]; $('#clHint').innerHTML = clarityHTML(form.title.value, true); form.title.focus(); alert('לא ניתן לשמור: הפעולה לא כתובה בצורה ברורה.\n' + why); return; }
     const f = new FormData(e.target), own = f.get('owner') || '', jobId = own.startsWith('j:') ? own.slice(2) : '', projectId = jobId ? ((findJob(jobId) || {}).projectId || '') : (own.startsWith('p:') ? own.slice(2) : '');
-    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: +f.get('priority'), visionId: f.get('visionId') || '', jobId, projectId, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
+    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: f.get('quad') ? quadPri[f.get('quad')] : (t.priority || 0), quad: f.get('quad') || '', want: +f.get('want') || 0, visionId: f.get('visionId') || '', jobId, projectId, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
     let saved = t;
     if (id) Object.assign(t, obj); else { saved = { id: uid(), done: false, subs: [], ...obj }; D().tasks.push(saved); }
     resolveLong([saved]);
@@ -1391,10 +1442,12 @@ function menuSheet(id) {
   sheet(`<h1>${esc(t.title)}</h1>
    <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${t.jobId ? jobChip(t) : projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
    ${t.notes ? `<p class="sub" style="white-space:pre-wrap">${esc(t.notes)}</p>` : ''}
+   ${t.done ? '' : '<div class="sub" style="margin:8px 0 4px">🧭 עדיפות</div>' + quadChips(t.id, t.quad || '', '') + '<div class="sub" style="margin:8px 0 2px">💗 כמה בא לי?</div>' + wantStars(t.id, t.want || 0, '')}
    <div class="grid2">
      ${t.done ? '' : `<button class="btn" data-act="runStart" data-id="${t.id}">◀ התחל עכשיו</button>`}
      <button class="btn ghost" data-act="menuDone" data-id="${t.id}">${t.done ? '↺ בטל ביצוע' : '✓ בוצע'}</button>
      <button class="btn ghost" data-act="moveSheet" data-id="${t.id}">📆 העבר</button>
+     ${t.done || !t.date ? '' : `<button class="btn ghost" data-act="toPool" data-id="${t.id}">↩ החזר לכל הפעולות</button>`}
      <button class="btn ghost" data-act="editTask" data-id="${t.id}">✏️ ערוך</button>
    </div>
    <div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
@@ -1671,6 +1724,28 @@ const A = {
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
   noiseOff: () => toggleNoise(),
+  undoMove: e => { const u = RDrag.undo; if (u && u.id === e.id) { const t = findTask(e.id); if (t) { t.date = u.date; Store.save(); } } $('#toast').hidden = true; render(); },
+  setQuad: e => {
+    if (!e.id) { const f = $('#f'), same = f.quad.value === e.q; f.quad.value = same ? '' : e.q; $('#quadBox').innerHTML = quadChips('', f.quad.value, ''); return; } // inside a form: just remember the choice
+    const x = itemOf(e.k, e.id); if (!x) return; const same = x.quad === e.q; x.quad = same ? '' : e.q;
+    if (!e.k) x.priority = same ? 0 : quadPri[e.q];
+    Store.save(); render(); if (!e.k && !$('#sheet').hidden) menuSheet(e.id);
+  },
+  setWant: e => {
+    if (!e.id) { const f = $('#f'), same = +f.want.value === +e.n; f.want.value = same ? 0 : e.n; $('#wantBox').innerHTML = wantStars('', +f.want.value, ''); return; }
+    const x = itemOf(e.k, e.id); if (!x) return; x.want = (x.want === +e.n) ? 0 : +e.n;
+    Store.save(); render(); if (!e.k && !$('#sheet').hidden) menuSheet(e.id);
+  },
+  toPool: e => { // take the action off its day and put it back in "כל הפעולות" (no date, parked so the daily organizing does not ask about it)
+    const t = findTask(e.id); if (!t) return; const prev = t.date; t.date = null; t.parked = true; delete t.ord; Store.save(); closeSheet(); render();
+    toast('<span>↩ הוחזרה לכל הפעולות</span><button class="btn ghost" data-act="undoPool" data-id="' + t.id + '" data-d="' + (prev || '') + '">בטל</button><button data-act="toastClose" aria-label="סגור">✕</button>', 6000);
+  },
+  undoPool: e => { const t = findTask(e.id); if (t) { t.date = e.d || null; t.parked = false; Store.save(); } $('#toast').hidden = true; render(); },
+  carryOver: () => { // move everything left undone from yesterday to today, on request only
+    const T = TODAY(), list = yesterdayLeft(); if (!list.length) return;
+    list.forEach(t => deferTo(t, T)); Store.save(); render();
+    const b = $('#carryBtn'); if (b) { b.textContent = '✓ הועברו ' + list.length + ' פעולות להיום'; b.disabled = true; b.removeAttribute('data-act'); } else toast('<span>⏩ הועברו ' + list.length + ' פעולות להיום</span><button data-act="toastClose" aria-label="סגור">✕</button>', 5000);
+  },
   hideSyncHint: () => { try { localStorage.setItem('doit-sync-hint-off', '1'); } catch (e) {} render(); },
   refreshApp: async () => { try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); for (const k of await caches.keys()) await caches.delete(k); } catch (e) {} location.href = location.pathname + '?' + (DEMO ? 'demo&' : '') + 'r=' + Date.now(); },
   clearOk: () => { const f = $('#f'); if (!f) return; f.dataset.ok = '1'; $('#clHint').innerHTML = '<div class="ok">✓ אישרת את הניסוח. אפשר לשמור.</div>'; },
@@ -1706,7 +1781,7 @@ const A = {
   rhythmDel: e => { D().rhythm = D().rhythm.filter(r => r.id !== e.id); Store.save(); render(); },
   dayStart: () => { D().dayLog[TODAY()] = { start: nowHM(), end: '' }; Store.save(); render(); },
   dayEnd: () => {
-    const T = TODAY(), L = (D().dayLog[T] = D().dayLog[T] || { start: nowHM(), end: '' }); L.end = nowHM(); Store.save(); render();
+    const T = TODAY(), L = (D().dayLog[T] = D().dayLog[T] || { start: '', end: '' }); L.end = nowHM(); Store.save(); render();
     const ts = tasksOn(T); const wt = Math.round((D().focus[T] || {}).workTotal || 0); toast(`<span>🌙 סיימת את היום. משך ${fmtDur(dayDurMin(L))}${wt ? `, מתוכו עבודה בפועל ${fmtDur(wt)}` : ''}, ${ts.filter(t => t.done).length}/${ts.length} פעולות בוצעו.</span><button data-act="toastClose" aria-label="סגור">✕</button>`, 8000); celebrate();
   },
   dayReopen: () => { const L = D().dayLog[TODAY()]; if (L) { L.end = ''; Store.save(); render(); } },
@@ -1820,6 +1895,9 @@ const A = {
   shift: e => { state.date = addDays(state.date, +e.n); render(); },
   goToday: () => { state.date = TODAY(); render(); },
   filter: e => { state.taskFilter = e.f; render(); },
+  filterQuad: e => { state.fQuad = state.fQuad === e.q ? '' : e.q; render(); },
+  filterWant: e => { state.fWant = state.fWant === +e.n ? 0 : +e.n; render(); },
+  filterReset: () => { state.fQuad = ''; state.fWant = 0; render(); },
   printDay: () => printDayCore(false), printDayAll: () => printDayCore(true), printWeek, printSel,
   openList: e => { state.openList = e.id; render(); },
   backLists: () => { state.openList = null; render(); },
@@ -1879,11 +1957,23 @@ document.addEventListener('input', ev => {
 });
 
 /* ---------- Reorder today's actions by dragging a row over another (mouse drag, or long-press on touch) ---------- */
-const RDrag = { el: null, pid: 0, sx: 0, sy: 0, active: false, timer: null, target: null, before: true, suppress: false };
+const RDrag = { el: null, pid: 0, sx: 0, sy: 0, active: false, timer: null, target: null, before: true, suppress: false, mode: 'reorder', zone: '' };
+const DRAG_TABS = ['today', 'tasks', 'projects', 'matrix'];
 function rdClear() { document.querySelectorAll('.drop-before,.drop-after').forEach(r => r.classList.remove('drop-before', 'drop-after')); }
-function rdReset() { clearTimeout(RDrag.timer); rdClear(); if (RDrag.el) { RDrag.el.classList.remove('rdrag'); RDrag.el.style.transform = ''; } RDrag.el = null; RDrag.active = false; RDrag.target = null; document.body.classList.remove('dragging'); }
-function rdStart() { RDrag.active = true; RDrag.el.classList.add('rdrag'); document.body.classList.add('dragging'); try { navigator.vibrate && navigator.vibrate(15); } catch (e) {} }
-function rdMove(y) {
+function rdReset() { clearTimeout(RDrag.timer); rdClear(); if (RDrag.el) { RDrag.el.classList.remove('rdrag'); RDrag.el.style.transform = ''; } const bar = $('#dropbar'); if (bar) bar.remove(); RDrag.el = null; RDrag.active = false; RDrag.target = null; RDrag.zone = ''; document.body.classList.remove('dragging'); }
+function rdStart() {
+  RDrag.active = true; RDrag.el.classList.add('rdrag'); document.body.classList.add('dragging'); try { navigator.vibrate && navigator.vibrate(15); } catch (e) {}
+  if (RDrag.mode === 'move') { // from the lists: two drop zones, today and tomorrow
+    const bar = document.createElement('div'); bar.id = 'dropbar'; bar.innerHTML = '<div data-drop="today">📥 היום</div><div data-drop="tomorrow">📆 מחר</div>'; document.body.appendChild(bar);
+  }
+}
+function rdMove(x, y) {
+  if (RDrag.mode === 'move') {
+    RDrag.el.style.transform = 'translate(' + (x - RDrag.sx) + 'px,' + (y - RDrag.sy) + 'px)'; RDrag.zone = '';
+    document.querySelectorAll('#dropbar > div').forEach(z => { const r = z.getBoundingClientRect(), over = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; z.classList.toggle('over', over); if (over) RDrag.zone = z.dataset.drop; });
+    if (y < 90) window.scrollBy(0, -12); else if (y > innerHeight - 240 && y < innerHeight - 160) window.scrollBy(0, 12);
+    return;
+  }
   RDrag.el.style.transform = 'translateY(' + (y - RDrag.sy) + 'px)'; rdClear();
   const rows = [...document.querySelectorAll('#view > .grp[data-tid]')].filter(r => r !== RDrag.el);
   if (!rows.length) return;
@@ -1893,11 +1983,20 @@ function rdMove(y) {
   if (y < 90) window.scrollBy(0, -12); else if (y > innerHeight - 110) window.scrollBy(0, 12);
 }
 function rdEnd(commit) {
-  const el = RDrag.el, target = RDrag.target, before = RDrag.before, was = RDrag.active;
+  const el = RDrag.el, target = RDrag.target, before = RDrag.before, was = RDrag.active, mode = RDrag.mode, zone = RDrag.zone;
   rdReset();
   if (!was) return;
   RDrag.suppress = true; setTimeout(() => { RDrag.suppress = false; }, 350);
-  if (!commit || !target || !el) return;
+  if (!commit || !el) return;
+  if (mode === 'move') { // drop on "today" / "tomorrow": schedule the action for that day
+    const t = findTask(el.dataset.tid); if (!zone || !t) return;
+    const nd = zone === 'today' ? TODAY() : addDays(TODAY(), 1); if (t.date === nd) return;
+    t.date = nd; classify(t); delete t.ord; Store.save(); render();
+    toast('<span>' + (zone === 'today' ? '📥 הועברה להיום' : '📆 הועברה למחר') + ': <b>' + esc(t.title) + '</b></span><button class="btn ghost" data-act="undoMove" data-id="' + t.id + '">בטל</button><button data-act="toastClose" aria-label="סגור">✕</button>', 6000);
+    RDrag.undo = { id: t.id, date: el.dataset.prev || null };
+    return;
+  }
+  if (!target) return;
   const ids = [...document.querySelectorAll('#view > .grp[data-tid]')].map(r => r.dataset.tid).filter(id => id !== el.dataset.tid);
   const at = ids.indexOf(target.dataset.tid) + (before ? 0 : 1); ids.splice(at, 0, el.dataset.tid);
   const d = state.date, rest = tasksOn(d).map(t => t.id).filter(id => !ids.includes(id));
@@ -1905,15 +2004,17 @@ function rdEnd(commit) {
   Store.save(); render();
 }
 document.addEventListener('pointerdown', e => {
-  if (state.tab !== 'today' || e.target.closest('button,input,textarea,select,summary,a,details')) return;
-  const row = e.target.closest('#view > .grp[data-tid]'); if (!row || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  Object.assign(RDrag, { el: row, pid: e.pointerId, sx: e.clientX, sy: e.clientY, active: false, target: null });
+  if (!DRAG_TABS.includes(state.tab) || e.target.closest('button,input,textarea,select,summary,a,details')) return;
+  const today = state.tab === 'today', row = e.target.closest(today ? '#view > .grp[data-tid]' : '#view .grp[data-tid]'); if (!row || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  const t = findTask(row.dataset.tid); if (!today && (!t || t.done)) return; // from the lists only open actions can be scheduled
+  if (t) row.dataset.prev = t.date || '';
+  Object.assign(RDrag, { el: row, pid: e.pointerId, sx: e.clientX, sy: e.clientY, active: false, target: null, mode: today ? 'reorder' : 'move', zone: '' });
   if (e.pointerType !== 'mouse') RDrag.timer = setTimeout(rdStart, 380);
 });
 document.addEventListener('pointermove', e => {
   if (!RDrag.el || e.pointerId !== RDrag.pid) return;
-  if (RDrag.active) return rdMove(e.clientY);
-  if (Math.hypot(e.clientX - RDrag.sx, e.clientY - RDrag.sy) > 8) { if (e.pointerType === 'mouse') { rdStart(); rdMove(e.clientY); } else rdReset(); } // touch moved first: let it scroll
+  if (RDrag.active) return rdMove(e.clientX, e.clientY);
+  if (Math.hypot(e.clientX - RDrag.sx, e.clientY - RDrag.sy) > 8) { if (e.pointerType === 'mouse') { rdStart(); rdMove(e.clientX, e.clientY); } else rdReset(); } // touch moved first: let it scroll
 });
 document.addEventListener('pointerup', e => { if (RDrag.el && e.pointerId === RDrag.pid) rdEnd(true); });
 document.addEventListener('pointercancel', e => { if (RDrag.el && e.pointerId === RDrag.pid) rdEnd(false); });
