@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-24.3'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-24.4'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -277,9 +277,10 @@ function toast(html, ms = 9000) {
 }
 function showNext(doneId) {
   const n = nextTask(doneId);
-  if (!n) { toast('<span>🎉 סיימת את פעולות היום</span><button data-act="toastClose">✕</button>', 5000); return; }
+  if (!n) { const d0 = doneId ? findTask(doneId) : null; toast('<span>' + (d0 && d0.done ? '✓ "' + esc(d0.title) + '" סומנה כבוצעה. ' : '') + '🎉 סיימת את פעולות היום</span><button data-act="toastClose">✕</button>', 6000); return; }
   const q = quadOf(effQuad(n)), why = [q ? q[1] : '', n.mins ? n.mins + ' ד׳' : ''].filter(Boolean).join(' · ');
-  toast('<span>ההצעה הבאה: <b>' + esc(n.title) + '</b>' + (why ? ' (' + why + ')' : '') + '</span><button class="btn" data-act="runStart" data-id="' + n.id + '">◀ התחל עכשיו</button><button class="btn ghost" data-act="chooseOther">בחר משימה אחרת</button><button class="btn ghost" data-act="runBreak">☕ אני צריך הפסקה</button><button data-act="toastClose" aria-label="סגור">✕</button>');
+  const dn = doneId ? findTask(doneId) : null;
+  toast('<span>' + (dn && dn.done ? '✓ "' + esc(dn.title) + '" סומנה כבוצעה. ' : '') + 'ההצעה הבאה: <b>' + esc(n.title) + '</b>' + (why ? ' (' + why + ')' : '') + '</span><button class="btn" data-act="runStart" data-id="' + n.id + '">◀ התחל עכשיו</button><button class="btn ghost" data-act="chooseOther">בחר משימה אחרת</button><button class="btn ghost" data-act="runBreak">☕ אני צריך הפסקה</button><button data-act="toastClose" aria-label="סגור">✕</button>');
 }
 /* Quick capture: one field, no date/energy/priority; classified later in the daily "ארגון" */
 let captured = 0;
@@ -304,19 +305,25 @@ const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 function runOpen(id, brk, bmins, blabel, rid) {
   clearInterval(Run.tick); closeSheet();
   if (!brk && id) Work.last = id;
-  Object.assign(Run, { idea: brk ? pickIdea() : '', id: brk ? null : id, brk: !!brk, running: false, ended: false, label: blabel || '', rhythmId: rid || '', brkStarted: false, pomo: false });
+  Object.assign(Run, { mini: false, idea: brk ? pickIdea() : '', id: brk ? null : id, brk: !!brk, running: false, ended: false, label: blabel || '', rhythmId: rid || '', brkStarted: false, pomo: false });
   const t = findTask(id);
   const pick = brk ? (bmins || 10) : [5, 15, 25].reduce((a, m) => Math.abs(m - ((t && t.mins) || 15)) < Math.abs(a - ((t && t.mins) || 15)) ? m : a, 15);
   Run.total = Run.left = pick * 60; runRender(); $('#run').hidden = false; document.body.classList.add('running');
 }
-function runClose() { clearInterval(Run.tick); Run.running = false; $('#run').hidden = true; document.body.classList.remove('running'); render(); }
+function runClose() { clearInterval(Run.tick); Run.running = false; Run.mini = false; $('#run').hidden = true; $('#run').classList.remove('mini'); document.body.classList.remove('running', 'miniRun'); render(); }
 function runRender() {
   const t = Run.brk ? null : findTask(Run.id), el = $('#run');
   if (!Run.brk && !t) return runClose();
+  if (Run.mini) { // minimized: a compact bar above the navigation
+    el.classList.add('mini'); document.body.classList.remove('running'); document.body.classList.add('miniRun');
+    el.innerHTML = '<div class="miniinfo" data-act="runExpand"><div class="t">' + (Run.brk ? esc(Run.label || '☕ הפסקה') : esc(t.title)) + '</div><div class="sub">' + (Run.ended ? 'הזמן נגמר' : Run.running ? 'רץ ברקע' : 'מושהה') + '</div></div><div class="minitime" id="runTime">' + mmss(Run.left) + '</div><button class="iconbtn" data-act="runToggle" aria-label="השהה או המשך">' + (Run.running ? '⏸' : '◀') + '</button>' + (Run.brk ? '' : '<button class="iconbtn" data-act="runDone" aria-label="סיימתי">✓</button>') + '<button class="iconbtn" data-act="runExpand" aria-label="הרחב">⤢</button>';
+    return;
+  }
+  el.classList.remove('mini'); document.body.classList.remove('miniRun'); document.body.classList.add('running');
   const step = t ? ((t.subs || []).find(s => !s.done) || {}).title || t.first || '' : '';
   const mins = Run.brk ? [...new Set([5, 10, Math.round(Run.total / 60)])].sort((a, b) => a - b) : [5, 15, 25];
   el.innerHTML = `<div class="runbox">
-    <button class="iconbtn runx" data-act="runClose" aria-label="סגור">✕</button>
+    <button class="iconbtn runx" data-act="runClose" aria-label="סגור">✕</button><button class="iconbtn runmin" data-act="runMinimize" aria-label="מזער, הטיימר ממשיך ברקע">▁ מזער</button>
     <div class="sub">${Run.brk ? 'הפסקה' : 'עכשיו עובדים על'}</div>
     <h1>${Run.brk ? esc(Run.label || '☕ הפסקה') : esc(t.title)}</h1>
     ${Run.brk && !Run.ended && Run.idea ? '<div class="remind" style="margin:6px 0">💡 ' + esc(Run.idea) + ' <button type="button" class="iconbtn" data-act="nextIdea" aria-label="רעיון אחר">↻</button></div>' : ''}
@@ -336,7 +343,7 @@ function runRender() {
 function runTick() {
   Run.left = Math.max(0, Math.round((Run.endAt - Date.now()) / 1000));
   const el = $('#runTime'); if (el) el.textContent = mmss(Run.left);
-  if (Run.left <= 0) { clearInterval(Run.tick); Run.running = false; Run.ended = true; if (!Run.brk) { addWork(Run.total / 60); Work.skipId = Run.id; } runBeep(); runRender(); }
+  if (Run.left <= 0) { clearInterval(Run.tick); Run.running = false; Run.ended = true; Run.mini = false; if (!Run.brk) { addWork(Run.total / 60); Work.skipId = Run.id; } runBeep(); runRender(); }
 }
 function runStartTimer() { Run.endAt = Date.now() + Run.left * 1000; Run.running = true; if (Run.brk) Run.brkStarted = true; clearInterval(Run.tick); Run.tick = setInterval(runTick, 250); runRender(); }
 function stuckSheet() {
@@ -1787,6 +1794,8 @@ const A = {
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
   noiseOff: () => toggleNoise(),
+  runMinimize: () => { Run.mini = true; runRender(); },
+  runExpand: () => { Run.mini = false; runRender(); },
   setMode: e => { state.mode = e.m; try { localStorage.setItem('doit-mode', e.m); } catch (x) {} render(); window.scrollTo(0, 0); },
   chooseOther: () => chooseOther(),
   pickNow: e => { state.doId = e.id; closeSheet(); $('#toast').hidden = true; runOpen(e.id); },
