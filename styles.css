@@ -265,7 +265,6 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 #dropbar{position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));display:flex;gap:10px;z-index:30;pointer-events:none}
 #dropbar>div{flex:1;text-align:center;padding:18px 8px;border-radius:16px;background:var(--card);border:2px dashed var(--brand);color:var(--brand);font-weight:700;font-size:16px;box-shadow:0 6px 18px #0004}
 #dropbar>div.over{background:var(--brand);color:var(--brand-ink);border-style:solid}
-.uboard.tasksboard .ucol{flex:0 0 min(78vw,250px)}
 .modesw{margin:0 0 8px}
 .modesw button{padding:7px 16px;font-size:15px}
 .nowcard{background:var(--soft)}
@@ -278,3 +277,20 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 body.miniRun .fab,body.miniRun #capture{bottom:calc(140px + env(safe-area-inset-bottom))}
 body.miniRun .toast{bottom:calc(210px + env(safe-area-inset-bottom))}
 body.miniRun #view{padding-bottom:170px}
+.focusnote{background:var(--soft);color:var(--brand);border-radius:12px;padding:8px 12px;margin:0 0 6px;font-size:14px;line-height:1.5}
+.focusform label{margin-top:10px}
+.focusform .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.focusform select,.focusform input{font-size:16px}
+.focusform input[hidden]{display:none}
+/* bigger touch targets without changing the layout */
+.check{position:relative}
+.check::after{content:'';position:absolute;inset:-9px}
+.dot7{width:30px;height:30px}
+.fq button{padding:8px 12px}
+.fdet{margin:4px 0}
+.fdet>summary{cursor:pointer;color:var(--brand);font-weight:600;padding:6px 0;font-size:14px}
+.stepbar{display:flex;align-items:center;gap:6px;margin:6px 0 10px}
+.stepbar i{flex:0 0 28px;height:5px;border-radius:3px;background:var(--line)}
+.stepbar i.on{background:var(--brand)}
+.stepbar .sub{flex:1;margin-inline-start:6px}
+.hearts button{padding:5px 7px}

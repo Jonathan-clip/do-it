@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-24.4'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-24.5'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -161,7 +161,7 @@ const taskOrder = (d, a, b) => { // a manual drag order wins; otherwise today's 
   if (a.ord !== undefined && b.ord !== undefined) return a.ord - b.ord;
   if (a.ord !== undefined) return -1;
   if (b.ord !== undefined) return 1;
-  const m = d === TODAY() ? normEnergy((D().focus[d] || {}).energy) : '', e = x => x.energy || 3, p = x => { const q = effQuad(x); return q ? quadRank[q] + 1 : (x.priority || 0); };
+  const m = d === TODAY() ? normEnergy((D().focus[d] || {}).energy) : '', e = x => x.energy || 3, p = x => { const q = effQuad(x); return q ? ({ q1: 4, q2: 3, q3: 2, q4: 0 })[q] : 1 + (x.priority || 0) * 0.5; };
   if (m === 'midlow' || m === 'tired' || m === 'flood' || m === 'focus') return e(a) - e(b) || p(b) - p(a); // gentler states: easy actions first
   return (b.energy || 0) - (a.energy || 0) || p(b) - p(a);
 };
@@ -276,6 +276,7 @@ function toast(html, ms = 9000) {
   toast.t = setTimeout(() => { el.hidden = true; }, ms);
 }
 function showNext(doneId) {
+  if (notifyLevel() === 'quiet') { const q = doneId ? findTask(doneId) : null; if (q && q.done) toast('<span>✓ "' + esc(q.title) + '" סומנה כבוצעה</span><button data-act="toastClose" aria-label="סגור">✕</button>', 2500); return; }
   const n = nextTask(doneId);
   if (!n) { const d0 = doneId ? findTask(doneId) : null; toast('<span>' + (d0 && d0.done ? '✓ "' + esc(d0.title) + '" סומנה כבוצעה. ' : '') + '🎉 סיימת את פעולות היום</span><button data-act="toastClose">✕</button>', 6000); return; }
   const q = quadOf(effQuad(n)), why = [q ? q[1] : '', n.mins ? n.mins + ' ד׳' : ''].filter(Boolean).join(' · ');
@@ -407,7 +408,7 @@ function energyHelp(v) {
     high: ['⚡ אנרגיה גבוהה', ['זה הזמן לדבר הקשה והחשוב, לפני שהאנרגיה יורדת.', 'בלוק אחד של 25 דקות בלי הפרעות, ואז הפסקה.'],
       [mit && !mit.done ? b('runStart', '◀ להתחיל את הפעולה החשובה', `data-id="${mit.id}"`) : '', first ? b('runStart', '◀ להתחיל: ' + esc(first.title), `data-id="${first.id}"`) : '']],
     midlow: ['🙂 אנרגיה בינונית או נמוכה', ['לא מכריחים. מתחילים בקל ובקצר, וצוברים תנופה.', 'סידרתי את היום כך שהפעולות הקלות קודם.', 'שלוש פעולות להיום מספיקות.'],
-      [easy ? b('runStart', '🍃 פעולה קלה: ' + esc(easy.title), `data-id="${easy.id}"`) : '']],
+      [easy ? b('runStart', '🍃 פעולה קלה: ' + esc(easy.title), `data-id="${easy.id}"`) : '', b('runBreakMin', '☕ הפסקה של 10 דקות', 'data-m="10" data-l="☕ הפסקה"')]],
     tired: ['😴 עייפות', ['עייפות היא מידע, לא כישלון.', 'בחר אחד מהשלושה:'],
       [b('brainlessList', '⚡ עבור לביצוע פעולות brainless'), b('runBreakMin', '💪 בצע פושאפס', 'data-m="2" data-l="💪 פושאפס"'), b('runBreakMin', '🛋 לך תנוח לחצי שעה', 'data-m="30" data-l="🛋 מנוחה של חצי שעה"')]],
     flood: ['🌊 הצפה', ['עוצרים הכל לדקה. נשימה איטית: שאיפה 4, נשיפה 6.', 'פורקים הכל לדף, בלי לארגן (הכפתור 💭).', 'מציגים רק פעולה אחת. השאר מחכות.'],
@@ -474,17 +475,10 @@ function focusMethod(k) {
     else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast('<span>הטקסט הועתק. שלח אותו למישהו 👍</span><button data-act="toastClose">✕</button>', 5000)).catch(() => {});
   }
 }
-let lastEnergyAsk = 0;
-function askEnergyToast(force) { // recommended moments: morning, after a break, every ~3 hours while the app is open
-  const T = TODAY(), f = D().focus[T] || {}, h = new Date().getHours();
-  if (!force && (h < 7 || h >= 22)) return;
-  if (!force && ((f.energyAt && Date.now() - new Date(f.energyAt).getTime() < 3 * 36e5) || (f.energyAsk && Date.now() - new Date(f.energyAsk).getTime() < 3 * 36e5) || Date.now() - lastEnergyAsk < 3 * 36e5)) return;
-  if (!$('#toast').hidden || !$('#sheet').hidden || !$('#run').hidden) return;
-  lastEnergyAsk = Date.now(); fo(T).energyAsk = new Date().toISOString(); Store.save();
-  toast(`<span>מה מצב האנרגיה שלך עכשיו?</span><div class="opt etoast">${ENERGY_MODES.map(([v, l]) => `<button data-act="setEnergy" data-v="${v}">${l}</button>`).join('')}</div><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000);
-}
 
 /* Work time and the hourly break: after ~50 minutes of work (timer + completed actions) suggest 10 minutes off */
+const NOTIFY = [['quiet', '🔕 שקט: בלי הצעות והודעות', 'רק אישור קצר כשמסמנים פעולה כבוצעה.'], ['normal', '🔔 רגיל', 'הצעה לפעולה הבאה, הודעת תגמול וחזרה מהפסקה.'], ['full', '🔔 מזכירה יותר', 'בנוסף: הצעת הפסקה אחרי כ-50 דקות ותזכורות לארוחות ולמנוחה.']];
+const notifyLevel = () => { try { return localStorage.getItem('doit-notify') || 'normal'; } catch (e) { return 'normal'; } };
 const Work = { skipId: '', pending: false };
 function addWork(m) {
   const f = fo(TODAY()); f.work = (f.work || 0) + Math.max(0, m); f.workTotal = (f.workTotal || 0) + Math.max(0, m); Store.save();
@@ -498,7 +492,7 @@ function afterDone(t) {
   let due;
   if (Work.skipId === t.id) { due = Work.pending; Work.skipId = ''; } else due = addWork(t.mins || 5);
   if (rewardNotify()) return;
-  if (due) suggestBreak(); else showNext(t.id);
+  if (due && notifyLevel() === 'full') suggestBreak(); else showNext(t.id);
 }
 function finishBreak() {
   const T = TODAY(), f = fo(T); f.work = 0; f.workNext = 50;
@@ -532,7 +526,7 @@ function tick() {
   if (document.hidden || tickBusy) return; tickBusy = true;
   try {
     const T = TODAY(); ensureDayStart();
-    if (!$('#toast').hidden || !$('#sheet').hidden || !$('#run').hidden) return;
+    if (!$('#toast').hidden || !$('#sheet').hidden || !$('#run').hidden || notifyLevel() !== 'full') return; // meal / rest / hourly-break reminders only in the "full" level
     const now = toMin(nowHM()), log = D().rhythmLog[T] || {}, f = D().focus[T] || {};
     const r = rhythmSorted().find(x => !log[x.id] && toMin(x.time) <= now && now < toMin(x.time) + 180 && !tick.shown[T + x.id]);
     if (r) { tick.shown[T + r.id] = 1; toast(`<span>${r.kind === 'meal' ? '🍽' : '😌'} הגיע הזמן: <b>${esc(r.label)}</b> (${r.mins} ד׳)</span><button class="btn" data-act="rhythmStart" data-id="${r.id}">◀ התחל</button><button class="btn ghost" data-act="rhythmDone" data-id="${r.id}">✓ ${r.kind === 'rest' ? 'כבר נחתי' : 'כבר אכלתי'}</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000); return; }
@@ -596,7 +590,7 @@ function reviewSheet() {
   if (ts.length && done === ts.length) tips.push('עמדת בכל הפעולות. שים לב מה עזר לך, ושמור על זה.');
   else if (!tips.length && left.length) tips.push('נסה לתכנן פחות פעולות, ובחר מראש את החשובה ביותר.');
   const list = (arr, icon) => arr.slice(0, 8).map(t => '<div class="sub" style="margin:2px 0">' + icon + ' ' + esc(t.title) + (t.mins ? ' · ' + t.mins + ' ד׳' : '') + ((t.defers || 0) >= 2 ? ' · נדחתה ' + t.defers + ' פעמים' : '') + '</div>').join('') + (arr.length > 8 ? '<div class="sub">ועוד ' + (arr.length - 8) + '…</div>' : '');
-  sheet(`<h1>סיכום אתמול ☀️</h1>
+  sheet(`<h1>סיכום אתמול ☀️</h1>${morningBar('review')}
    <div class="meta" style="margin:4px 0 8px"><span>✅ ${done}/${ts.length} פעולות (${pct}%)</span>${doneMin ? '<span>⏱ ' + doneMin + ' ד׳ הושלמו</span>' : ''}${wt ? '<span>💼 עבודה בפועל ' + fmtDur(wt) + '</span>' : ''}${L.start ? '<span>🕗 ' + L.start + (L.end ? '–' + L.end + ' (' + fmtDur(dayDurMin(L)) + ')' : ' (בלי סיום)') + '</span>' : ''}${rItems.length ? '<span>☕ ' + rDone + '/' + rItems.length + ' הפסקות</span>' : ''}${energyL ? '<span>' + energyL + '</span>' : ''}</div>
    ${mit ? '<div class="sub">⭐ הפעולה החשובה: <b>' + esc(mit.title) + '</b> ' + (mit.done ? '✓ בוצעה' : '✗ לא בוצעה') + '</div>' : ''}
    ${doneL.length ? '<h2 style="margin:12px 0 4px">הספקת</h2>' + list(doneL, '✅') : ''}
@@ -608,12 +602,29 @@ function reviewSheet() {
    <div class="actions"><button type="button" class="btn ghost" data-act="reviewLater">אין צורך</button><button class="btn">שמור והמשך</button></div></form>`);
   $('#f').onsubmit = e => { e.preventDefault(); const f = new FormData(e.target); D().review[y] = { met: f.get('met') || '', improve: f.get('improve').trim(), at: new Date().toISOString() }; Store.save(); closeSheet(); setTimeout(askFocus, 250); };
 }
+const Morning = { plan: [], active: false };
+const morningEligible = () => {
+  const T = TODAY(), y = addDays(T, -1), f = D().focus[T] || {}, fe = focusOn(T);
+  return {
+    visual: !visualSnooze && !D().visual[T] && !workedToday() && !f.visualAsked && new Date().getHours() < 14,
+    review: !reviewSnooze && !D().review[y] && !f.reviewAsked && (tasksOn(y).length > 0 || ((D().focus[y] || {}).workTotal || 0) > 0),
+    focus: !focusSnooze && !f.askedAt && !(fe.mit && fe.fun)
+  };
+};
+function morningBar(name) {
+  if (!Morning.active || Morning.plan.length < 2 || !Morning.plan.includes(name)) return '';
+  const i = Morning.plan.indexOf(name);
+  return '<div class="stepbar">' + Morning.plan.map((k, n) => '<i class="' + (n <= i ? 'on' : '') + '"></i>').join('') + '<span class="sub">שלב ' + (i + 1) + ' מתוך ' + Morning.plan.length + '</span><button type="button" class="lnk" data-act="morningSkipAll">דלג על הכל</button></div>';
+}
 function askMorning() {
+  if (!D().tasks.length) return; // a brand-new user has nothing to review or plan: no popups
   if (!$('#sheet').hidden || !$('#run').hidden) return;
-  const T = TODAY(), y = addDays(T, -1);
-  if (!visualSnooze && !D().visual[T] && !workedToday() && !(D().focus[T] || {}).visualAsked && new Date().getHours() < 14) return visualOffer();
-  if (!reviewSnooze && !D().review[y] && !(D().focus[T] || {}).reviewAsked && (tasksOn(y).length || ((D().focus[y] || {}).workTotal || 0) > 0)) return reviewSheet();
-  askFocus();
+  const el = morningEligible();
+  if (!Morning.active) { Morning.plan = ['visual', 'review', 'focus'].filter(k => el[k]); if (!Morning.plan.length) return; Morning.active = true; }
+  if (el.visual) return visualOffer();
+  if (el.review) return reviewSheet();
+  if (el.focus) return askFocus();
+  Morning.active = false;
 }
 /* ---------- Morning guided visualization: shown paragraph by paragraph, optional auto-advance and read-aloud ---------- */
 const VISUALIZATION = [
@@ -654,7 +665,7 @@ function visOpen() { clearInterval(Run.tick); closeSheet(); Vis.i = 0; Vis.auto 
 function visStop() { clearTimeout(Vis.timer); if (canSpeak()) speechSynthesis.cancel(); $('#run').hidden = true; document.body.classList.remove('running'); }
 function visualOffer() {
   fo(TODAY()).visualAsked = true; Store.save(); // offered once a day; the card on the Today screen stays
-  sheet(`<h1>🧘 דמיון מודרך</h1><p class="sub">כמה דקות של דמיון לפני שמתחילים את היום. תקרא בקצב שלך, או תן לאפליקציה להתקדם לבד.</p>
+  sheet(`<h1>🧘 דמיון מודרך</h1>${morningBar('visual')}<p class="sub">כמה דקות של דמיון לפני שמתחילים את היום. תקרא בקצב שלך, או תן לאפליקציה להתקדם לבד.</p>
    <div class="actions"><button class="btn ghost" data-act="visLater">אחר כך</button><button class="btn" data-act="visStart">◀ להתחיל</button></div>`);
 }
 const workedToday = () => { const T = TODAY(); return tasksOn(T).some(t => t.done) || ((D().focus[T] || {}).work || 0) > 0; }; // started working: the morning visualization no longer matters today
@@ -699,7 +710,7 @@ function rewardSheet() {
 }
 function rewardNotify() { // first time today's condition is met: celebrate once
   const T = TODAY(), s = rewardState(T), f = fo(T);
-  if (!s.rule || !s.achieved || f.rewardNotified) return false;
+  if (notifyLevel() === 'quiet' || !s.rule || !s.achieved || f.rewardNotified) return false;
   f.rewardNotified = true; Store.save(); celebrate();
   toast('<span>🎉 עמדת בתנאי התגמול של היום!</span><button class="btn" data-act="rewardOpen">🎁 לבחור תגמול</button><button data-act="toastClose" aria-label="סגור">✕</button>', 15000);
   return true;
@@ -774,7 +785,7 @@ function doView() { // do mode: only the current action, nothing else to distrac
   return '<div class="top"><div class="brand">' + logoMark(36) + '<div><h1>היום</h1><div class="sub">' + longDate(d) + '</div></div></div><div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">' + (Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤') + '</button></div></div>'
     + modeSwitch()
     + '<div class="card"><div class="row"><b class="grow">' + done + '/' + ts.length + ' הושלמו' + (rem ? ' · נותרו ' + rem + ' ד׳' : '') + '</b>' + dayBtn + '</div><div class="bar"><div style="width:' + pct + '%"></div></div>' + (est ? '<div class="sub" style="margin-top:6px">סיום משוער ' + est + ' (כולל הפסקות)</div>' : '') + '</div>'
-    + (cur ? nowCard(cur) : '<div class="card"><div class="t">🎉 אין עוד פעולות פתוחות להיום</div><div class="sub" style="margin-top:6px">במצב תכנון אפשר להוסיף פעולות מהמאגר, או לסיים את היום.</div><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px">📋 למצב תכנון</button></div>')
+    + (cur ? nowCard(cur) : ts.length === 0 ? '<div class="card"><div class="t">עוד אין פעולות להיום</div><div class="sub" style="margin-top:6px">הוסף את הפעולה הראשונה, או בחר מהמאגר במצב תכנון.</div><button class="btn startnow" data-act="addTask" style="margin-top:8px">＋ פעולה חדשה</button><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px;width:100%">📋 למצב תכנון</button></div>' : '<div class="card"><div class="t">🎉 אין עוד פעולות פתוחות להיום</div><div class="sub" style="margin-top:6px">במצב תכנון אפשר להוסיף פעולות מהמאגר, או לסיים את היום.</div><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px">📋 למצב תכנון</button></div>')
     + (queue.length ? '<h2>בתור</h2>' + queue.map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + quadChip(t) + '</div></div>').join('') : '')
     + energyBar(d)
     + '<button class="fab" data-act="addTask" aria-label="פעולה חדשה">+</button>';
@@ -784,6 +795,7 @@ function chooseOther() { // pick another action to do now (the user decides, the
   sheet('<h1>בחר משימה אחרת</h1>' + (list.length ? '<div class="grid2" style="grid-template-columns:1fr">' + list.map(t => '<button class="btn ghost" data-act="pickNow" data-id="' + t.id + '">◀ ' + esc(t.title) + (t.mins ? ' · ' + t.mins + ' ד׳' : '') + '</button>').join('') + '</div>' : '<p class="sub">אין עוד פעולות פתוחות להיום. אפשר להוסיף מהמאגר במצב תכנון.</p>') + '<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>');
 }
 function returnToast() { // after a break: remind what I was doing, back to it with one tap
+  if (notifyLevel() === 'quiet') return;
   const t = Work.last ? findTask(Work.last) : null;
   if (t && !t.done) toast('<span>חזרת מהפסקה. עבדת על: <b>' + esc(t.title) + '</b>' + (t.first ? ' · הצעד: ' + esc(t.first) : '') + '</span><button class="btn" data-act="runStart" data-id="' + t.id + '">◀ חזור לעבוד עליה</button><button class="btn ghost" data-act="chooseOther">בחר משימה אחרת</button><button data-act="toastClose" aria-label="סגור">✕</button>', 25000);
   else showNext('');
@@ -806,27 +818,30 @@ function focusCard(d) {
     ${f.mit && d === TODAY() && !(f.mitId && (D().tasks.find(x => x.id === f.mitId) || {}).done) ? `<button class="btn startnow" data-act="runStart" data-id="${f.mitId}">◀ התחל עכשיו</button>` : ''}</div>`;
 }
 let focusSnooze = false;
-function focusSheet(d) {
-  const f = focusOn(d), open = D().tasks.filter(t => !t.done && t.date === d).sort((a, b) => (b.energy || 0) - (a.energy || 0) || (b.priority || 0) - (a.priority || 0)).slice(0, 6);
-  sheet(`<h1>${d === TODAY() ? 'בוקר טוב 👋' : 'מיקוד היום'}</h1>
-  <div class="remind">💬 ${esc(reminder())}</div>
-  ${(D().review[addDays(d, -1)] || {}).improve ? '<div class="remind" style="background:var(--warn-bg);color:var(--warn-ink)">אתמול רצית לשפר: ' + esc(D().review[addDays(d, -1)].improve) + '</div>' : ''}
-  <form id="f">
-   <label>⭐ מה הפעולה החשובה ביותר היום?</label>
-   <input name="mit" value="${esc(f.mit)}" autocomplete="off" placeholder="כתוב, או בחר ממשימות היום">
-   <input type="hidden" name="mitId" value="${f.mitId}">
-   ${open.length ? '<div class="opt" style="margin-top:6px">' + open.map(t => '<button type="button" data-act="focusPick" data-id="' + t.id + '">' + esc(t.title) + '</button>').join('') + '</div>' : ''}
-   <label>🎉 מה הפאן של היום? (משהו שמשמח אותך לקראתו)</label>
-   <input name="fun" value="${esc(f.fun)}" autocomplete="off" placeholder="למשל: קפה עם חברה, סרט בערב, הליכה בשקיעה">
-   <label>🎁 מתי היום ייחשב כעמידה, ויזכה בתגמול?</label><select name="rewardRule">${REWARD_RULES.map(([v, l]) => `<option value="${v}" ${((D().focus[d] || {}).rewardRule || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
-   <label>🔋 איך האנרגיה שלך עכשיו?</label><div class="opt" id="enOpts">${ENERGY_MODES.map(([v, l]) => `<button type="button" class="${f.energy === v ? 'on' : ''}" onclick="const f=this.closest('form');f.energy.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div><input type="hidden" name="energy" value="${f.energy}">
+function focusSheet(d) { // the morning sheet: one dropdown per choice, so it stays short and calm
+  const f = focusOn(d), raw = D().focus[d] || {}, prevImp = (D().review[addDays(d, -1)] || {}).improve;
+  const open = tasksOn(d).filter(t => !t.done).slice(0, 30), cur = f.mitId && open.some(t => t.id === f.mitId) ? f.mitId : (f.mit ? '__other' : '');
+  sheet(`<h1>${d === TODAY() ? 'בוקר טוב 👋' : 'מיקוד היום'}</h1>${d === TODAY() ? morningBar('focus') : ''}
+  <div class="focusnote">💬 ${esc(reminder())}${prevImp ? '<br>🔸 אתמול רצית לשפר: ' + esc(prevImp) : ''}</div>
+  <form id="f" class="focusform">
+   <label>⭐ הפעולה החשובה היום</label>
+   <select name="mitSel"><option value="">בחר פעולה...</option>${open.map(t => '<option value="' + t.id + '" ' + (cur === t.id ? 'selected' : '') + '>' + esc(t.title) + '</option>').join('')}<option value="__other" ${cur === '__other' ? 'selected' : ''}>✏️ אחרת, אכתוב בעצמי</option></select>
+   <input name="mit" value="${esc(f.mitId ? '' : f.mit)}" autocomplete="off" placeholder="כתוב את הפעולה החשובה" ${cur === '__other' ? '' : 'hidden'}>
+   <label>🎉 הפאן של היום</label>
+   <input name="fun" value="${esc(f.fun)}" autocomplete="off" placeholder="משהו שמשמח אותך לקראתו">
+   <div class="two">
+    <div><label>🎁 תנאי לתגמול</label><select name="rewardRule">${REWARD_RULES.map(([v, l]) => '<option value="' + v + '" ' + ((raw.rewardRule || '') === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select></div>
+    <div><label>🔋 אנרגיה</label><select name="energy"><option value="">בחר מצב...</option>${ENERGY_MODES.map(([v, l]) => '<option value="' + v + '" ' + (f.energy === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select></div>
+   </div>
    <div class="actions"><button type="button" class="btn ghost" data-act="focusLater">אין צורך</button><button class="btn">שמור</button></div>
   </form>`);
-  $('#f').mit.addEventListener('input', () => { $('#f').mitId.value = ''; });
-  $('#f').onsubmit = e => {
-    e.preventDefault(); const fd = new FormData(e.target);
-    Object.assign(fo(d), { mit: fd.get('mit').trim(), mitId: fd.get('mitId') || '', fun: fd.get('fun').trim(), energy: fd.get('energy') || '', rewardRule: fd.get('rewardRule') || '', energyAt: new Date().toISOString() });
-    Store.save(); closeSheet(); render();
+  const form = $('#f');
+  form.mitSel.addEventListener('change', () => { const o = form.mitSel.value === '__other'; form.mit.hidden = !o; if (o) form.mit.focus(); });
+  form.onsubmit = e => {
+    e.preventDefault(); const fd = new FormData(form), sel = fd.get('mitSel') || '';
+    const mitId = sel && sel !== '__other' ? sel : '', mit = sel === '__other' ? fd.get('mit').trim() : '';
+    Object.assign(fo(d), { mit, mitId, fun: fd.get('fun').trim(), energy: fd.get('energy') || '', rewardRule: fd.get('rewardRule') || '', energyAt: new Date().toISOString() });
+    Morning.active = false; Store.save(); closeSheet(); render();
   };
 }
 function askFocus() { // start-of-day prompt: only for today, only if something is missing, never over another open sheet
@@ -876,6 +891,11 @@ function upCard(t, showDate) {
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
+const filterOk = t => (!state.fQuad || (state.fQuad === 'none' ? !effQuad(t) : effQuad(t) === state.fQuad)) && (!state.fWant || (t.want || 0) >= state.fWant);
+const filterBar = () => '<details class="fdet" ' + (state.fQuad || state.fWant ? 'open' : '') + '><summary>🧭 סינון לפי עדיפות' + (state.fQuad || state.fWant ? ' · פעיל' : '') + '</summary>'
+  + '<div class="opt fq"><span class="sub">🧭</span>' + [['', 'הכל']].concat(QUADS.map(q => [q[0], q[1]]), [['none', 'ללא סיווג']]).map(([k, l]) => '<button class="' + ((state.fQuad || '') === k ? 'on' : '') + '" data-act="filterQuad" data-q="' + k + '">' + l + '</button>').join('') + '</div>'
+  + '<div class="opt fq"><span class="sub">💗</span>' + [[0, 'הכל'], [3, '3 ומעלה'], [4, '4 ומעלה'], [5, '5']].map(([n, l]) => '<button class="' + ((state.fWant || 0) === n ? 'on' : '') + '" data-act="filterWant" data-n="' + n + '">' + l + '</button>').join('') + '</div>'
+  + (state.fQuad || state.fWant ? '<button class="lnk" data-act="filterReset">נקה סינון</button>' : '') + '</details>';
 const views = {
   today() {
     if (state.mode === 'do' && state.date === TODAY()) return doView();
@@ -913,7 +933,9 @@ const views = {
     // Todoist-style board in three modes: days (rolling), week, month. Everything is laid out right-to-left.
     const T = TODAY(), mode = state.upMode;
     const label = d => d === T ? 'היום' : d === addDays(T, 1) ? 'מחר' : 'יום ' + DAYN[parse(d).getDay()];
-    const dayCol = d => { const ts = tasksOn(d); return upCol(d, `${shortDate(d)} · ${label(d)}`, ts.length, `<button class="uadd" data-act="addTaskOn" data-date="${d}">＋ הוסף משימה</button>${ts.map(t => upCard(t)).join('')}`); };
+    const dayCol = d => { const ts = tasksOn(d).filter(filterOk); return upCol(d, `${shortDate(d)} · ${label(d)}`, ts.length, `<button class="uadd" data-act="addTaskOn" data-date="${d}">＋ הוסף פעולה</button>${ts.map(t => upCard(t)).join('')}`); };
+    const poolCol = () => { const ps = D().tasks.filter(t => !t.date && !t.done && filterOk(t)); return upCol('none', 'ללא תאריך', ps.length, '<button class="uadd" data-act="addTaskOn" data-date="">＋ הוסף פעולה</button>' + ps.map(t => upCard(t)).join('')); };
+    const overCol = () => { const os = D().tasks.filter(t => t.date && t.date < T && !t.done && filterOk(t)).sort((a, b) => a.date.localeCompare(b.date)); return upCol('overdue', 'באיחור', os.length, os.map(t => upCard(t, true)).join(''), os.length ? '<button class="lnk" data-act="rescheduleOverdue">העבר להיום</button>' : ''); };
     const curYM = mode === 'month' ? state.upMonth : state.upStart.slice(0, 7);
     const ymList = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 2 + i); return fmt(d).slice(0, 7); });
     if (!ymList.includes(curYM)) { ymList.push(curYM); ymList.sort(); }
@@ -923,17 +945,17 @@ const views = {
     if (mode === 'week') {
       const ws = state.upWeek;
       nav = navRow(`${shortDate(ws)} – ${shortDate(addDays(ws, 6))}`);
-      body = `<div class="uboard week" id="uboard">${Array.from({ length: 7 }, (_, i) => dayCol(addDays(ws, i))).join('')}</div>`;
+      body = `<div class="uboard week" id="uboard">${poolCol()}${overCol()}${Array.from({ length: 7 }, (_, i) => dayCol(addDays(ws, i))).join('')}</div>`;
     } else if (mode === 'three') {
       const s3 = state.up3;
       nav = navRow(`${shortDate(s3)} – ${shortDate(addDays(s3, 2))}`);
-      body = `<div class="uboard three" id="uboard">${Array.from({ length: 3 }, (_, i) => dayCol(addDays(s3, i))).join('')}</div>`;
+      body = `<div class="uboard three" id="uboard">${poolCol()}${overCol()}${Array.from({ length: 3 }, (_, i) => dayCol(addDays(s3, i))).join('')}</div>`;
     } else if (mode === 'month') {
       const [y, m] = state.upMonth.split('-').map(Number), first = new Date(y, m - 1, 1), st = new Date(y, m - 1, 1 - first.getDay());
       let cells = DAYS.map(x => `<div class="mh">${x}</div>`).join('');
       for (let i = 0; i < 42; i++) {
         const c = new Date(st); c.setDate(st.getDate() + i);
-        const s = fmt(c), ts = tasksOn(s);
+        const s = fmt(c), ts = tasksOn(s).filter(filterOk);
         cells += `<div class="mcell ${c.getMonth() !== m - 1 ? 'out' : ''} ${s === T ? 'today' : ''} ${s === state.upSel ? 'sel' : ''}" data-drop="${s}" data-act="upPick" data-date="${s}"><span class="mnum">${c.getDate()}</span>${ts.slice(0, 3).map(t => `<div class="ucard mini ${t.done ? 'done' : ''}" data-task="${t.id}" data-act="taskMenu" data-id="${t.id}"><span class="t">${esc(t.title)}</span></div>`).join('')}${ts.length > 3 ? `<span class="mmore">+${ts.length - 3}</span>` : ''}</div>`;
       }
       const sel = state.upSel, sts = tasksOn(sel);
@@ -942,53 +964,34 @@ const views = {
         <section class="ucol msel" data-drop="${sel}"><button class="uadd" data-act="addTaskOn" data-date="${sel}">＋ הוסף משימה</button>${sts.map(t => upCard(t)).join('') || '<div class="empty">אין פעולות ליום הזה</div>'}</section>`;
     } else {
       const start = state.upStart, days = Array.from({ length: state.upDays }, (_, i) => addDays(start, i));
-      const undated = D().tasks.filter(t => !t.date && !t.done);
       body = `<div class="uboard" id="uboard">
+        ${poolCol()}${overCol()}
         ${days.map(dayCol).join('')}
         <section class="ucol umore"><button class="uadd" data-act="upMore">＋ עוד שבועיים</button></section>
-        ${upCol('none', 'ללא תאריך', undated.length, `<button class="uadd" data-act="addTaskOn" data-date="">＋ הוסף משימה</button>${undated.map(t => upCard(t)).join('')}`)}
       </div>`;
     }
     return `<div class="top"><h1>בקרוב</h1><div class="sw">${mode === 'week' || mode === 'three' ? '' : monthSel}<button class="iconbtn" data-act="printWeek">🖨 שבוע</button></div></div>
       <div class="seg">${[['three', '3 ימים'], ['week', 'שבוע'], ['month', 'חודש'], ['days', 'כל הימים']].map(([k, l]) => `<button class="${mode === k ? 'on' : ''}" data-act="upMode" data-m="${k}">${l}</button>`).join('')}</div>
+      ${filterBar()}
+      ${mode === 'month' ? '' : '<div class="opt" style="margin:6px 0"><button data-act="upJump" data-c="none">📥 ללא תאריך (' + D().tasks.filter(t => !t.date && !t.done && filterOk(t)).length + ')</button><button data-act="upJump" data-c="overdue">⏰ באיחור (' + D().tasks.filter(t => t.date && t.date < T && !t.done && filterOk(t)).length + ')</button></div>'}
       ${nav}${body}
-      <div class="sub" style="margin-top:6px">גרור משימה (במגע: לחיצה ארוכה) כדי להעביר אותה ליום אחר.</div>`;
+      <div class="sub" style="margin-top:6px">גרור פעולה (במגע: לחיצה ארוכה) כדי להעביר אותה ליום אחר, או למאגר "ללא תאריך".</div>`;
   },
   tasks() {
-    const f = state.taskFilter, view = state.taskView || 'board', T = TODAY();
-    let list = D().tasks.slice();
+    const f = state.taskFilter;
+    let list = D().tasks.filter(filterOk);
     if (f === 'open') list = list.filter(t => !t.done);
     if (f === 'done') list = list.filter(t => t.done);
     if (f === 'nodate') list = list.filter(t => !t.date && !t.done);
     if (f === 'brainless') list = list.filter(t => t.brainless && !t.done);
-    if (state.fQuad) list = list.filter(t => state.fQuad === 'none' ? !effQuad(t) : effQuad(t) === state.fQuad); // by the matrix
-    if (state.fWant) list = list.filter(t => (t.want || 0) >= state.fWant); // by how much I feel like doing it
-    const byDate = (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || b.priority - a.priority;
+    list.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || b.priority - a.priority);
     const F = [['open', 'פתוחות'], ['brainless', '⚡ Brainless'], ['nodate', 'ללא תאריך'], ['done', 'הושלמו'], ['all', 'הכל']];
-    const head = `<div class="top"><h1>כל הפעולות</h1><div class="sw"><button class="iconbtn" data-act="addBulk">📋 הזנה מרוכזת</button><button class="iconbtn" data-act="printSel">🖨 נבחרות</button></div></div>
-      <div class="opt" style="margin:0 0 6px"><button class="${view === 'board' ? 'on' : ''}" data-act="taskView" data-v="board">▦ לוח</button><button class="${view === 'list' ? 'on' : ''}" data-act="taskView" data-v="list">☰ רשימה</button></div>
+    return `<div class="top"><h1>כל הפעולות</h1><div class="sw"><button class="iconbtn" data-act="addBulk">📋 הזנה מרוכזת</button><button class="iconbtn" data-act="printSel">🖨 נבחרות</button></div></div>
       <div class="seg">${F.map(([k, l]) => `<button class="${f === k ? 'on' : ''}" data-act="filter" data-f="${k}">${l}</button>`).join('')}</div>
-      <div class="opt fq"><span class="sub">🧭</span>${[['', 'הכל']].concat(QUADS.map(q => [q[0], q[1]]), [['none', 'ללא סיווג']]).map(([k, l]) => `<button class="${(state.fQuad || '') === k ? 'on' : ''}" data-act="filterQuad" data-q="${k}">${l}</button>`).join('')}</div>
-      <div class="opt fq"><span class="sub">💗</span>${[[0, 'הכל'], [3, '3 ומעלה'], [4, '4 ומעלה'], [5, '5']].map(([n, l]) => `<button class="${(state.fWant || 0) === n ? 'on' : ''}" data-act="filterWant" data-n="${n}">${l}</button>`).join('')}</div>
-      <div class="sub" style="margin:6px 0">${list.length} פעולות${state.fQuad || state.fWant ? ' <button class="lnk" data-act="filterReset">נקה סינון</button>' : ''}</div>`;
-    if (view === 'list') {
-      list.sort(byDate);
-      return head + (list.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות שמתאימות לסינון</div>') + '<button class="fab" data-act="addTask">+</button>';
-    }
-    // board: undated pool, overdue, the next seven days, later, and (when asked for) done. Right-to-left, so the first column is on the right.
-    const open = list.filter(t => !t.done), doneL = list.filter(t => t.done), last = addDays(T, 6);
-    const lbl = d => d === T ? 'היום' : d === addDays(T, 1) ? 'מחר' : 'יום ' + DAYN[parse(d).getDay()];
-    const add = d => '<button class="uadd" data-act="addTaskOn" data-date="' + d + '">＋ הוסף פעולה</button>';
-    const dayCol = d => { const ts = open.filter(t => t.date === d).sort((a, b) => taskOrder(d, a, b) || (b.want || 0) - (a.want || 0)); return upCol(d, shortDate(d) + ' · ' + lbl(d), ts.length, add(d) + ts.map(t => upCard(t)).join('')); };
-    const none = open.filter(t => !t.date).sort(byDate), over = open.filter(t => t.date && t.date < T).sort(byDate), later = open.filter(t => t.date && t.date > last).sort(byDate);
-    const cols = [
-      upCol('none', 'ללא תאריך', none.length, add('') + none.map(t => upCard(t)).join('')),
-      upCol('overdue', 'באיחור', over.length, over.map(t => upCard(t, true)).join(''), over.length ? '<button class="lnk" data-act="rescheduleOverdue">העבר להיום</button>' : ''),
-      ...Array.from({ length: 7 }, (_, i) => dayCol(addDays(T, i))),
-      upCol('later', 'מאוחר יותר', later.length, later.map(t => upCard(t, true)).join('')),
-      (f === 'done' || f === 'all') ? upCol('done', '✓ הושלמו', doneL.length, doneL.slice(0, 60).map(t => upCard(t, true)).join('')) : ''
-    ];
-    return head + '<div class="uboard tasksboard" id="uboard">' + cols.join('') + '</div><button class="fab" data-act="addTask">+</button>';
+      ${filterBar()}
+      <div class="sub" style="margin:6px 0">${list.length} פעולות. הלוח עם הגרירה נמצא בטאב "בקרוב".</div>
+      ${list.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות שמתאימות לסינון</div>'}
+      <button class="fab" data-act="addTask">+</button>`;
   },
   habits() {
     const d = TODAY(), last7 = Array.from({ length: 7 }, (_, i) => addDays(d, i - 6));
@@ -1068,17 +1071,21 @@ const views = {
     const wait = D().goals.filter(g => g.reward && !g.claimed && goalState(g).achieved).length;
     const item = (t, icon, title, sub) => `<div class="card row" data-act="goTab" data-t="${t}"><span style="font-size:26px">${icon}</span><div class="grow"><div class="t"><b>${title}</b></div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
     return `<div class="top"><div class="brand">${logoMark(40)}<h1>Do It</h1></div></div>
-      ${item('matrix', '🧭', 'מטריצת עדיפויות', `${D().tasks.filter(t => !t.done && !t.quad).length} פעולות לא מסווגות`)}
-      ${item('dayrewards', '🎁', 'תגמולים יומיים', `${D().dayRewards.length} תגמולים ברשימה`)}
-      ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
+      <h2>יומי</h2>
       ${item('journal', '📓', 'יומן', `${journalDays().length} ימים עם רישום`)}
+      ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
+      ${item('dayrewards', '🎁', 'תגמולים יומיים', `${D().dayRewards.length} תגמולים ברשימה`)}
+      <h2>תכנון</h2>
       ${item('tasks', '✅', 'כל הפעולות', `${D().tasks.filter(t => !t.done).length} פתוחות`)}
       ${item('projects', '📁', 'פרויקטים', `${D().projects.filter(p => projState(p).done < projState(p).total).length} פעילים`)}
+      ${item('matrix', '🧭', 'מטריצת עדיפויות', `${D().tasks.filter(t => !t.done && !effQuad(t)).length} פעולות לא מסווגות`)}
+      <h2>אישי</h2>
       ${item('habits', '🔁', 'הרגלים', `${D().habits.length} הרגלים`)}
       ${item('goals', '🎯', 'יעדים ותגמולים', `${activeG} פעילים${wait ? ` · 🎁 ${wait} ממתינים` : ''}`)}
       ${item('vision', '🌟', 'חזון', `${D().visions.length} פריטים`)}
       ${item('lists', '📝', 'רשימות', `${D().lists.length} רשימות`)}
-      <h2>גרסה</h2>
+      <h2>הגדרות</h2>
+      <div class="card"><div class="t"><b>🔔 רמת הודעות</b></div><select id="notifySel" style="margin-top:6px">${NOTIFY.map(([v, l]) => '<option value="' + v + '" ' + (notifyLevel() === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select><div class="sub" id="notifyDesc" style="margin-top:6px">${(NOTIFY.find(x => x[0] === notifyLevel()) || NOTIFY[1])[2]}</div></div>
       <div class="card row"><div class="grow"><div class="t">גרסה ${APP_VERSION}</div><div class="sub">אם נראה שהאפליקציה לא מעודכנת, לחץ כדי לנקות את המטמון ולטעון מחדש</div></div><button class="iconbtn" data-act="refreshApp">🔄 רענון</button></div>
       <h2>חשבון</h2>
       <div class="card row" data-act="account"><span style="font-size:26px">☁️</span><div class="grow"><div class="t"><b>כניסה וסנכרון</b></div><div class="meta">${Cloud.user ? esc(Cloud.user.email) : 'לא מחובר'}</div></div>${chev('l')}</div>`;
@@ -1176,14 +1183,15 @@ function render() {
     if (el === document.activeElement) { focusKey = k; try { caret = el.selectionStart; } catch (e) {} }
   });
   const board = $('#uboard'), boardScroll = board ? board.scrollLeft : null; // keep the board's horizontal position across re-renders
-  document.body.classList.toggle('wide', state.tab === 'upcoming' || (state.tab === 'tasks' && (state.taskView || 'board') === 'board'));
+  document.body.classList.toggle('wide', state.tab === 'upcoming');
   $('#view').innerHTML = views[state.tab]();
   if (MORE_TABS.includes(state.tab) && !(state.tab === 'lists' && state.openList) && !(state.tab === 'projects' && (state.openProject || state.openJob))) // back to the "עוד" menu
     $('#view').insertAdjacentHTML('afterbegin', `<button class="iconbtn backmore" data-act="goTab" data-t="more" aria-label="חזרה לעוד">${chev('r')}<span style="margin-inline-start:6px">עוד</span></button>`);
   if (DEMO) $('#view').insertAdjacentHTML('afterbegin', '<div class="demobar">מצב דמו · נתונים בדויים <button class="lnk" data-act="demoReset">אפס דמו</button></div>');
+  if (boardScroll === null && $('#uboard') && state.tab === 'upcoming' && state.upMode !== 'month') { const b = $('#uboard'), c = [...b.querySelectorAll('.ucol[data-drop]')].find(x => /^[0-9]{4}-/.test(x.dataset.drop)); if (c) b.scrollLeft += c.getBoundingClientRect().right - b.getBoundingClientRect().right + 16; }
   if (boardScroll !== null && $('#uboard')) $('#uboard').scrollLeft = boardScroll;
   // Entrance animation (FitMe-style soft rise, staggered) only when the screen changes, not on every re-render.
-  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.tab === 'tasks' ? (state.taskView || 'board') : '') + (state.openList || '') + (state.openProject || '') + (state.openJob || '');
+  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.openList || '') + (state.openProject || '') + (state.openJob || '');
   const enter = state.viewKey !== key; state.viewKey = key;
   if (!enter) { // same screen: put back what was typed, and the cursor
     document.querySelectorAll('#view input, #view select, #view textarea').forEach(el => {
@@ -1524,7 +1532,7 @@ function menuSheet(id) {
 }
 function moveSheet(id) {
   const t = findTask(id), T = TODAY();
-  const opts = [['מחר', addDays(T, 1)], ['מחרתיים', addDays(T, 2)], ['בעוד שבוע', addDays(T, 7)], ['ללא תאריך', 'none']];
+  const opts = [['היום', T], ['מחר', addDays(T, 1)], ['מחרתיים', addDays(T, 2)], ['בעוד שבוע', addDays(T, 7)], ['ללא תאריך', 'none']];
   sheet(`<h1>להעביר ל...</h1><p class="sub">${esc(t.title)}</p>
    <div class="opt">${opts.map(([l, v]) => `<button data-act="moveTo" data-id="${id}" data-d="${v}">${l}${v !== 'none' ? ' · ' + shortDate(v) : ''}</button>`).join('')}</div>
    <label>או בחר תאריך</label><div class="row"><input type="date" id="moveDate" value="${t.date || ''}"><button class="btn" data-act="moveCustom" data-id="${id}">קבע</button></div>
@@ -1684,8 +1692,8 @@ const A = {
   editTask: e => taskForm(e.id), addTask: () => taskForm(),
   habToTask: e => { const h = D().habits.find(x => x.id === e.id); taskForm(undefined, TODAY(), '', { title: h.task || h.title, energy: h.energy || 3, mins: h.mins || 15, visionId: h.visionId || '', repeat: 'd1' }); },
   focusEdit: () => focusSheet(state.date),
-  focusPick: e => { const t = D().tasks.find(x => x.id === e.id), f = $('#f'); if (t) { f.mit.value = t.title; f.mitId.value = t.id; } },
-  focusLater: () => { focusSnooze = true; closeSheet(); },
+  morningSkipAll: () => { const f = fo(TODAY()); f.visualAsked = true; f.reviewAsked = true; f.askedAt = new Date().toISOString(); Morning.active = false; Store.save(); closeSheet(); },
+  focusLater: () => { focusSnooze = true; Morning.active = false; closeSheet(); },
   demoReset: () => { if (confirm('לאפס את הדמו לנתונים ההתחלתיים?')) { seedDemo(); render(); } },
   editHabit: e => habitForm(e.id), addHabit: () => habitForm(),
   editVision: e => visionForm(e.id), addVision: () => visionForm(),
@@ -1787,13 +1795,10 @@ const A = {
   },
   capture: () => captureSheet(),
   nextReminder: () => { state.remShift = (state.remShift || 0) + 1; render(); },
-  setEnergy: e => {
-    $('#toast').hidden = true; const T = TODAY(), f = fo(T), on = f.energy !== e.v;
-    f.energy = on ? e.v : ''; f.energyAt = new Date().toISOString(); Store.save(); render(); if (on) energyHelp(e.v);
-  },
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
   noiseOff: () => toggleNoise(),
+  upJump: e => { const c = document.querySelector('#uboard .ucol[data-drop="' + e.c + '"]'); if (c) c.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); },
   runMinimize: () => { Run.mini = true; runRender(); },
   runExpand: () => { Run.mini = false; runRender(); },
   setMode: e => { state.mode = e.m; try { localStorage.setItem('doit-mode', e.m); } catch (x) {} render(); window.scrollTo(0, 0); },
@@ -1869,7 +1874,6 @@ const A = {
   rewriteDel: e => { if (confirm('למחוק את הפעולה?')) { D().tasks = D().tasks.filter(t => t.id !== e.id); Store.save(); closeSheet(); render(); } },
   rewriteKeep: e => { const t = findTask(e.id); t.nudged = t.defers; Store.save(); closeSheet(); },
   toggleShowAll: () => { state.showAll = !state.showAll; render(); },
-  toggleShowDone: () => { state.showDone = !state.showDone; render(); },
   toastClose: () => { $('#toast').hidden = true; },
   runStart: e => {
     $('#toast').hidden = true; let id = e.id;
@@ -1972,7 +1976,6 @@ const A = {
   shift: e => { state.date = addDays(state.date, +e.n); render(); },
   goToday: () => { state.date = TODAY(); render(); },
   filter: e => { state.taskFilter = e.f; render(); },
-  taskView: e => { state.taskView = e.v; render(); window.scrollTo(0, 0); },
   filterQuad: e => { state.fQuad = state.fQuad === e.q ? '' : e.q; render(); },
   filterWant: e => { state.fWant = state.fWant === +e.n ? 0 : +e.n; render(); },
   filterReset: () => { state.fQuad = ''; state.fWant = 0; render(); },
@@ -1995,6 +1998,7 @@ document.addEventListener('click', ev => {
   if (nav) { state.tab = nav.dataset.tab; state.openList = null; state.openProject = null; state.openJob = null; render(); window.scrollTo(0, 0); }
 });
 document.addEventListener('change', ev => {
+  if (ev.target.id === 'notifySel') { try { localStorage.setItem('doit-notify', ev.target.value); } catch (e) {} const d = $('#notifyDesc'); if (d) d.textContent = (NOTIFY.find(x => x[0] === ev.target.value) || NOTIFY[1])[2]; return; }
   if (ev.target.id === 'energySel') { A.setEnergyTo(ev.target.value); return; }
   if (ev.target.id === 'upMonth') {
     const v = ev.target.value, first = v === TODAY().slice(0, 7) ? TODAY() : v + '-01';
