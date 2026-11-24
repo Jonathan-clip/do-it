@@ -1,9 +1,9 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-24.2'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-24.3'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
-const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
+const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
 const TS_KEY = DEMO ? 'doit-demo-updated-v1' : 'doit-updated-v1';
 const SYNC_KEY = DEMO ? 'doit-demo-synced-v1' : 'doit-synced-v1';
 // v2 structure: a task that had subtasks becomes a "job" (task) and each subtask an action; every other old task is already an action.
@@ -21,7 +21,7 @@ function migrate(d) {
   });
   d.tasks = keep; d.v = 2; return d;
 }
-const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm', 'dayRewards'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual'];
+const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm', 'dayRewards', 'breakIdeas'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual'];
 const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return h + ':' + str.length; };
 function itemHashes(d) { // one entry per collection item / per dated entry, so changes and deletions can be tracked
   const o = {};
@@ -151,6 +151,7 @@ function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in lo
 }
 const MORE_TABS = ['journal', 'rhythm', 'dayrewards', 'matrix', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
 const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
+state.mode = (() => { try { const m = localStorage.getItem('doit-mode'); if (m === 'plan' || m === 'do') return m; } catch (e) {} return window.matchMedia && matchMedia('(max-width: 700px)').matches ? 'do' : 'plan'; })();
 // Weekly vision data lives in D().weeks[<Sunday date>]; created lazily on first edit.
 const weekData = ws => (D().weeks[ws] = D().weeks[ws] || { vision: '', outcomes: [], visionIds: [], worked: '', improve: '' });
 
@@ -277,7 +278,8 @@ function toast(html, ms = 9000) {
 function showNext(doneId) {
   const n = nextTask(doneId);
   if (!n) { toast('<span>🎉 סיימת את פעולות היום</span><button data-act="toastClose">✕</button>', 5000); return; }
-  toast(`<span>מה הדבר הבא? <b>${esc(n.title)}</b></span><button class="btn" data-act="runStart" data-id="${n.id}">התחל</button><button class="btn ghost" data-act="runBreak">☕ הפסקה</button><button data-act="toastClose" aria-label="סגור">✕</button>`);
+  const q = quadOf(effQuad(n)), why = [q ? q[1] : '', n.mins ? n.mins + ' ד׳' : ''].filter(Boolean).join(' · ');
+  toast('<span>ההצעה הבאה: <b>' + esc(n.title) + '</b>' + (why ? ' (' + why + ')' : '') + '</span><button class="btn" data-act="runStart" data-id="' + n.id + '">◀ התחל עכשיו</button><button class="btn ghost" data-act="chooseOther">בחר משימה אחרת</button><button class="btn ghost" data-act="runBreak">☕ אני צריך הפסקה</button><button data-act="toastClose" aria-label="סגור">✕</button>');
 }
 /* Quick capture: one field, no date/energy/priority; classified later in the daily "ארגון" */
 let captured = 0;
@@ -301,7 +303,8 @@ function runBeep() {
 const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 function runOpen(id, brk, bmins, blabel, rid) {
   clearInterval(Run.tick); closeSheet();
-  Object.assign(Run, { id: brk ? null : id, brk: !!brk, running: false, ended: false, label: blabel || '', rhythmId: rid || '', brkStarted: false, pomo: false });
+  if (!brk && id) Work.last = id;
+  Object.assign(Run, { idea: brk ? pickIdea() : '', id: brk ? null : id, brk: !!brk, running: false, ended: false, label: blabel || '', rhythmId: rid || '', brkStarted: false, pomo: false });
   const t = findTask(id);
   const pick = brk ? (bmins || 10) : [5, 15, 25].reduce((a, m) => Math.abs(m - ((t && t.mins) || 15)) < Math.abs(a - ((t && t.mins) || 15)) ? m : a, 15);
   Run.total = Run.left = pick * 60; runRender(); $('#run').hidden = false; document.body.classList.add('running');
@@ -316,6 +319,7 @@ function runRender() {
     <button class="iconbtn runx" data-act="runClose" aria-label="סגור">✕</button>
     <div class="sub">${Run.brk ? 'הפסקה' : 'עכשיו עובדים על'}</div>
     <h1>${Run.brk ? esc(Run.label || '☕ הפסקה') : esc(t.title)}</h1>
+    ${Run.brk && !Run.ended && Run.idea ? '<div class="remind" style="margin:6px 0">💡 ' + esc(Run.idea) + ' <button type="button" class="iconbtn" data-act="nextIdea" aria-label="רעיון אחר">↻</button></div>' : ''}
     ${!Run.brk && t && t.notes ? '<div class="sub" style="white-space:pre-wrap;margin:-6px 0 12px">' + esc(t.notes) + '</div>' : ''}
     ${Run.brk ? '' : `<label class="sub">הצעד הראשון</label><input id="runStep" value="${esc(step)}" placeholder="מה הדבר הראשון והקטן שעושים?" autocomplete="off" ${(t.subs || []).some(s => !s.done) ? 'readonly' : ''}>`}
     <div class="opt runmins">${mins.map(m => `<button class="${Run.total === m * 60 ? 'on' : ''}" data-act="runMins" data-m="${m}" ${Run.running ? 'disabled' : ''}>${m} ד׳</button>`).join('')}</div>
@@ -492,7 +496,7 @@ function afterDone(t) {
 function finishBreak() {
   const T = TODAY(), f = fo(T); f.work = 0; f.workNext = 50;
   if (Run.rhythmId) { (D().rhythmLog[T] = D().rhythmLog[T] || {})[Run.rhythmId] = true; }
-  Store.save(); runClose(); askEnergyToast(true);
+  Store.save(); runClose(); returnToast();
 }
 
 function estimateEnd(rem) { // when the day's remaining work should end, counting the hourly break and the meals/rest not yet taken
@@ -526,7 +530,6 @@ function tick() {
     const r = rhythmSorted().find(x => !log[x.id] && toMin(x.time) <= now && now < toMin(x.time) + 180 && !tick.shown[T + x.id]);
     if (r) { tick.shown[T + r.id] = 1; toast(`<span>${r.kind === 'meal' ? '🍽' : '😌'} הגיע הזמן: <b>${esc(r.label)}</b> (${r.mins} ד׳)</span><button class="btn" data-act="rhythmStart" data-id="${r.id}">◀ התחל</button><button class="btn ghost" data-act="rhythmDone" data-id="${r.id}">✓ ${r.kind === 'rest' ? 'כבר נחתי' : 'כבר אכלתי'}</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000); return; }
     if ((f.work || 0) >= (f.workNext || 50)) { suggestBreak(); return; }
-    askEnergyToast();
   } finally { tickBusy = false; }
 }
 tick.shown = {};
@@ -746,6 +749,42 @@ const wantStars = (id, cur, kind) => '<div class="hearts">' + [1, 2, 3, 4, 5].ma
 const prioBox = (kind, x) => '<div class="card"><div class="sub">🧭 עדיפות (דחוף / חשוב)</div>' + quadChips(x.id, x.quad || '', kind) + '<div class="sub" style="margin-top:10px">💗 כמה בא לי לעשות את זה?</div>' + wantStars(x.id, x.want || 0, kind) + '</div>';
 const prioFields = x => '<label>🧭 עדיפות (מטריצת אייזנהאואר)</label><div id="quadBox">' + quadChips('', x.quad || '', '') + '</div><input type="hidden" name="quad" value="' + (x.quad || '') + '"><label>💗 כמה בא לי לעשות את זה? (1 = בכלל לא, 5 = מאוד)</label><div id="wantBox">' + wantStars('', x.want || 0, '') + '</div><input type="hidden" name="want" value="' + (x.want || 0) + '">';
 const quadChips = (id, cur, kind) => '<div class="opt quadopts">' + QUADS.map(q => '<button type="button" class="' + (cur === q[0] ? 'on' : '') + '" data-act="setQuad" data-id="' + id + '" data-k="' + (kind || '') + '" data-q="' + q[0] + '">' + q[1] + '</button>').join('') + '</div>' + (quadOf(cur) ? '<div class="sub" style="margin-top:6px">' + esc(quadOf(cur)[2]) + '</div>' : '');
+/* ---------- Plan mode / do mode, the next-action suggestion, coming back from a break ---------- */
+const modeSwitch = () => '<div class="opt modesw"><button class="' + (state.mode === 'plan' ? 'on' : '') + '" data-act="setMode" data-m="plan">📋 תכנון</button><button class="' + (state.mode === 'do' ? 'on' : '') + '" data-act="setMode" data-m="do">🎯 ביצוע</button></div>';
+const currentAction = () => { const t = state.doId ? findTask(state.doId) : null; return (t && !t.done && t.date === TODAY()) ? t : nextTask(''); };
+function nowCard(t) {
+  return '<div class="card nowcard"><div class="sub">עכשיו</div><div class="t big">' + esc(t.title) + '</div>' + (t.notes ? '<div class="sub" style="white-space:pre-wrap;margin-top:4px">' + esc(t.notes) + '</div>' : '')
+    + '<div class="meta" style="margin:8px 0">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + (t.energy ? '<span style="color:var(--accent)">' + stars(t.energy) + '</span>' : '') + quadChip(t) + (t.want ? '<span>💗' + t.want + '</span>' : '') + (t.jobId ? jobChip(t) : projectChip(t)) + '</div>'
+    + '<button class="btn startnow" data-act="runStart" data-id="' + t.id + '">◀ התחל עכשיו</button>'
+    + '<div class="grid2"><button class="btn ghost" data-act="chooseOther">🔁 בחר משימה אחרת</button><button class="btn ghost" data-act="runBreak">☕ אני צריך הפסקה</button></div>'
+    + '<button class="lnk" data-act="toggleTask" data-id="' + t.id + '" style="margin-top:8px">✓ כבר עשיתי את זה</button></div>';
+}
+function doView() { // do mode: only the current action, nothing else to distract
+  const d = TODAY(), ts = tasksOn(d), open = ts.filter(t => !t.done), done = ts.length - open.length, cur = currentAction(), L0 = D().dayLog[d] || {};
+  const rem = open.reduce((a, t) => a + (t.mins || 0), 0), est = rem ? estimateEnd(rem) : '', pct = ts.length ? Math.round(done / ts.length * 100) : 0;
+  const queue = open.filter(t => !cur || t.id !== cur.id).slice(0, 2);
+  const dayBtn = !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : (L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 סיום יום</button>' : '');
+  return '<div class="top"><div class="brand">' + logoMark(36) + '<div><h1>היום</h1><div class="sub">' + longDate(d) + '</div></div></div><div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">' + (Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤') + '</button></div></div>'
+    + modeSwitch()
+    + '<div class="card"><div class="row"><b class="grow">' + done + '/' + ts.length + ' הושלמו' + (rem ? ' · נותרו ' + rem + ' ד׳' : '') + '</b>' + dayBtn + '</div><div class="bar"><div style="width:' + pct + '%"></div></div>' + (est ? '<div class="sub" style="margin-top:6px">סיום משוער ' + est + ' (כולל הפסקות)</div>' : '') + '</div>'
+    + (cur ? nowCard(cur) : '<div class="card"><div class="t">🎉 אין עוד פעולות פתוחות להיום</div><div class="sub" style="margin-top:6px">במצב תכנון אפשר להוסיף פעולות מהמאגר, או לסיים את היום.</div><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px">📋 למצב תכנון</button></div>')
+    + (queue.length ? '<h2>בתור</h2>' + queue.map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + quadChip(t) + '</div></div>').join('') : '')
+    + energyBar(d)
+    + '<button class="fab" data-act="addTask" aria-label="פעולה חדשה">+</button>';
+}
+function chooseOther() { // pick another action to do now (the user decides, the order is only a hint)
+  $('#toast').hidden = true; const cur = currentAction(), list = tasksOn(TODAY()).filter(t => !t.done && (!cur || t.id !== cur.id)).slice(0, 6);
+  sheet('<h1>בחר משימה אחרת</h1>' + (list.length ? '<div class="grid2" style="grid-template-columns:1fr">' + list.map(t => '<button class="btn ghost" data-act="pickNow" data-id="' + t.id + '">◀ ' + esc(t.title) + (t.mins ? ' · ' + t.mins + ' ד׳' : '') + '</button>').join('') + '</div>' : '<p class="sub">אין עוד פעולות פתוחות להיום. אפשר להוסיף מהמאגר במצב תכנון.</p>') + '<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>');
+}
+function returnToast() { // after a break: remind what I was doing, back to it with one tap
+  const t = Work.last ? findTask(Work.last) : null;
+  if (t && !t.done) toast('<span>חזרת מהפסקה. עבדת על: <b>' + esc(t.title) + '</b>' + (t.first ? ' · הצעד: ' + esc(t.first) : '') + '</span><button class="btn" data-act="runStart" data-id="' + t.id + '">◀ חזור לעבוד עליה</button><button class="btn ghost" data-act="chooseOther">בחר משימה אחרת</button><button data-act="toastClose" aria-label="סגור">✕</button>', 25000);
+  else showNext('');
+}
+/* Break ideas: your own list (walk, sport, tidy up...), with a few defaults */
+const DEFAULT_IDEAS = ['לצאת להליכה קצרה', 'לעשות ספורט קצר', 'לסדר קצת את הבית', 'לשתות מים ולהתמתח'];
+const ideaList = () => D().breakIdeas.length ? D().breakIdeas.map(x => x.title) : DEFAULT_IDEAS;
+const pickIdea = prev => { const l = ideaList().filter(x => x !== prev); return l[Math.floor(Math.random() * l.length)] || ''; };
 /* ---------- Personal reminders: two sentences shown on the daily screen and while working ---------- */
 const REMINDERS = ['להרגיש את הכאב של הצמיחה, לצאת מאזור הנוחות.', 'האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.'];
 const remIndex = () => { const n = Math.floor(parse(TODAY()).getTime() / 864e5) + (state.remShift || 0); return ((n % REMINDERS.length) + REMINDERS.length) % REMINDERS.length; };
@@ -832,6 +871,7 @@ const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" da
 
 const views = {
   today() {
+    if (state.mode === 'do' && state.date === TODAY()) return doView();
     const d = state.date, ts = tasksOn(d), hs = habitsOn(d);
     const isToday = d === TODAY(); // the daily "ארגון" ritual counts as one item on today's list
     const total = ts.length + hs.length + (isToday ? 1 : 0), done = ts.filter(t => t.done).length + hs.filter(h => habitDone(h, d)).length + (isToday && orgDone(d) ? 1 : 0);
@@ -844,6 +884,7 @@ const views = {
       <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
       <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 סיום יום</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
        ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
+      ${isToday ? modeSwitch() : ''}
       ${isToday ? syncHint() : ''}
       ${visTop ? visualCard(d) : ''}
       ${rhythmStrip(d, 'near')}
@@ -907,7 +948,7 @@ const views = {
       <div class="sub" style="margin-top:6px">גרור משימה (במגע: לחיצה ארוכה) כדי להעביר אותה ליום אחר.</div>`;
   },
   tasks() {
-    const f = state.taskFilter;
+    const f = state.taskFilter, view = state.taskView || 'board', T = TODAY();
     let list = D().tasks.slice();
     if (f === 'open') list = list.filter(t => !t.done);
     if (f === 'done') list = list.filter(t => t.done);
@@ -915,15 +956,32 @@ const views = {
     if (f === 'brainless') list = list.filter(t => t.brainless && !t.done);
     if (state.fQuad) list = list.filter(t => state.fQuad === 'none' ? !effQuad(t) : effQuad(t) === state.fQuad); // by the matrix
     if (state.fWant) list = list.filter(t => (t.want || 0) >= state.fWant); // by how much I feel like doing it
-    list.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || b.priority - a.priority);
+    const byDate = (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || b.priority - a.priority;
     const F = [['open', 'פתוחות'], ['brainless', '⚡ Brainless'], ['nodate', 'ללא תאריך'], ['done', 'הושלמו'], ['all', 'הכל']];
-    return `<div class="top"><h1>כל הפעולות</h1><div class="sw"><button class="iconbtn" data-act="addBulk">📋 הזנה מרוכזת</button><button class="iconbtn" data-act="printSel">🖨 נבחרות</button></div></div>
+    const head = `<div class="top"><h1>כל הפעולות</h1><div class="sw"><button class="iconbtn" data-act="addBulk">📋 הזנה מרוכזת</button><button class="iconbtn" data-act="printSel">🖨 נבחרות</button></div></div>
+      <div class="opt" style="margin:0 0 6px"><button class="${view === 'board' ? 'on' : ''}" data-act="taskView" data-v="board">▦ לוח</button><button class="${view === 'list' ? 'on' : ''}" data-act="taskView" data-v="list">☰ רשימה</button></div>
       <div class="seg">${F.map(([k, l]) => `<button class="${f === k ? 'on' : ''}" data-act="filter" data-f="${k}">${l}</button>`).join('')}</div>
       <div class="opt fq"><span class="sub">🧭</span>${[['', 'הכל']].concat(QUADS.map(q => [q[0], q[1]]), [['none', 'ללא סיווג']]).map(([k, l]) => `<button class="${(state.fQuad || '') === k ? 'on' : ''}" data-act="filterQuad" data-q="${k}">${l}</button>`).join('')}</div>
       <div class="opt fq"><span class="sub">💗</span>${[[0, 'הכל'], [3, '3 ומעלה'], [4, '4 ומעלה'], [5, '5']].map(([n, l]) => `<button class="${(state.fWant || 0) === n ? 'on' : ''}" data-act="filterWant" data-n="${n}">${l}</button>`).join('')}</div>
-      <div class="sub" style="margin:6px 0">${list.length} פעולות${state.fQuad || state.fWant ? ' <button class="lnk" data-act="filterReset">נקה סינון</button>' : ''}</div>
-      ${list.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות שמתאימות לסינון</div>'}
-      <button class="fab" data-act="addTask">+</button>`;
+      <div class="sub" style="margin:6px 0">${list.length} פעולות${state.fQuad || state.fWant ? ' <button class="lnk" data-act="filterReset">נקה סינון</button>' : ''}</div>`;
+    if (view === 'list') {
+      list.sort(byDate);
+      return head + (list.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות שמתאימות לסינון</div>') + '<button class="fab" data-act="addTask">+</button>';
+    }
+    // board: undated pool, overdue, the next seven days, later, and (when asked for) done. Right-to-left, so the first column is on the right.
+    const open = list.filter(t => !t.done), doneL = list.filter(t => t.done), last = addDays(T, 6);
+    const lbl = d => d === T ? 'היום' : d === addDays(T, 1) ? 'מחר' : 'יום ' + DAYN[parse(d).getDay()];
+    const add = d => '<button class="uadd" data-act="addTaskOn" data-date="' + d + '">＋ הוסף פעולה</button>';
+    const dayCol = d => { const ts = open.filter(t => t.date === d).sort((a, b) => taskOrder(d, a, b) || (b.want || 0) - (a.want || 0)); return upCol(d, shortDate(d) + ' · ' + lbl(d), ts.length, add(d) + ts.map(t => upCard(t)).join('')); };
+    const none = open.filter(t => !t.date).sort(byDate), over = open.filter(t => t.date && t.date < T).sort(byDate), later = open.filter(t => t.date && t.date > last).sort(byDate);
+    const cols = [
+      upCol('none', 'ללא תאריך', none.length, add('') + none.map(t => upCard(t)).join('')),
+      upCol('overdue', 'באיחור', over.length, over.map(t => upCard(t, true)).join(''), over.length ? '<button class="lnk" data-act="rescheduleOverdue">העבר להיום</button>' : ''),
+      ...Array.from({ length: 7 }, (_, i) => dayCol(addDays(T, i))),
+      upCol('later', 'מאוחר יותר', later.length, later.map(t => upCard(t, true)).join('')),
+      (f === 'done' || f === 'all') ? upCol('done', '✓ הושלמו', doneL.length, doneL.slice(0, 60).map(t => upCard(t, true)).join('')) : ''
+    ];
+    return head + '<div class="uboard tasksboard" id="uboard">' + cols.join('') + '</div><button class="fab" data-act="addTask">+</button>';
   },
   habits() {
     const d = TODAY(), last7 = Array.from({ length: 7 }, (_, i) => addDays(d, i - 6));
@@ -1048,6 +1106,9 @@ const views = {
       <label>משך</label><select name="mins">${[10, 15, 20, 30, 45, 60].map(m => `<option value="${m}" ${m === 30 ? 'selected' : ''}>${m} דקות</option>`).join('')}</select>
       <label>סוג</label><select name="kind"><option value="meal">ארוחה</option><option value="rest">מנוחה יומית</option></select>
       <div class="actions"><button class="btn">הוסף</button></div></form>
+     <h2>רעיונות להפסקה</h2><p class="sub">מה כיף לעשות בהפסקה. אחד מהם מוצע בכל הפסקה.</p>
+     ${D().breakIdeas.map(x => '<div class="card row"><span style="font-size:20px">💡</span><div class="t grow">' + esc(x.title) + '</div><button class="iconbtn" data-act="ideaDel" data-id="' + x.id + '" aria-label="מחק">✕</button></div>').join('') || '<div class="sub">עדיין אין רעיונות משלך. עד אז מוצעים: ' + DEFAULT_IDEAS.join(', ') + '.</div>'}
+     <form id="ideaForm" class="row" style="margin-top:8px"><input name="title" placeholder="רעיון חדש להפסקה" required autocomplete="off"><button class="btn">הוסף</button></form>
      <h2>הפסקה בכל שעה</h2><p class="sub">אחרי כ-50 דקות עבודה (לפי הטיימר ופעולות שסימנת כבוצעו) תופיע הצעה ל-10 דקות הפסקה, בלי חסימה. ההצעה מופיעה כשהאפליקציה פתוחה.</p>
      <h2>שעות ההתחלה והסיום שלי</h2>${dayHistoryHTML()}`;
   },
@@ -1108,14 +1169,14 @@ function render() {
     if (el === document.activeElement) { focusKey = k; try { caret = el.selectionStart; } catch (e) {} }
   });
   const board = $('#uboard'), boardScroll = board ? board.scrollLeft : null; // keep the board's horizontal position across re-renders
-  document.body.classList.toggle('wide', state.tab === 'upcoming');
+  document.body.classList.toggle('wide', state.tab === 'upcoming' || (state.tab === 'tasks' && (state.taskView || 'board') === 'board'));
   $('#view').innerHTML = views[state.tab]();
   if (MORE_TABS.includes(state.tab) && !(state.tab === 'lists' && state.openList) && !(state.tab === 'projects' && (state.openProject || state.openJob))) // back to the "עוד" menu
     $('#view').insertAdjacentHTML('afterbegin', `<button class="iconbtn backmore" data-act="goTab" data-t="more" aria-label="חזרה לעוד">${chev('r')}<span style="margin-inline-start:6px">עוד</span></button>`);
   if (DEMO) $('#view').insertAdjacentHTML('afterbegin', '<div class="demobar">מצב דמו · נתונים בדויים <button class="lnk" data-act="demoReset">אפס דמו</button></div>');
   if (boardScroll !== null && $('#uboard')) $('#uboard').scrollLeft = boardScroll;
   // Entrance animation (FitMe-style soft rise, staggered) only when the screen changes, not on every re-render.
-  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.openList || '') + (state.openProject || '') + (state.openJob || '');
+  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.tab === 'tasks' ? (state.taskView || 'board') : '') + (state.openList || '') + (state.openProject || '') + (state.openJob || '');
   const enter = state.viewKey !== key; state.viewKey = key;
   if (!enter) { // same screen: put back what was typed, and the cursor
     document.querySelectorAll('#view input, #view select, #view textarea').forEach(el => {
@@ -1140,6 +1201,8 @@ function render() {
     weekData(state.weekStart).outcomes.push({ id: uid(), text: txt, done: false });
     e.target.reset(); Store.save(); render(); $('#outText').focus();
   };
+  const idf = $('#ideaForm');
+  if (idf) idf.onsubmit = e => { e.preventDefault(); const t = new FormData(idf).get('title').trim(); if (!t) return; D().breakIdeas.push({ id: uid(), title: t }); idf.reset(); Store.save(); render(); };
   const rf = $('#rhForm');
   if (rf) rf.onsubmit = e => { e.preventDefault(); const f = new FormData(rf); D().rhythm.push({ id: uid(), label: f.get('label').trim(), time: f.get('time'), mins: +f.get('mins'), kind: f.get('kind') }); rf.reset(); Store.save(); render(); };
   const rw = $('#rwForm');
@@ -1724,6 +1787,11 @@ const A = {
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
   noiseOff: () => toggleNoise(),
+  setMode: e => { state.mode = e.m; try { localStorage.setItem('doit-mode', e.m); } catch (x) {} render(); window.scrollTo(0, 0); },
+  chooseOther: () => chooseOther(),
+  pickNow: e => { state.doId = e.id; closeSheet(); $('#toast').hidden = true; runOpen(e.id); },
+  nextIdea: () => { Run.idea = pickIdea(Run.idea); runRender(); },
+  ideaDel: e => { D().breakIdeas = D().breakIdeas.filter(x => x.id !== e.id); Store.save(); render(); },
   undoMove: e => { const u = RDrag.undo; if (u && u.id === e.id) { const t = findTask(e.id); if (t) { t.date = u.date; Store.save(); } } $('#toast').hidden = true; render(); },
   setQuad: e => {
     if (!e.id) { const f = $('#f'), same = f.quad.value === e.q; f.quad.value = same ? '' : e.q; $('#quadBox').innerHTML = quadChips('', f.quad.value, ''); return; } // inside a form: just remember the choice
@@ -1895,6 +1963,7 @@ const A = {
   shift: e => { state.date = addDays(state.date, +e.n); render(); },
   goToday: () => { state.date = TODAY(); render(); },
   filter: e => { state.taskFilter = e.f; render(); },
+  taskView: e => { state.taskView = e.v; render(); window.scrollTo(0, 0); },
   filterQuad: e => { state.fQuad = state.fQuad === e.q ? '' : e.q; render(); },
   filterWant: e => { state.fWant = state.fWant === +e.n ? 0 : +e.n; render(); },
   filterReset: () => { state.fQuad = ''; state.fWant = 0; render(); },
@@ -2077,7 +2146,7 @@ function dragEnd(drop) {
   Drag.suppressClick = true; setTimeout(() => { Drag.suppressClick = false; }, 60);
   if (!drop || !col) return;
   const target = col.dataset.drop, t = findTask(id);
-  if (!t || target === 'overdue') return;
+  if (!t || ['overdue', 'later', 'done'].includes(target)) return; // columns you cannot drop into
   const nd = target === 'none' ? null : target;
   if (t.date !== nd) { deferTo(t, nd); Store.save(); render(); nudgeAny([t.id]); }
 }
@@ -2159,7 +2228,7 @@ Cloud.init();
     if (seen) sp.remove(); else { sp.addEventListener('animationend', e => { if (e.animationName === 'splash') sp.remove(); }); setTimeout(() => sp.remove(), 2200); }
   }
 }
-ensureDayStart(); setTimeout(() => { askMorning(); askEnergyToast(); }, 2400); // after the splash and the first cloud sync
+ensureDayStart(); setTimeout(() => { askMorning(); }, 2400); // after the splash and the first cloud sync
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   const hadController = !!navigator.serviceWorker.controller; // an update replaces an older worker: reload once so the new version is the one on screen
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !window.__swReloaded) { window.__swReloaded = true; location.reload(); } });
