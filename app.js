@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-25.2'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-25.5'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -541,15 +541,22 @@ document.addEventListener('toggle', e => { if (e.target && e.target.id === 'toda
 
 /* Day start and end: stamped automatically on the first open, end by button; both editable */
 function ensureDayStart() { /* the day start is marked by the user (button), never stamped automatically */ }
-const dayDurMin = L => L && L.start && L.end ? Math.max(0, toMin(L.end) - toMin(L.start)) : (L && L.start ? Math.max(0, toMin(nowHM()) - toMin(L.start)) : 0);
+// A day that ends after midnight counts from its start time on the previous date (end earlier than start = crossed midnight)
+const dayDurMin = L => { if (!L || !L.start) return 0; const e = L.end || nowHM(); let d = toMin(e) - toMin(L.start); if (d < 0) d += 1440; return d; };
+function dayKey() { // which log the "good night" button belongs to: today, or yesterday's day if it is still open past midnight
+  const T = TODAY(), y = addDays(T, -1), Y = D().dayLog[y], now = toMin(nowHM());
+  if ((D().dayLog[T] || {}).start || !Y || !Y.start) return T;
+  if (!Y.end) return (now + 1440 - toMin(Y.start)) <= 18 * 60 && toMin(Y.start) > now ? y : T;
+  return toMin(Y.end) < toMin(Y.start) && now <= toMin(Y.end) + 60 ? y : T;
+}
 function dayCard(d) {
   if (d !== TODAY()) return '';
-  const L = D().dayLog[d] || {};
-  const btn = !L.start ? '<button class="iconbtn" data-act="dayStart">◀ התחל יום</button>' : !L.end ? '<button class="iconbtn" data-act="dayEnd">🌙 סיימתי יום</button>' : '<button class="iconbtn" data-act="dayReopen" aria-label="פתח מחדש">↺</button>';
+  const L = D().dayLog[dayKey()] || {};
+  const btn = !L.start ? '<button class="iconbtn" data-act="dayStart">◀ התחל יום</button>' : !L.end ? '<button class="iconbtn" data-act="dayEnd">🌙 לילה טוב</button>' : '<button class="iconbtn" data-act="dayReopen" aria-label="פתח מחדש">↺</button>';
   return `<div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow" data-act="dayEdit"><div class="t">${L.start ? 'התחלת ב-' + L.start : 'היום עוד לא התחיל'}${L.end ? ' · סיימת ב-' + L.end : ''}</div>${L.start ? `<div class="meta"><span>${L.end ? 'משך היום' : 'עד עכשיו'}: ${fmtDur(dayDurMin(L))}</span></div>` : ''}</div>${btn}</div>`;
 }
 function dayEditSheet() {
-  const T = TODAY(), L = D().dayLog[T] || {};
+  const T = dayKey(), L = D().dayLog[T] || {};
   sheet(`<h1>שעות היום</h1><form id="f"><label>התחלת יום</label><input type="time" name="start" value="${L.start || ''}"><label>סיום יום</label><input type="time" name="end" value="${L.end || ''}">
    <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
   $('#f').onsubmit = e => { e.preventDefault(); const f = new FormData(e.target); D().dayLog[T] = { start: f.get('start') || '', end: f.get('end') || '' }; Store.save(); closeSheet(); render(); };
@@ -779,10 +786,10 @@ function nowCard(t) {
     + '<button class="lnk" data-act="toggleTask" data-id="' + t.id + '" style="margin-top:8px">✓ כבר עשיתי את זה</button></div>';
 }
 function doView() { // do mode: only the current action, nothing else to distract
-  const d = TODAY(), ts = tasksOn(d), open = ts.filter(t => !t.done), done = ts.length - open.length, cur = currentAction(), L0 = D().dayLog[d] || {};
+  const d = TODAY(), ts = tasksOn(d), open = ts.filter(t => !t.done), done = ts.length - open.length, cur = currentAction(), L0 = D().dayLog[dayKey()] || {};
   const rem = open.reduce((a, t) => a + (t.mins || 0), 0), est = rem ? estimateEnd(rem) : '', pct = ts.length ? Math.round(done / ts.length * 100) : 0;
   const queue = open.filter(t => !cur || t.id !== cur.id).slice(0, 2);
-  const dayBtn = !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : (L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 סיום יום</button>' : '');
+  const dayBtn = !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : (L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : '');
   return '<div class="top"><div class="brand">' + logoMark(36) + '<div><h1>היום</h1><div class="sub">' + longDate(d) + '</div></div></div><div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">' + (Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤') + '</button></div></div>'
     + modeSwitch()
     + '<div class="card"><div class="row"><b class="grow">' + done + '/' + ts.length + ' הושלמו' + (rem ? ' · נותרו ' + rem + ' ד׳' : '') + '</b>' + dayBtn + '</div><div class="bar"><div style="width:' + pct + '%"></div></div>' + (est ? '<div class="sub" style="margin-top:6px">סיום משוער ' + est + ' (כולל הפסקות)</div>' : '') + '</div>'
@@ -1166,12 +1173,12 @@ const views = {
     const total = ts.length + hs.length + (isToday ? 1 : 0), done = ts.filter(t => t.done).length + hs.filter(h => habitDone(h, d)).length + (isToday && orgDone(d) ? 1 : 0);
     const pct = total ? Math.round(done / total * 100) : 0;
     const remaining = ts.filter(t => !t.done).reduce((a, t) => a + (t.mins || 0), 0) + hs.filter(h => !habitDone(h, d)).reduce((a, h) => a + (h.mins || 0), 0);
-    const L0 = isToday ? (D().dayLog[d] || {}) : {}, est = isToday && remaining ? estimateEnd(remaining) : '';
+    const L0 = isToday ? (D().dayLog[dayKey()] || {}) : {}, est = isToday && remaining ? estimateEnd(remaining) : '';
     const visTop = isToday && !D().visual[d] && new Date().getHours() < 11, rs = isToday ? rewardState(d) : {}, rewardTop = isToday && rs.rule && rs.achieved && !rs.claimed;
     const hAct = hs.filter(h => !habitDone(h, d)).length;
     return `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
       <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
-      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 סיום יום</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
+      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
        ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
       ${isToday ? modeSwitch() : ''}
       ${isToday ? syncHint() : ''}
@@ -1198,7 +1205,6 @@ const views = {
     const label = d => d === T ? 'היום' : d === addDays(T, 1) ? 'מחר' : 'יום ' + DAYN[parse(d).getDay()];
     const dayCol = d => { const ts = tasksOn(d).filter(filterOk); return upCol(d, `${shortDate(d)} · ${label(d)}`, ts.length, `<button class="uadd" data-act="addTaskOn" data-date="${d}">＋ הוסף פעולה</button>${ts.map(t => upCard(t)).join('')}`); };
     const poolCol = () => { const ps = D().tasks.filter(t => !t.date && !t.done && filterOk(t)); return upCol('none', 'ללא תאריך', ps.length, '<button class="uadd" data-act="addTaskOn" data-date="">＋ הוסף פעולה</button>' + ps.map(t => upCard(t)).join('')); };
-    const overCol = () => { const os = D().tasks.filter(t => t.date && t.date < T && !t.done && filterOk(t)).sort((a, b) => a.date.localeCompare(b.date)); return upCol('overdue', 'באיחור', os.length, os.map(t => upCard(t, true)).join(''), os.length ? '<button class="lnk" data-act="rescheduleOverdue">העבר להיום</button>' : ''); };
     const curYM = mode === 'month' ? state.upMonth : state.upStart.slice(0, 7);
     const ymList = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 2 + i); return fmt(d).slice(0, 7); });
     if (!ymList.includes(curYM)) { ymList.push(curYM); ymList.sort(); }
@@ -1208,11 +1214,11 @@ const views = {
     if (mode === 'week') {
       const ws = state.upWeek;
       nav = navRow(`${shortDate(ws)} – ${shortDate(addDays(ws, 6))}`);
-      body = `<div class="uboard week" id="uboard">${poolCol()}${overCol()}${Array.from({ length: 7 }, (_, i) => dayCol(addDays(ws, i))).join('')}</div>`;
+      body = `<div class="uboard week" id="uboard">${poolCol()}${Array.from({ length: 7 }, (_, i) => dayCol(addDays(ws, i))).join('')}</div>`;
     } else if (mode === 'three') {
       const s3 = state.up3;
       nav = navRow(`${shortDate(s3)} – ${shortDate(addDays(s3, 2))}`);
-      body = `<div class="uboard three" id="uboard">${poolCol()}${overCol()}${Array.from({ length: 3 }, (_, i) => dayCol(addDays(s3, i))).join('')}</div>`;
+      body = `<div class="uboard three" id="uboard">${poolCol()}${Array.from({ length: 3 }, (_, i) => dayCol(addDays(s3, i))).join('')}</div>`;
     } else if (mode === 'month') {
       const [y, m] = state.upMonth.split('-').map(Number), first = new Date(y, m - 1, 1), st = new Date(y, m - 1, 1 - first.getDay());
       let cells = DAYS.map(x => `<div class="mh">${x}</div>`).join('');
@@ -1228,7 +1234,7 @@ const views = {
     } else {
       const start = state.upStart, days = Array.from({ length: state.upDays }, (_, i) => addDays(start, i));
       body = `<div class="uboard" id="uboard">
-        ${poolCol()}${overCol()}
+        ${poolCol()}
         ${days.map(dayCol).join('')}
         <section class="ucol umore"><button class="uadd" data-act="upMore">＋ עוד שבועיים</button></section>
       </div>`;
@@ -1236,7 +1242,7 @@ const views = {
     return `<div class="top"><h1>בקרוב</h1><div class="sw">${mode === 'week' || mode === 'three' ? '' : monthSel}<button class="iconbtn" data-act="printWeek">🖨 שבוע</button></div></div>
       <div class="seg">${[['three', '3 ימים'], ['week', 'שבוע'], ['month', 'חודש'], ['days', 'כל הימים']].map(([k, l]) => `<button class="${mode === k ? 'on' : ''}" data-act="upMode" data-m="${k}">${l}</button>`).join('')}</div>
       ${filterBar()}
-      ${mode === 'month' ? '' : '<div class="opt" style="margin:6px 0"><button data-act="upJump" data-c="none">📥 ללא תאריך (' + D().tasks.filter(t => !t.date && !t.done && filterOk(t)).length + ')</button><button data-act="upJump" data-c="overdue">⏰ באיחור (' + D().tasks.filter(t => t.date && t.date < T && !t.done && filterOk(t)).length + ')</button></div>'}
+      ${mode === 'month' ? '' : '<div class="opt" style="margin:6px 0"><button data-act="upJump" data-c="none">📥 ללא תאריך (' + D().tasks.filter(t => !t.date && !t.done && filterOk(t)).length + ')</button></div>'}
       ${nav}${body}
       <div class="sub" style="margin-top:6px">גרור פעולה (במגע: לחיצה ארוכה) כדי להעביר אותה ליום אחר, או למאגר "ללא תאריך".</div>`;
   },
@@ -2194,10 +2200,10 @@ const A = {
   rhythmDel: e => { D().rhythm = D().rhythm.filter(r => r.id !== e.id); Store.save(); render(); },
   dayStart: () => { D().dayLog[TODAY()] = { start: nowHM(), end: '' }; Store.save(); render(); },
   dayEnd: () => {
-    const T = TODAY(), L = (D().dayLog[T] = D().dayLog[T] || { start: '', end: '' }); L.end = nowHM(); Store.save(); render();
-    const ts = tasksOn(T); const wt = Math.round((D().focus[T] || {}).workTotal || 0); toast(`<span>🌙 סיימת את היום. משך ${fmtDur(dayDurMin(L))}${wt ? `, מתוכו עבודה בפועל ${fmtDur(wt)}` : ''}, ${ts.filter(t => t.done).length}/${ts.length} פעולות בוצעו.</span><button data-act="toastClose" aria-label="סגור">✕</button>`, 8000); celebrate();
+    const T = TODAY(), K = dayKey(), L = (D().dayLog[K] = D().dayLog[K] || { start: '', end: '' }); L.end = nowHM(); Store.save(); render();
+    const ts = tasksOn(K); const wt = Math.round((D().focus[K] || {}).workTotal || 0) + (K !== T ? Math.round((D().focus[T] || {}).workTotal || 0) : 0); toast(`<span>🌙 לילה טוב. שעת הסיום נרשמה ב-${L.end}. משך ${fmtDur(dayDurMin(L))}${wt ? `, מתוכו עבודה בפועל ${fmtDur(wt)}` : ''}, ${ts.filter(t => t.done).length}/${ts.length} פעולות בוצעו.</span><button data-act="toastClose" aria-label="סגור">✕</button>`, 8000); celebrate();
   },
-  dayReopen: () => { const L = D().dayLog[TODAY()]; if (L) { L.end = ''; Store.save(); render(); } },
+  dayReopen: () => { const L = D().dayLog[dayKey()]; if (L) { L.end = ''; Store.save(); render(); } },
   dayEdit: () => dayEditSheet(),
   reviewLater: () => { D().review[addDays(TODAY(), -1)] = { met: '', improve: '', skipped: true, at: new Date().toISOString() }; Store.save(); closeSheet(); setTimeout(askFocus, 250); },
   rewriteEdit: e => { const t = findTask(e.id); t.nudged = t.defers; Store.save(); taskForm(t.id); },
