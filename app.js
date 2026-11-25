@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-25.5'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-25.7'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -553,7 +553,7 @@ function dayCard(d) {
   if (d !== TODAY()) return '';
   const L = D().dayLog[dayKey()] || {};
   const btn = !L.start ? '<button class="iconbtn" data-act="dayStart">◀ התחל יום</button>' : !L.end ? '<button class="iconbtn" data-act="dayEnd">🌙 לילה טוב</button>' : '<button class="iconbtn" data-act="dayReopen" aria-label="פתח מחדש">↺</button>';
-  return `<div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow" data-act="dayEdit"><div class="t">${L.start ? 'התחלת ב-' + L.start : 'היום עוד לא התחיל'}${L.end ? ' · סיימת ב-' + L.end : ''}</div>${L.start ? `<div class="meta"><span>${L.end ? 'משך היום' : 'עד עכשיו'}: ${fmtDur(dayDurMin(L))}</span></div>` : ''}</div>${btn}</div>`;
+  return `<div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow" data-act="dayEdit"><div class="t">${L.start ? 'התחלת ב-' + L.start : 'היום עוד לא התחיל'}${L.end ? ' · סיימת ב-' + L.end : ''}</div>${L.start ? `<div class="meta"><span>${L.end ? 'משך היום' : 'עד עכשיו'}: ${fmtDur(dayDurMin(L))}</span></div>` : ''}</div><button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>${btn}</div>`;
 }
 function dayEditSheet() {
   const T = dayKey(), L = D().dayLog[T] || {};
@@ -792,7 +792,7 @@ function doView() { // do mode: only the current action, nothing else to distrac
   const dayBtn = !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : (L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : '');
   return '<div class="top"><div class="brand">' + logoMark(36) + '<div><h1>היום</h1><div class="sub">' + longDate(d) + '</div></div></div><div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">' + (Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤') + '</button></div></div>'
     + modeSwitch()
-    + '<div class="card"><div class="row"><b class="grow">' + done + '/' + ts.length + ' הושלמו' + (rem ? ' · נותרו ' + rem + ' ד׳' : '') + '</b>' + dayBtn + '</div><div class="bar"><div style="width:' + pct + '%"></div></div>' + (est ? '<div class="sub" style="margin-top:6px">סיום משוער ' + est + ' (כולל הפסקות)</div>' : '') + '</div>'
+    + '<div class="card"><div class="row"><b class="grow">' + done + '/' + ts.length + ' הושלמו' + (rem ? ' · נותרו ' + rem + ' ד׳' : '') + '</b><button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' + dayBtn + '</div><div class="bar"><div style="width:' + pct + '%"></div></div>' + (est ? '<div class="sub" style="margin-top:6px">סיום משוער ' + est + ' (כולל הפסקות)</div>' : '') + '</div>'
     + (cur ? nowCard(cur) : ts.length === 0 ? '<div class="card"><div class="t">עוד אין פעולות להיום</div><div class="sub" style="margin-top:6px">הוסף את הפעולה הראשונה, או בחר מהמאגר במצב תכנון.</div><button class="btn startnow" data-act="addTask" style="margin-top:8px">＋ פעולה חדשה</button><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px;width:100%">📋 למצב תכנון</button></div>' : '<div class="card"><div class="t">🎉 אין עוד פעולות פתוחות להיום</div><div class="sub" style="margin-top:6px">במצב תכנון אפשר להוסיף פעולות מהמאגר, או לסיים את היום.</div><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px">📋 למצב תכנון</button></div>')
     + (queue.length ? '<h2>בתור</h2>' + queue.map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + quadChip(t) + '</div></div>').join('') : '')
     + energyBar(d)
@@ -1178,7 +1178,7 @@ const views = {
     const hAct = hs.filter(h => !habitDone(h, d)).length;
     return `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
       <div class="sw"><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
-      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
+      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday ? '<button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' : ''}${isToday && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
        ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
       ${isToday ? modeSwitch() : ''}
       ${isToday ? syncHint() : ''}
@@ -1405,12 +1405,14 @@ const views = {
   matrix() {
     const open = D().tasks.filter(t => !t.done), by = k => open.filter(t => effQuad(t) === k).sort((a, b) => (b.want || 0) - (a.want || 0) || (a.date || '9999').localeCompare(b.date || '9999')), none = open.filter(t => !effQuad(t));
     const items = k => D().projects.filter(p => p.quad === k).map(p => '<div class="sub">📁 ' + esc(p.title) + '</div>').join('') + D().jobs.filter(j => j.quad === k).map(j => '<div class="sub">🧩 ' + esc(j.title) + '</div>').join('');
-    const fav = open.filter(t => (t.want || 0) >= 4).sort((a, b) => (b.want || 0) - (a.want || 0)).slice(0, 8);
+    const mcard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.quad ? '' : (effQuad(t) ? '<span title="עדיפות שעברה בירושה">↳ בירושה</span>' : '')) + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + ((t.want || 0) >= 4 ? '<span>💗' + t.want + '</span>' : '') + '</div></div>';
+    const cell = q => '<section class="mxcell ' + q[0] + '" data-drop="q:' + q[0] + '"><div class="mxh"><b>' + q[1] + '</b><span class="sub">' + by(q[0]).length + '</span></div>' + items(q[0]) + (by(q[0]).map(mcard).join('') || '<div class="sub mxempty">גרור לכאן</div>') + '</section>';
     return `<div class="top"><h1>מטריצת עדיפויות</h1></div>
-     <p class="sub">כל פרויקט, משימה ופעולה נבחנים לפי שאלות: האם זה דחוף, האם זה חשוב, וכמה בא לי לעשות את זה. פעולה בלי עדיפות משלה יורשת את זו של המשימה או הפרויקט שלה.</p>
-     ${fav.length ? '<h2>💗 מה הכי בא לי (4 עד 5)</h2>' + fav.map(t => taskRow(t, true)).join('') : ''}
-     ${QUADS.map(q => '<div class="card quadcard"><div class="t"><b>' + q[1] + '</b> <span class="sub">(' + by(q[0]).length + ' פעולות)</span></div><div class="sub" style="margin:4px 0">' + esc(q[2]) + '</div><div class="sub" style="opacity:.8">דוגמאות: ' + esc(q[3]) + '</div>' + items(q[0]) + '</div>' + by(q[0]).map(t => taskRow(t, true)).join('')).join('')}
-     ${none.length ? '<h2>עוד לא סווגו (' + none.length + ')</h2>' + none.slice(0, 40).map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div>' + quadChips(t.id, '', '') + '</div>').join('') : '<div class="empty">כל הפעולות הפתוחות סווגו</div>'}`;
+     <p class="sub">גרור כל פעולה לריבוע שמתאים לה (בטלפון: לחיצה ארוכה ואז גרירה). לחיצה קצרה פותחת את התפריט שלה. פעולה שלא מסווגת יורשת את העדיפות של המשימה או הפרויקט שלה.</p>
+     <div class="mxaxis"><span>🔥 דחוף</span><span>⏳ לא דחוף</span></div>
+     <div class="mx2">${QUADS.map(cell).join('')}</div>
+     <section class="mxcell mxnone" data-drop="q:none"><div class="mxh"><b>📥 עוד לא סווגו</b><span class="sub">${none.length}</span></div>${none.slice(0, 60).map(mcard).join('') || '<div class="sub mxempty">🎉 כל הפעולות הפתוחות סווגו. גרור לכאן כדי להסיר סיווג.</div>'}</section>
+     <details class="card" style="margin-top:10px"><summary>מה עושים בכל ריבוע?</summary>${QUADS.map(q => '<div style="margin-top:8px"><b>' + q[1] + '</b><div class="sub">' + esc(q[2]) + '</div><div class="sub" style="opacity:.8">דוגמאות: ' + esc(q[3]) + '</div></div>').join('')}</details>`;
   },
   assistant() { return asstView(); },
   assistmem() { return asstMemView(); },
@@ -2497,6 +2499,7 @@ function dragEnd(drop) {
   if (!drop || !col) return;
   const target = col.dataset.drop, t = findTask(id);
   if (!t || ['overdue', 'later', 'done'].includes(target)) return; // columns you cannot drop into
+  if (target.startsWith('q:')) { const q = target.slice(2) === 'none' ? '' : target.slice(2); if ((t.quad || '') !== q) { t.quad = q; t.priority = q ? quadPri[q] : 0; Store.save(); render(); } return; } // the priority matrix: drop on a square to set urgent / important
   const nd = target === 'none' ? null : target;
   if (t.date !== nd) { deferTo(t, nd); Store.save(); render(); nudgeAny([t.id]); }
 }
