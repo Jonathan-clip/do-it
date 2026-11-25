@@ -313,3 +313,4 @@ body.miniRun #view{padding-bottom:170px}
 .mxempty{opacity:.7;text-align:center;padding:14px 0}
 .ucard.mx{padding:7px 8px;margin-bottom:6px;border-radius:10px}.ucard.mx .t{font-size:13px;line-height:1.3}.ucard.mx .meta{font-size:11px}
 .ptag{font-weight:700;color:var(--info-ink)}
+.grp.drop-into>.card{outline:2px dashed var(--brand);background:var(--soft)}

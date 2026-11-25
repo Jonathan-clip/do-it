@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-25.16'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-25.21'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -384,7 +384,7 @@ function ownerOpts(sel) { // "belongs to": no project, or a project
   return opt('', 'ללא פרויקט') + D().projects.map(p => opt('p:' + p.id, '📁 ' + esc(p.title))).join('') + '<option value="__new__">＋ פרויקט חדש...</option>';
 }
 const projCard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + '</div></div>';
-const allSeg = () => '<div class="seg"><button class="' + (state.allMode === 'list' ? 'on' : '') + '" data-act="allMode" data-m="list">📋 רשימה</button><button class="' + (state.allMode === 'projects' ? 'on' : '') + '" data-act="allMode" data-m="projects">📁 לפי פרויקטים</button><button class="' + (state.allMode === 'matrix' ? 'on' : '') + '" data-act="allMode" data-m="matrix">🧭 לפי עדיפות</button></div>';
+const allSeg = () => '<div class="seg"><button class="' + (state.allMode === 'list' ? 'on' : '') + '" data-act="allMode" data-m="list">📋 רשימה</button><button class="' + (state.allMode === 'projects' ? 'on' : '') + '" data-act="allMode" data-m="projects">📁 לפי פרויקטים</button><button class="' + (state.allMode === 'matrix' ? 'on' : '') + '" data-act="allMode" data-m="matrix">🧭 לפי עדיפות</button><button class="' + (state.allMode === 'done' ? 'on' : '') + '" data-act="allMode" data-m="done">✅ בוצע</button></div>';
 function projectsBoard() { // "כל הפעולות" grouped by project: drag an action into a project square to assign it
   const open = D().tasks.filter(t => !t.done), cap = 8;
   const sec = p => { const ts = open.filter(t => t.projectId === p.id), s = projState(p);
@@ -768,7 +768,7 @@ const modeSwitch = () => '<div class="opt modesw"><button class="' + (state.mode
 const currentAction = () => { const t = state.doId ? findTask(state.doId) : null; return (t && !t.done && t.date === TODAY()) ? t : nextTask(''); };
 function nowCard(t) {
   return '<div class="card nowcard"><div class="sub">עכשיו</div><div class="t big">' + titleP(t) + '</div>' + (t.notes ? '<div class="sub" style="white-space:pre-wrap;margin-top:4px">' + esc(t.notes) + '</div>' : '')
-    + '<div class="meta" style="margin:8px 0">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + (t.energy ? '<span style="color:var(--accent)">' + stars(t.energy) + '</span>' : '') + quadChip(t) + (t.want ? '<span>💗' + t.want + '</span>' : '') + projectChip(t) + '</div>'
+    + '<div class="meta" style="margin:8px 0">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + quadChip(t) + (t.want ? '<span>💗' + t.want + '</span>' : '') + projectChip(t) + '</div>'
     + '<button class="btn startnow" data-act="runStart" data-id="' + t.id + '">◀ התחל עכשיו</button>'
     + '<div class="grid2"><button class="btn ghost" data-act="chooseOther">🔁 בחר פעולה אחרת</button><button class="btn ghost" data-act="runBreak">☕ אני צריך הפסקה</button></div>'
     + '<button class="lnk" data-act="toggleTask" data-id="' + t.id + '" style="margin-top:8px">✓ כבר עשיתי את זה</button></div>';
@@ -1062,7 +1062,7 @@ function asstMemView() {
     + '<button class="btn danger" style="width:100%;margin-top:14px" data-act="memClear">🗑 מחק את כל הזיכרון</button>';
 }
 /* ---------- Personal reminders: two sentences shown on the daily screen and while working ---------- */
-const REMINDERS = ['להרגיש את הכאב של הצמיחה, לצאת מאזור הנוחות.', 'האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.'];
+const REMINDERS = ['להרגיש את הכאב של הצמיחה, לצאת מאזור הנוחות.', 'האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.', 'אני מזהה שיש בי פחד להישאר מאחור, אבל אני לא חייב לפעול מתוך הפחד הזה.'];
 const remIndex = () => { const n = Math.floor(parse(TODAY()).getTime() / 864e5) + (state.remShift || 0); return ((n % REMINDERS.length) + REMINDERS.length) % REMINDERS.length; };
 const reminder = () => REMINDERS[remIndex()];
 /* ---------- Daily focus: the most important task and the "fun" of the day; asked at the start of the day when missing ---------- */
@@ -1123,7 +1123,7 @@ function taskRow(t, showDate) {
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${titleP(t)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins && state.tab !== 'today' ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.notes ? '<span title="יש תיאור">📝</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.mins && state.tab !== 'today' ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -1138,13 +1138,23 @@ function habitRow(h, d) {
 const shiftMonth = (ym, n) => { const [y, m] = ym.split('-').map(Number); return fmt(new Date(y, m - 1 + n, 1)).slice(0, 7); };
 // Collapse/expand chip for a parent task's subtasks (state is saved on the task as `collapsed`).
 const subToggle = t => subProg(t) ? `<button class="chip subtog ${t.collapsed ? 'closed' : ''}" data-act="toggleSubs" data-id="${t.id}" aria-expanded="${!t.collapsed}">☰ ${subProg(t)}</button>` : '';
+// "Done" view: finished actions grouped by the day they were finished (older ones fall back to their planned date), newest first
+function doneBoard() {
+  const T = TODAY(), by = {};
+  D().tasks.filter(t => t.done).forEach(t => { const k = t.doneAt || t.date || ''; (by[k] = by[k] || []).push(t); });
+  const keys = Object.keys(by).sort().reverse(), n = D().tasks.filter(t => t.done).length;
+  const lbl = k => !k ? 'ללא תאריך' : k === T ? 'היום' : k === addDays(T, -1) ? 'אתמול' : longDate(k);
+  return `<div class="top"><h1>כל הפעולות</h1></div>${allSeg()}
+    <div class="sub" style="margin:6px 0">${n} פעולות שבוצעו, מהאחרון לראשון.</div>
+    ${keys.map(k => `<h2>${lbl(k)} (${by[k].length})</h2>${by[k].map(t => taskRow(t, false)).join('')}`).join('') || '<div class="empty">עוד לא בוצעו פעולות</div>'}`;
+}
 function upCard(t, showDate) {
   const v = t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : '';
   const subs = (t.subs && t.subs.length && !t.collapsed) ? `<div class="usubs">${t.subs.map(s => `<div class="urow ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div></div>`).join('')}</div>` : '';
   return `<div class="ucard p${t.priority} ${t.done ? 'done' : ''}" data-task="${t.id}"><div class="urow">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${titleP(t)}</div>
-    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
+    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
@@ -1191,7 +1201,7 @@ const views = {
     // Todoist-style board in three modes: days (rolling), week, month. Everything is laid out right-to-left.
     const T = TODAY(), mode = state.upMode;
     const label = d => d === T ? 'היום' : d === addDays(T, 1) ? 'מחר' : 'יום ' + DAYN[parse(d).getDay()];
-    const dayCol = d => { const ts = tasksOn(d).filter(filterOk); return upCol(d, `${shortDate(d)} · ${label(d)}`, ts.length, `<button class="uadd" data-act="addTaskOn" data-date="${d}">＋ הוסף פעולה</button>${ts.map(t => upCard(t)).join('')}`); };
+    const dayCol = d => { const ts = tasksOn(d).filter(t => !t.done).filter(filterOk); return upCol(d, `${shortDate(d)} · ${label(d)}`, ts.length, `<button class="uadd" data-act="addTaskOn" data-date="${d}">＋ הוסף פעולה</button>${ts.map(t => upCard(t)).join('')}`); };
     const poolCol = () => { const ps = D().tasks.filter(t => !t.date && !t.done && filterOk(t)); return upCol('none', 'ללא תאריך', ps.length, '<button class="uadd" data-act="addTaskOn" data-date="">＋ הוסף פעולה</button>' + ps.map(t => upCard(t)).join('')); };
     const curYM = mode === 'month' ? state.upMonth : state.upStart.slice(0, 7);
     const ymList = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 2 + i); return fmt(d).slice(0, 7); });
@@ -1212,10 +1222,10 @@ const views = {
       let cells = DAYS.map(x => `<div class="mh">${x}</div>`).join('');
       for (let i = 0; i < 42; i++) {
         const c = new Date(st); c.setDate(st.getDate() + i);
-        const s = fmt(c), ts = tasksOn(s).filter(filterOk);
+        const s = fmt(c), ts = tasksOn(s).filter(t => !t.done).filter(filterOk);
         cells += `<div class="mcell ${c.getMonth() !== m - 1 ? 'out' : ''} ${s === T ? 'today' : ''} ${s === state.upSel ? 'sel' : ''}" data-drop="${s}" data-act="upPick" data-date="${s}"><span class="mnum">${c.getDate()}</span>${ts.slice(0, 3).map(t => `<div class="ucard mini ${t.done ? 'done' : ''}" data-task="${t.id}" data-act="taskMenu" data-id="${t.id}"><span class="t">${esc(t.title)}</span></div>`).join('')}${ts.length > 3 ? `<span class="mmore">+${ts.length - 3}</span>` : ''}</div>`;
       }
-      const sel = state.upSel, sts = tasksOn(sel);
+      const sel = state.upSel, sts = tasksOn(sel).filter(t => !t.done);
       nav = navRow(`${MONTHS[m - 1]} ${y}`);
       body = `<div class="mgrid">${cells}</div><h2>${longDate(sel)}</h2>
         <section class="ucol msel" data-drop="${sel}"><button class="uadd" data-act="addTaskOn" data-date="${sel}">＋ הוסף פעולה</button>${sts.map(t => upCard(t)).join('') || '<div class="empty">אין פעולות ליום הזה</div>'}</section>`;
@@ -1237,6 +1247,7 @@ const views = {
   tasks() {
     if (state.allMode === 'projects') return projectsBoard();
     if (state.allMode === 'matrix') return views.matrixBody();
+    if (state.allMode === 'done') return doneBoard();
     const f = state.taskFilter;
     let list = D().tasks.filter(filterOk);
     if (f === 'open') list = list.filter(t => !t.done);
@@ -1244,7 +1255,7 @@ const views = {
     if (f === 'nodate') list = list.filter(t => !t.date && !t.done);
     if (f === 'brainless') list = list.filter(t => t.brainless && !t.done);
     list.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || b.priority - a.priority);
-    const F = [['open', 'פתוחות'], ['brainless', '⚡ Brainless'], ['nodate', 'ללא תאריך'], ['done', 'הושלמו'], ['all', 'הכל']];
+    const F = [['open', 'פתוחות'], ['brainless', '⚡ Brainless'], ['nodate', 'ללא תאריך'], ['all', 'הכל']];
     return `<div class="top"><h1>כל הפעולות</h1><div class="sw"><button class="iconbtn" data-act="addBulk">📋 הזנה מרוכזת</button><button class="iconbtn" data-act="printSel">🖨 נבחרות</button></div></div>
       ${allSeg()}<div class="seg">${F.map(([k, l]) => `<button class="${f === k ? 'on' : ''}" data-act="filter" data-f="${k}">${l}</button>`).join('')}</div>
       ${filterBar()}
@@ -1693,7 +1704,7 @@ function orgStep1() {
   sheet(`<h1>🗂 ארגון · שלב 1 מתוך 2</h1><p class="sub">יום חדש, מתחילים מחדש. לכל פעולה שנשארה: להשאיר להיום, לדחות לתאריך אחר, או להעביר למאגר. שום דבר לא עובר אוטומטית. ${rows.length ? `נותרו ${left} לתארוך.` : ''}</p>
    ${rows.length ? `<div class="actions" style="margin:0 0 10px"><button class="btn ghost" data-act="orgSuggest">✨ הצע לי חלוקה לפי העומס</button></div>` : ''}
    ${rows.map(t => `<div class="bulkrow ${(!t.date && !t.parked) || (t.date && t.date < T) ? 'miss' : ''}"><div class="t"><b>${esc(t.title)}</b></div>
-     <div class="meta">${Org.orig[t.id] ? `<span style="color:var(--danger)">היה ב-${shortDate(Org.orig[t.id])}</span>` : t.parked ? '<span>📦 במאגר</span>' : t.inbox ? '<span>📥 נקלט</span>' : '<span>ללא תאריך</span>'}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}</div>
+     <div class="meta">${Org.orig[t.id] ? `<span style="color:var(--danger)">היה ב-${shortDate(Org.orig[t.id])}</span>` : t.parked ? '<span>📦 במאגר</span>' : t.inbox ? '<span>📥 נקלט</span>' : '<span>ללא תאריך</span>'}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}</div>
      <div class="opt" style="margin-top:8px">${opts.map(([l, v]) => `<button class="${t.date === v ? 'on' : ''}" data-act="orgSet" data-id="${t.id}" data-d="${v}">${l}</button>`).join('')}<button class="${t.parked ? 'on' : ''}" data-act="orgPark" data-id="${t.id}">📦 למאגר</button><input type="date" style="width:auto" data-orgdate="${t.id}" value="${t.date && !opts.some(o => o[1] === t.date) ? t.date : ''}"></div></div>`).join('') || '<div class="empty">🎉 אין פעולות ללא תאריך או באיחור</div>'}
    <div class="actions"><button class="btn ghost" data-act="close">סגור</button><button class="btn" data-act="orgNext">המשך ללו"ז של מחר</button></div>`);
   $('#sheet .panel').scrollTop = st;
@@ -1777,7 +1788,7 @@ function menuSheet(id) {
   const t = findTask(id); if (!t) return closeSheet();
   const v = t.visionId ? visionName(t.visionId) : '';
   sheet(`<h1>${esc(t.title)}</h1>
-   <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+   <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
    ${t.notes ? `<p class="sub" style="white-space:pre-wrap">${esc(t.notes)}</p>` : ''}
    ${t.done ? '' : '<div class="sub" style="margin:8px 0 4px">🧭 עדיפות</div>' + quadChips(t.id, t.quad || '', '') + '<div class="sub" style="margin:8px 0 2px">💗 כמה בא לי?</div>' + wantStars(t.id, t.want || 0, '')}
    <div class="grid2">
@@ -1918,7 +1929,7 @@ function printDayCore(all) {
   const orgRow = d === TODAY() && (all || !orgDone(d)) ? pRow('🗂 ארגון: לתארך פעולות ולוודא את הלו"ז של מחר') : '';
   const L = d === TODAY() ? (D().dayLog[dayKey()] || {}) : (D().dayLog[d] || {});
   const hours = L.start ? `<div class="pl sm">🕗 התחלת ב-${L.start}${L.end ? ` · סיימת ב-${L.end} · משך ${fmtDur(dayDurMin(L))}` : ''}</div>` : '';
-  printHTML(`<h1>${longDate(d)}</h1>${hours}<h2>פעולות</h2>${orgRow}${ts.map(t => '<div>' + pRow((t.done ? '✓ ' : '') + (t.priority == 2 ? '‼ ' : t.priority == 1 ? '! ' : '') + pTitle(t) + (t.energy ? ' ' + stars(t.energy) : '')) + (t.subs || []).filter(s => all || !s.done).map(s => `<div style="margin-inline-start:26px">${pRow(s.title, true)}</div>`).join('') + '</div>').join('') || '<div class="pl">—</div>'}
+  printHTML(`<h1>${longDate(d)}</h1>${hours}<h2>פעולות</h2>${orgRow}${ts.map(t => '<div>' + pRow((t.done ? '✓ ' : '') + (t.priority == 2 ? '‼ ' : t.priority == 1 ? '! ' : '') + pTitle(t)) + (t.subs || []).filter(s => all || !s.done).map(s => `<div style="margin-inline-start:26px">${pRow(s.title, true)}</div>`).join('') + '</div>').join('') || '<div class="pl">—</div>'}
    <h2>הרגלים</h2>${habitsOn(d).map(h => pRow(h.title)).join('') || '<div class="pl">—</div>'}
    <h2>הערות</h2><div class="lines">${'<div></div>'.repeat(8)}</div>`);
 }
@@ -1937,7 +1948,7 @@ function printSel() {
 /* ---------- Events ---------- */
 const A = {
   toggleTask: e => {
-    const t = D().tasks.find(x => x.id === e.id); t.done = !t.done;
+    const t = D().tasks.find(x => x.id === e.id); t.done = !t.done; t.doneAt = t.done ? TODAY() : '';
     if (t.repeat) {
       if (t.done && !t.spawned) { const n = { ...t, id: uid(), done: false, date: nextRepeatDate(t), spawned: '', subs: (t.subs || []).map(x => ({ ...x, id: uid(), done: false })) }; D().tasks.push(n); t.spawned = n.id; }
       else if (!t.done && t.spawned) { const n = D().tasks.find(x => x.id === t.spawned); if (n && !n.done) D().tasks = D().tasks.filter(x => x !== n); t.spawned = ''; }
@@ -1987,7 +1998,7 @@ const A = {
   delGoal: e => { if (confirm('למחוק את היעד?')) { D().goals = D().goals.filter(x => x.id !== e.id); Store.save(); closeSheet(); render(); } },
   star: e => { const n = +e.n; document.querySelectorAll('#stars button').forEach((b, i) => b.classList.toggle('on', i < n)); document.querySelector('input[name=energy]').value = n; },
   taskMenu: e => menuSheet(e.id),
-  menuDone: e => { const t = findTask(e.id); t.done = !t.done; Store.save(); closeSheet(); render(); if (t.done && t.date === TODAY()) afterDone(t); },
+  menuDone: e => { const t = findTask(e.id); t.done = !t.done; t.doneAt = t.done ? TODAY() : ''; Store.save(); closeSheet(); render(); if (t.done && t.date === TODAY()) afterDone(t); },
   moveSheet: e => moveSheet(e.id),
   moveTo: e => { const t = findTask(e.id); deferTo(t, e.d === 'none' ? null : e.d); Store.save(); closeSheet(); render(); nudgeAny([t.id]); },
   moveCustom: e => { const v = $('#moveDate').value; if (!v) return; const t = findTask(e.id); deferTo(t, v); Store.save(); closeSheet(); render(); nudgeAny([t.id]); },
@@ -2120,6 +2131,7 @@ const A = {
   pickNow: e => { state.doId = e.id; closeSheet(); $('#toast').hidden = true; runOpen(e.id); },
   nextIdea: () => { Run.idea = pickIdea(Run.idea); runRender(); },
   ideaDel: e => { D().breakIdeas = D().breakIdeas.filter(x => x.id !== e.id); Store.save(); render(); },
+  undoNest: () => { const u = RDrag.undoNest; if (!u) return; const p = findTask(u.pid); if (p) p.subs = (p.subs || []).filter(x => x.id !== u.task.id); if (!D().tasks.some(x => x.id === u.task.id)) D().tasks.push(u.task); RDrag.undoNest = null; Store.save(); render(); toast('<span>↩ הפעולה חזרה למקומה</span>', 2500); },
   undoMove: e => { const u = RDrag.undo; if (u && u.id === e.id) { const t = findTask(e.id); if (t) { t.date = u.date; Store.save(); } } $('#toast').hidden = true; render(); },
   setQuad: e => {
     if (!e.id) { const f = $('#f'), same = f.quad.value === e.q; f.quad.value = same ? '' : e.q; $('#quadBox').innerHTML = quadChips('', f.quad.value, ''); return; } // inside a form: just remember the choice
@@ -2356,35 +2368,56 @@ document.addEventListener('input', ev => {
 /* ---------- Reorder today's actions by dragging a row over another (mouse drag, or long-press on touch) ---------- */
 const RDrag = { el: null, pid: 0, sx: 0, sy: 0, active: false, timer: null, target: null, before: true, suppress: false, mode: 'reorder', zone: '' };
 const DRAG_TABS = ['today', 'tasks', 'projects', 'matrix'];
-function rdClear() { document.querySelectorAll('.drop-before,.drop-after').forEach(r => r.classList.remove('drop-before', 'drop-after')); }
-function rdReset() { clearTimeout(RDrag.timer); rdClear(); if (RDrag.el) { RDrag.el.classList.remove('rdrag'); RDrag.el.style.transform = ''; } const bar = $('#dropbar'); if (bar) bar.remove(); RDrag.el = null; RDrag.active = false; RDrag.target = null; RDrag.zone = ''; document.body.classList.remove('dragging'); }
+function rdClear() { document.querySelectorAll('.drop-before,.drop-after,.drop-into').forEach(r => r.classList.remove('drop-before', 'drop-after', 'drop-into')); }
+function rdReset() { clearTimeout(RDrag.timer); rdClear(); if (RDrag.el) { RDrag.el.classList.remove('rdrag'); RDrag.el.style.transform = ''; } const bar = $('#dropbar'); if (bar) bar.remove(); RDrag.el = null; RDrag.active = false; RDrag.target = null; RDrag.nest = false; RDrag.zone = ''; document.body.classList.remove('dragging'); }
 function rdStart() {
   RDrag.active = true; RDrag.el.classList.add('rdrag'); document.body.classList.add('dragging'); try { navigator.vibrate && navigator.vibrate(15); } catch (e) {}
   if (RDrag.mode === 'move') { // from the lists: two drop zones, today and tomorrow
     const bar = document.createElement('div'); bar.id = 'dropbar'; bar.innerHTML = '<div data-drop="today">📥 היום</div><div data-drop="tomorrow">📆 מחר</div>'; document.body.appendChild(bar);
   }
 }
+// the open action row under the pointer (centre band only when reordering), as the target for turning a dragged action into its sub-action
+function nestRowAt(y, band) {
+  return [...document.querySelectorAll('#view .grp[data-tid]')].find(r => {
+    if (r === RDrag.el) return false; const t = findTask(r.dataset.tid); if (!t || t.done) return false;
+    const b = r.getBoundingClientRect(), f = (y - b.top) / b.height; return band ? f > .3 && f < .7 : f >= 0 && f <= 1;
+  });
+}
+function nestInto(id, pid) {
+  const t = findTask(id), p = findTask(pid); if (!t || !p || t === p) return;
+  if ((t.subs || []).length) { toast('<span>לפעולה "' + esc(t.title) + '" יש כבר תתי-פעולות, אז אי אפשר להכניס אותה לתוך פעולה אחרת</span><button data-act="toastClose" aria-label="סגור">✕</button>', 5000); return; }
+  D().tasks = D().tasks.filter(x => x.id !== id);
+  p.subs = p.subs || []; p.subs.push({ id: t.id, title: t.title, done: !!t.done, mins: t.mins || 0, notes: t.notes || '' });
+  RDrag.undoNest = { task: t, pid };
+  Store.save(); render();
+  toast('<span>↳ נכנסה כתת-פעולה אל: <b>' + esc(p.title) + '</b></span><button class="btn ghost" data-act="undoNest">בטל</button><button data-act="toastClose" aria-label="סגור">✕</button>', 7000);
+}
 function rdMove(x, y) {
   if (RDrag.mode === 'move') {
     RDrag.el.style.transform = 'translate(' + (x - RDrag.sx) + 'px,' + (y - RDrag.sy) + 'px)'; RDrag.zone = '';
     document.querySelectorAll('#dropbar > div').forEach(z => { const r = z.getBoundingClientRect(), over = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; z.classList.toggle('over', over); if (over) RDrag.zone = z.dataset.drop; });
+    rdClear(); RDrag.target = null; RDrag.nest = false;
+    if (!RDrag.zone) { const hit = nestRowAt(y); if (hit) { hit.classList.add('drop-into'); RDrag.target = hit; RDrag.nest = true; } }
     if (y < 90) window.scrollBy(0, -12); else if (y > innerHeight - 240 && y < innerHeight - 160) window.scrollBy(0, 12);
     return;
   }
   RDrag.el.style.transform = 'translateY(' + (y - RDrag.sy) + 'px)'; rdClear();
   const rows = [...document.querySelectorAll('#view > .grp[data-tid]')].filter(r => r !== RDrag.el);
   if (!rows.length) return;
+  RDrag.nest = false;
+  const mid = nestRowAt(y, true); if (mid) { mid.classList.add('drop-into'); RDrag.target = mid; RDrag.nest = true; if (y < 90) window.scrollBy(0, -12); else if (y > innerHeight - 110) window.scrollBy(0, 12); return; }
   let t = rows.find(r => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; }), before = true;
   if (!t) { t = rows[rows.length - 1]; before = false; }
   t.classList.add(before ? 'drop-before' : 'drop-after'); RDrag.target = t; RDrag.before = before;
   if (y < 90) window.scrollBy(0, -12); else if (y > innerHeight - 110) window.scrollBy(0, 12);
 }
 function rdEnd(commit) {
-  const el = RDrag.el, target = RDrag.target, before = RDrag.before, was = RDrag.active, mode = RDrag.mode, zone = RDrag.zone;
+  const el = RDrag.el, target = RDrag.target, before = RDrag.before, was = RDrag.active, mode = RDrag.mode, zone = RDrag.zone, nest = RDrag.nest;
   rdReset();
   if (!was) return;
   RDrag.suppress = true; setTimeout(() => { RDrag.suppress = false; }, 350);
   if (!commit || !el) return;
+  if (nest && target) { nestInto(el.dataset.tid, target.dataset.tid); return; }
   if (mode === 'move') { // drop on "today" / "tomorrow": schedule the action for that day
     const t = findTask(el.dataset.tid); if (!zone || !t) return;
     const nd = zone === 'today' ? TODAY() : addDays(TODAY(), 1); if (t.date === nd) return;
