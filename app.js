@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-25.13'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-25.16'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -178,6 +178,8 @@ const stars = n => '★'.repeat(n || 0);
 const logoMark = (s = 32) => `<svg class="logo" width="${s}" height="${s}" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"/><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/><circle cx="390" cy="170" r="36" fill="#e8a33d"/></svg>`;
 /* Projects: a project groups several tasks (task.projectId). Deleting a project keeps its tasks. */
 const projectName = id => (D().projects.find(p => p.id === id) || {}).title;
+// "Project: action" prefix for titles (skipped inside that project's own screen)
+const titleP = t => { const n = t.projectId && projectName(t.projectId); return (n && state.openProject !== t.projectId ? '<span class="ptag">' + esc(n) + ':</span> ' : '') + esc(t.title); };
 const projectChip = t => t.projectId && projectName(t.projectId) ? `<span class="chip" style="background:var(--info-bg);color:var(--info-ink)">📁 ${esc(projectName(t.projectId))}</span>` : '';
 const projectOpts = sel => `<option value="">ללא פרויקט</option>${D().projects.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}<option value="__new__">＋ פרויקט חדש...</option>`;
 function newProject() {
@@ -765,7 +767,7 @@ const quadChips = (id, cur, kind) => '<div class="opt quadopts">' + QUADS.map(q 
 const modeSwitch = () => '<div class="opt modesw"><button class="' + (state.mode === 'plan' ? 'on' : '') + '" data-act="setMode" data-m="plan">📋 תכנון</button><button class="' + (state.mode === 'do' ? 'on' : '') + '" data-act="setMode" data-m="do">🎯 ביצוע</button></div>';
 const currentAction = () => { const t = state.doId ? findTask(state.doId) : null; return (t && !t.done && t.date === TODAY()) ? t : nextTask(''); };
 function nowCard(t) {
-  return '<div class="card nowcard"><div class="sub">עכשיו</div><div class="t big">' + esc(t.title) + '</div>' + (t.notes ? '<div class="sub" style="white-space:pre-wrap;margin-top:4px">' + esc(t.notes) + '</div>' : '')
+  return '<div class="card nowcard"><div class="sub">עכשיו</div><div class="t big">' + titleP(t) + '</div>' + (t.notes ? '<div class="sub" style="white-space:pre-wrap;margin-top:4px">' + esc(t.notes) + '</div>' : '')
     + '<div class="meta" style="margin:8px 0">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + (t.energy ? '<span style="color:var(--accent)">' + stars(t.energy) + '</span>' : '') + quadChip(t) + (t.want ? '<span>💗' + t.want + '</span>' : '') + projectChip(t) + '</div>'
     + '<button class="btn startnow" data-act="runStart" data-id="' + t.id + '">◀ התחל עכשיו</button>'
     + '<div class="grid2"><button class="btn ghost" data-act="chooseOther">🔁 בחר פעולה אחרת</button><button class="btn ghost" data-act="runBreak">☕ אני צריך הפסקה</button></div>'
@@ -1120,8 +1122,8 @@ function taskRow(t, showDate) {
   return `<div class="grp" data-tid="${t.id}"><div class="card row p${effQuad(t) === 'q1' ? 2 : t.priority} ${t.done ? 'done' : ''}">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
-      <div class="t">${esc(t.title)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.notes ? '<span title="יש תיאור">📝</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="t">${titleP(t)}</div>
+      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins && state.tab !== 'today' ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.notes ? '<span title="יש תיאור">📝</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -1141,8 +1143,8 @@ function upCard(t, showDate) {
   const subs = (t.subs && t.subs.length && !t.collapsed) ? `<div class="usubs">${t.subs.map(s => `<div class="urow ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div></div>`).join('')}</div>` : '';
   return `<div class="ucard p${t.priority} ${t.done ? 'done' : ''}" data-task="${t.id}"><div class="urow">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
-    <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${esc(t.title)}</div>
-    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${projectChip(t)}</div></div></div>${subs}</div>`;
+    <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${titleP(t)}</div>
+    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
@@ -1897,6 +1899,7 @@ function accountSheet() {
 }
 
 /* ---------- Print ---------- */
+const pTitle = t => { const n = t.projectId && projectName(t.projectId); return (n ? n + ': ' : '') + t.title; };
 function printHTML(html) {
   $('#print').innerHTML = html;
   setTimeout(() => window.print(), 50);
@@ -1915,8 +1918,7 @@ function printDayCore(all) {
   const orgRow = d === TODAY() && (all || !orgDone(d)) ? pRow('🗂 ארגון: לתארך פעולות ולוודא את הלו"ז של מחר') : '';
   const L = d === TODAY() ? (D().dayLog[dayKey()] || {}) : (D().dayLog[d] || {});
   const hours = L.start ? `<div class="pl sm">🕗 התחלת ב-${L.start}${L.end ? ` · סיימת ב-${L.end} · משך ${fmtDur(dayDurMin(L))}` : ''}</div>` : '';
-  const prj = t => { const p = t.projectId && D().projects.find(x => x.id === t.projectId); return p ? ' · 📁 ' + p.title : ''; };
-  printHTML(`<h1>${longDate(d)}</h1>${hours}<h2>פעולות</h2>${orgRow}${ts.map(t => '<div>' + pRow((t.done ? '✓ ' : '') + (t.priority == 2 ? '‼ ' : t.priority == 1 ? '! ' : '') + t.title + prj(t) + (t.mins ? ` · ${t.mins} ד׳` : '') + (t.energy ? ' ' + stars(t.energy) : '')) + (t.subs || []).filter(s => all || !s.done).map(s => `<div style="margin-inline-start:26px">${pRow(s.title, true)}</div>`).join('') + '</div>').join('') || '<div class="pl">—</div>'}
+  printHTML(`<h1>${longDate(d)}</h1>${hours}<h2>פעולות</h2>${orgRow}${ts.map(t => '<div>' + pRow((t.done ? '✓ ' : '') + (t.priority == 2 ? '‼ ' : t.priority == 1 ? '! ' : '') + pTitle(t) + (t.energy ? ' ' + stars(t.energy) : '')) + (t.subs || []).filter(s => all || !s.done).map(s => `<div style="margin-inline-start:26px">${pRow(s.title, true)}</div>`).join('') + '</div>').join('') || '<div class="pl">—</div>'}
    <h2>הרגלים</h2>${habitsOn(d).map(h => pRow(h.title)).join('') || '<div class="pl">—</div>'}
    <h2>הערות</h2><div class="lines">${'<div></div>'.repeat(8)}</div>`);
 }
@@ -1924,12 +1926,12 @@ function printWeek() {
   const ws = weekStart(state.date);
   printHTML(`<h1>שבוע ${shortDate(ws)} – ${shortDate(addDays(ws, 6))}</h1><div class="wk">${Array.from({ length: 7 }, (_, i) => {
     const s = addDays(ws, i);
-    return `<div class="wd"><b>יום ${DAYN[i]} · ${shortDate(s)}</b>${tasksOn(s).map(t => pRow(t.title, true)).join('')}${habitsOn(s).map(h => pRow('🔁 ' + h.title, true)).join('')}</div>`;
+    return `<div class="wd"><b>יום ${DAYN[i]} · ${shortDate(s)}</b>${tasksOn(s).map(t => pRow(pTitle(t), true)).join('')}${habitsOn(s).map(h => pRow('🔁 ' + h.title, true)).join('')}</div>`;
   }).join('')}</div>`);
 }
 function printSel() {
   const ts = D().tasks.filter(t => t.print && !t.done);
-  printHTML(`<h1>פעולות להדפסה</h1>${ts.map(t => pRow(t.title + (t.date ? ' (' + shortDate(t.date) + ')' : ''))).join('') || '<div class="pl">אין פעולות מסומנות להדפסה</div>'}`);
+  printHTML(`<h1>פעולות להדפסה</h1>${ts.map(t => pRow(pTitle(t) + (t.date ? ' (' + shortDate(t.date) + ')' : ''))).join('') || '<div class="pl">אין פעולות מסומנות להדפסה</div>'}`);
 }
 
 /* ---------- Events ---------- */
