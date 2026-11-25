@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-25.11'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-25.12'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -295,13 +295,15 @@ function showNext(doneId) {
 let captured = 0;
 function captureSheet() {
   sheet(`<h1>💭 מה עובר לי בראש?</h1><p class="sub">שורה מהירה לרשימה, ותארגן אחר כך בתהליך "ארגון". או לפרוק הכל ולעשות סדר עם העוזר.</p>
-   <form id="capForm" class="row"><input id="capText" placeholder="מה עולה לך?" autocomplete="off" autofocus><button class="btn">הוסף</button></form>
+   <form id="capForm"><div class="row"><input id="capText" placeholder="מה עולה לך?" autocomplete="off" autofocus><button class="btn">הוסף</button></div>
+   <label>פרויקט (אופציונלי)</label><select id="capProj"><option value="">ללא פרויקט</option>${D().projects.map(p => `<option value="${p.id}">📁 ${esc(p.title)}</option>`).join('')}</select>
+   <label>דחוף / חשוב (אופציונלי)</label><select id="capQuad"><option value="">ללא סיווג</option>${QUADS.map(q => `<option value="${q[0]}">${q[1]}</option>`).join('')}</select></form>
    <div id="capDone" class="sub" style="margin-top:8px">${captured ? `נקלטו ${captured} ✓` : ''}</div>
    <button class="btn" style="width:100%;margin-top:12px" data-act="asstFromCapture">🧠 לפרוק ולעשות סדר עם העוזר</button>
    <div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
   $('#capForm').onsubmit = e => {
     e.preventDefault(); const txt = $('#capText').value.trim(); if (!txt) return;
-    D().tasks.push({ id: uid(), title: txt, date: null, done: false, priority: 0, energy: 0, mins: 0, brainless: false, print: false, visionId: '', projectId: '', notes: '', subs: [], inbox: true });
+    D().tasks.push({ id: uid(), title: txt, date: null, done: false, priority: 0, energy: 0, mins: 0, brainless: false, print: false, visionId: '', projectId: $('#capProj').value, notes: '', subs: [], inbox: true, quad: $('#capQuad').value, ...($('#capQuad').value ? { priority: quadPri[$('#capQuad').value] } : {}) });
     Store.save(); render(); captured++; $('#capDone').textContent = `נקלטו ${captured} ✓`; $('#capText').value = ''; $('#capText').focus();
   };
 }
