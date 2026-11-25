@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-25.21'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-25.24'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -289,7 +289,7 @@ function showNext(doneId) {
   if (notifyLevel() === 'quiet') { const q = doneId ? findTask(doneId) : null; if (q && q.done) toast('<span>✓ "' + esc(q.title) + '" סומנה כבוצעה</span><button data-act="toastClose" aria-label="סגור">✕</button>', 2500); return; }
   const n = nextTask(doneId);
   if (!n) { const d0 = doneId ? findTask(doneId) : null; toast('<span>' + (d0 && d0.done ? '✓ "' + esc(d0.title) + '" סומנה כבוצעה. ' : '') + '🎉 סיימת את פעולות היום</span><button data-act="toastClose">✕</button>', 6000); return; }
-  const q = quadOf(effQuad(n)), why = [q ? q[1] : '', n.mins ? n.mins + ' ד׳' : ''].filter(Boolean).join(' · ');
+  const q = quadOf(effQuad(n)), why = [q ? q[1] : ''].filter(Boolean).join(' · ');
   const dn = doneId ? findTask(doneId) : null;
   toast('<span>' + (dn && dn.done ? '✓ "' + esc(dn.title) + '" סומנה כבוצעה. ' : '') + 'ההצעה הבאה: <b>' + esc(n.title) + '</b>' + (why ? ' (' + why + ')' : '') + '</span><button class="btn" data-act="runStart" data-id="' + n.id + '">◀ התחל עכשיו</button><button class="btn ghost" data-act="chooseOther">בחר פעולה אחרת</button><button class="btn ghost" data-act="runBreak">☕ אני צריך הפסקה</button><button data-act="toastClose" aria-label="סגור">✕</button>');
 }
@@ -383,7 +383,7 @@ function ownerOpts(sel) { // "belongs to": no project, or a project
   const opt = (v, l) => `<option value="${v}" ${v === sel ? 'selected' : ''}>${l}</option>`;
   return opt('', 'ללא פרויקט') + D().projects.map(p => opt('p:' + p.id, '📁 ' + esc(p.title))).join('') + '<option value="__new__">＋ פרויקט חדש...</option>';
 }
-const projCard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + '</div></div>';
+const projCard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + '</div></div>';
 const allSeg = () => '<div class="seg"><button class="' + (state.allMode === 'list' ? 'on' : '') + '" data-act="allMode" data-m="list">📋 רשימה</button><button class="' + (state.allMode === 'projects' ? 'on' : '') + '" data-act="allMode" data-m="projects">📁 לפי פרויקטים</button><button class="' + (state.allMode === 'matrix' ? 'on' : '') + '" data-act="allMode" data-m="matrix">🧭 לפי עדיפות</button><button class="' + (state.allMode === 'done' ? 'on' : '') + '" data-act="allMode" data-m="done">✅ בוצע</button></div>';
 function projectsBoard() { // "כל הפעולות" grouped by project: drag an action into a project square to assign it
   const open = D().tasks.filter(t => !t.done), cap = 8;
@@ -602,7 +602,7 @@ function reviewSheet() {
   if (L.start && !L.end) tips.push('לא סימנת סיום יום, ולכן משך היום לא נספר. כדאי ללחוץ "סיום יום" בסוף היום.');
   if (ts.length && done === ts.length) tips.push('עמדת בכל הפעולות. שים לב מה עזר לך, ושמור על זה.');
   else if (!tips.length && left.length) tips.push('נסה לתכנן פחות פעולות, ובחר מראש את החשובה ביותר.');
-  const list = (arr, icon) => arr.slice(0, 8).map(t => '<div class="sub" style="margin:2px 0">' + icon + ' ' + esc(t.title) + (t.mins ? ' · ' + t.mins + ' ד׳' : '') + ((t.defers || 0) >= 2 ? ' · נדחתה ' + t.defers + ' פעמים' : '') + '</div>').join('') + (arr.length > 8 ? '<div class="sub">ועוד ' + (arr.length - 8) + '…</div>' : '');
+  const list = (arr, icon) => arr.slice(0, 8).map(t => '<div class="sub" style="margin:2px 0">' + icon + ' ' + esc(t.title) +  + ((t.defers || 0) >= 2 ? ' · נדחתה ' + t.defers + ' פעמים' : '') + '</div>').join('') + (arr.length > 8 ? '<div class="sub">ועוד ' + (arr.length - 8) + '…</div>' : '');
   sheet(`<h1>סיכום אתמול ☀️</h1>${morningBar('review')}
    <div class="meta" style="margin:4px 0 8px"><span>✅ ${done}/${ts.length} פעולות (${pct}%)</span>${doneMin ? '<span>⏱ ' + doneMin + ' ד׳ הושלמו</span>' : ''}${wt ? '<span>💼 עבודה בפועל ' + fmtDur(wt) + '</span>' : ''}${L.start ? '<span>🕗 ' + L.start + (L.end ? '–' + L.end + ' (' + fmtDur(dayDurMin(L)) + ')' : ' (בלי סיום)') + '</span>' : ''}${rItems.length ? '<span>☕ ' + rDone + '/' + rItems.length + ' הפסקות</span>' : ''}${energyL ? '<span>' + energyL + '</span>' : ''}</div>
    ${mit ? '<div class="sub">⭐ הפעולה החשובה: <b>' + esc(mit.title) + '</b> ' + (mit.done ? '✓ בוצעה' : '✗ לא בוצעה') + '</div>' : ''}
@@ -768,7 +768,7 @@ const modeSwitch = () => '<div class="opt modesw"><button class="' + (state.mode
 const currentAction = () => { const t = state.doId ? findTask(state.doId) : null; return (t && !t.done && t.date === TODAY()) ? t : nextTask(''); };
 function nowCard(t) {
   return '<div class="card nowcard"><div class="sub">עכשיו</div><div class="t big">' + titleP(t) + '</div>' + (t.notes ? '<div class="sub" style="white-space:pre-wrap;margin-top:4px">' + esc(t.notes) + '</div>' : '')
-    + '<div class="meta" style="margin:8px 0">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + quadChip(t) + (t.want ? '<span>💗' + t.want + '</span>' : '') + projectChip(t) + '</div>'
+    + '<div class="meta" style="margin:8px 0">' + quadChip(t) + (t.want ? '<span>💗' + t.want + '</span>' : '') + projectChip(t) + '</div>'
     + '<button class="btn startnow" data-act="runStart" data-id="' + t.id + '">◀ התחל עכשיו</button>'
     + '<div class="grid2"><button class="btn ghost" data-act="chooseOther">🔁 בחר פעולה אחרת</button><button class="btn ghost" data-act="runBreak">☕ אני צריך הפסקה</button></div>'
     + '<button class="lnk" data-act="toggleTask" data-id="' + t.id + '" style="margin-top:8px">✓ כבר עשיתי את זה</button></div>';
@@ -782,13 +782,13 @@ function doView() { // do mode: only the current action, nothing else to distrac
     + modeSwitch()
     + '<div class="card"><div class="row"><b class="grow">' + done + '/' + ts.length + ' הושלמו' + (rem ? ' · נותרו ' + rem + ' ד׳' : '') + '</b><button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' + dayBtn + '</div><div class="bar"><div style="width:' + pct + '%"></div></div>' + (est ? '<div class="sub" style="margin-top:6px">סיום משוער ' + est + ' (כולל הפסקות)</div>' : '') + '</div>'
     + (cur ? nowCard(cur) : ts.length === 0 ? '<div class="card"><div class="t">עוד אין פעולות להיום</div><div class="sub" style="margin-top:6px">הוסף את הפעולה הראשונה, או בחר מהמאגר במצב תכנון.</div><button class="btn startnow" data-act="addTask" style="margin-top:8px">＋ פעולה חדשה</button><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px;width:100%">📋 למצב תכנון</button></div>' : '<div class="card"><div class="t">🎉 אין עוד פעולות פתוחות להיום</div><div class="sub" style="margin-top:6px">במצב תכנון אפשר להוסיף פעולות מהמאגר, או לסיים את היום.</div><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px">📋 למצב תכנון</button></div>')
-    + (queue.length ? '<h2>בתור</h2>' + queue.map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + '</div></div>').join('') : '')
+    + (queue.length ? '<h2>בתור</h2>' + queue.map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div><div class="meta">' + '</div></div>').join('') : '')
     + energyBar(d)
     + '<button class="fab" data-act="addTask" aria-label="פעולה חדשה">+</button>';
 }
 function chooseOther() { // pick another action to do now (the user decides, the order is only a hint)
   $('#toast').hidden = true; const cur = currentAction(), list = tasksOn(TODAY()).filter(t => !t.done && (!cur || t.id !== cur.id)).slice(0, 6);
-  sheet('<h1>בחר פעולה אחרת</h1>' + (list.length ? '<div class="grid2" style="grid-template-columns:1fr">' + list.map(t => '<button class="btn ghost" data-act="pickNow" data-id="' + t.id + '">◀ ' + esc(t.title) + (t.mins ? ' · ' + t.mins + ' ד׳' : '') + '</button>').join('') + '</div>' : '<p class="sub">אין עוד פעולות פתוחות להיום. אפשר להוסיף מהמאגר במצב תכנון.</p>') + '<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>');
+  sheet('<h1>בחר פעולה אחרת</h1>' + (list.length ? '<div class="grid2" style="grid-template-columns:1fr">' + list.map(t => '<button class="btn ghost" data-act="pickNow" data-id="' + t.id + '">◀ ' + esc(t.title) +  + '</button>').join('') + '</div>' : '<p class="sub">אין עוד פעולות פתוחות להיום. אפשר להוסיף מהמאגר במצב תכנון.</p>') + '<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>');
 }
 function returnToast() { // after a break: remind what I was doing, back to it with one tap
   if (notifyLevel() === 'quiet') return;
@@ -1118,12 +1118,12 @@ function nextRepeatDate(t) {
 function taskRow(t, showDate) {
   const v = t.visionId ? visionName(t.visionId) : '';
   // Parent task; its subtasks are nested right under it.
-  const subsHtml = (t.subs && t.subs.length && !t.collapsed) ? `<div class="subs">${t.subs.map(s => `<div class="row ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div></div>`).join('')}</div>` : '';
+  const subsHtml = (t.subs && t.subs.length && !t.collapsed) ? `<div class="subs">${t.subs.map(s => `<div class="row ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}</div></div>`).join('')}</div>` : '';
   return `<div class="grp" data-tid="${t.id}"><div class="card row p${effQuad(t) === 'q1' ? 2 : t.priority} ${t.done ? 'done' : ''}">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${titleP(t)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.mins && state.tab !== 'today' ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -1150,11 +1150,11 @@ function doneBoard() {
 }
 function upCard(t, showDate) {
   const v = t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : '';
-  const subs = (t.subs && t.subs.length && !t.collapsed) ? `<div class="usubs">${t.subs.map(s => `<div class="urow ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div></div>`).join('')}</div>` : '';
+  const subs = (t.subs && t.subs.length && !t.collapsed) ? `<div class="usubs">${t.subs.map(s => `<div class="urow ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}</div></div>`).join('')}</div>` : '';
   return `<div class="ucard p${t.priority} ${t.done ? 'done' : ''}" data-task="${t.id}"><div class="urow">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${titleP(t)}</div>
-    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
+    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
@@ -1398,7 +1398,7 @@ const views = {
   matrixBody() {
     const open = D().tasks.filter(t => !t.done), by = k => open.filter(t => effQuad(t) === k).sort((a, b) => (b.want || 0) - (a.want || 0) || (a.date || '9999').localeCompare(b.date || '9999')), none = open.filter(t => !effQuad(t));
     const items = k => D().projects.filter(p => p.quad === k).map(p => '<div class="sub">📁 ' + esc(p.title) + '</div>').join('') ;
-    const mcard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.quad ? '' : (effQuad(t) ? '<span title="עדיפות שעברה בירושה">↳ בירושה</span>' : '')) + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + ((t.want || 0) >= 4 ? '<span>💗' + t.want + '</span>' : '') + '</div></div>';
+    const mcard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.quad ? '' : (effQuad(t) ? '<span title="עדיפות שעברה בירושה">↳ בירושה</span>' : '')) + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + ((t.want || 0) >= 4 ? '<span>💗' + t.want + '</span>' : '') + '</div></div>';
     const cell = q => '<section class="mxcell ' + q[0] + '" data-drop="q:' + q[0] + '"><div class="mxh"><b>' + q[1] + '</b><span class="sub">' + by(q[0]).length + '</span></div>' + items(q[0]) + (by(q[0]).map(mcard).join('') || '<div class="sub mxempty">גרור לכאן</div>') + '</section>';
     return `<div class="top"><h1>כל הפעולות</h1></div>${allSeg()}
      <p class="sub">גרור כל פעולה לריבוע שמתאים לה (בטלפון: לחיצה ארוכה ואז גרירה). לחיצה קצרה פותחת את התפריט שלה. פעולה שלא מסווגת יורשת את העדיפות של הפעולה או הפרויקט שלה.</p>
@@ -1541,7 +1541,6 @@ function taskForm(id, presetDate, presetProject, preset) {
    <select name="mins">${mo.map(m => `<option value="${m}" ${m == (t.mins || 15) ? 'selected' : ''}>${m} דקות</option>`).join('')}</select>
    ${prioFields(t)}
    <label>פרויקט (אופציונלי)</label><select name="owner">${ownerOpts(t.projectId ? 'p:' + t.projectId : '')}</select>
-   <label>קישור לחזון (אופציונלי)</label><select name="visionId">${visionOpts(t.visionId)}</select>
    <label class="row" style="color:var(--ink)"><input type="checkbox" name="brainless" style="width:auto" ${t.brainless ? 'checked' : ''}> ⚡ Brainless (פעולה פשוטה שאפשר להעיף ברגע)</label>
    <label class="row" style="color:var(--ink)"><input type="checkbox" name="print" style="width:auto" ${t.print ? 'checked' : ''}> סמן להדפסה</label>
    </details>
@@ -1563,7 +1562,7 @@ function taskForm(id, presetDate, presetProject, preset) {
     e.preventDefault();
     if (blocked()) { const why = clarity(form.title.value)[0]; $('#clHint').innerHTML = clarityHTML(form.title.value, true); form.title.focus(); alert('לא ניתן לשמור: הפעולה לא כתובה בצורה ברורה.\n' + why); return; }
     const f = new FormData(e.target), own = f.get('owner') || '', jobId = '', projectId = own.startsWith('p:') ? own.slice(2) : '', prevS = t.subs || [], subs = (f.get('subs') || '').split('\n').map(x => x.trim()).filter(Boolean).map(l => prevS.find(x => x.title === l) || { id: uid(), title: l, done: false });
-    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: f.get('quad') ? quadPri[f.get('quad')] : (t.priority || 0), quad: f.get('quad') || '', want: +f.get('want') || 0, visionId: f.get('visionId') || '', jobId, projectId, subs, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
+    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: f.get('quad') ? quadPri[f.get('quad')] : (t.priority || 0), quad: f.get('quad') || '', want: +f.get('want') || 0, visionId: t.visionId || '', jobId, projectId, subs, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
     let saved = t;
     if (id) Object.assign(t, obj); else { saved = { id: uid(), done: false, subs: [], ...obj }; D().tasks.push(saved); }
     resolveLong([saved]);
@@ -1704,7 +1703,7 @@ function orgStep1() {
   sheet(`<h1>🗂 ארגון · שלב 1 מתוך 2</h1><p class="sub">יום חדש, מתחילים מחדש. לכל פעולה שנשארה: להשאיר להיום, לדחות לתאריך אחר, או להעביר למאגר. שום דבר לא עובר אוטומטית. ${rows.length ? `נותרו ${left} לתארוך.` : ''}</p>
    ${rows.length ? `<div class="actions" style="margin:0 0 10px"><button class="btn ghost" data-act="orgSuggest">✨ הצע לי חלוקה לפי העומס</button></div>` : ''}
    ${rows.map(t => `<div class="bulkrow ${(!t.date && !t.parked) || (t.date && t.date < T) ? 'miss' : ''}"><div class="t"><b>${esc(t.title)}</b></div>
-     <div class="meta">${Org.orig[t.id] ? `<span style="color:var(--danger)">היה ב-${shortDate(Org.orig[t.id])}</span>` : t.parked ? '<span>📦 במאגר</span>' : t.inbox ? '<span>📥 נקלט</span>' : '<span>ללא תאריך</span>'}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}</div>
+     <div class="meta">${Org.orig[t.id] ? `<span style="color:var(--danger)">היה ב-${shortDate(Org.orig[t.id])}</span>` : t.parked ? '<span>📦 במאגר</span>' : t.inbox ? '<span>📥 נקלט</span>' : '<span>ללא תאריך</span>'}</div>
      <div class="opt" style="margin-top:8px">${opts.map(([l, v]) => `<button class="${t.date === v ? 'on' : ''}" data-act="orgSet" data-id="${t.id}" data-d="${v}">${l}</button>`).join('')}<button class="${t.parked ? 'on' : ''}" data-act="orgPark" data-id="${t.id}">📦 למאגר</button><input type="date" style="width:auto" data-orgdate="${t.id}" value="${t.date && !opts.some(o => o[1] === t.date) ? t.date : ''}"></div></div>`).join('') || '<div class="empty">🎉 אין פעולות ללא תאריך או באיחור</div>'}
    <div class="actions"><button class="btn ghost" data-act="close">סגור</button><button class="btn" data-act="orgNext">המשך ללו"ז של מחר</button></div>`);
   $('#sheet .panel').scrollTop = st;
@@ -1736,7 +1735,7 @@ function orgStep2() {
    <div class="card" style="background:var(--soft)"><b>${ts.length} פעולות · ${load} דקות</b>${first ? `<div class="sub">הפעולה הראשונה: ${esc(first.title)}${first.energy ? ' ' + stars(first.energy) : ''}. פעולות עם אנרגיה גבוהה תמיד בהתחלה.</div>` : ''}</div>
    ${warns.length ? warns.map(w => `<div class="clarity"><div class="w">⚠ ${esc(w)}</div></div>`).join('') : '<div class="clarity"><div class="ok">✓ הלו"ז של מחר נראה מאוזן וברור.</div></div>'}
    ${ts.map(t => { const cl = clarity(t.title); return `<div class="bulkrow"><div class="t"><b>${esc(t.title)}</b></div>
-     <div class="meta">${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : '<span>בלי אנרגיה</span>'}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${cl.length ? '<span style="color:var(--warn-ink)">⚠ ניסוח לא ברור</span>' : ''}</div>
+     <div class="meta">${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : '<span>בלי אנרגיה</span>'}${cl.length ? '<span style="color:var(--warn-ink)">⚠ ניסוח לא ברור</span>' : ''}</div>
      <div class="opt" style="margin-top:8px"><span class="sub">להעביר ל:</span>${mv.map(([l, v]) => `<button data-act="orgMove" data-id="${t.id}" data-d="${v}">${l}</button>`).join('')}</div></div>`; }).join('')}
    <div class="actions"><button class="btn ghost" data-act="orgAddTomorrow">＋ פעולה למחר</button></div>
    <div class="actions"><button class="btn ghost" data-act="orgBack">חזרה</button><button class="btn" data-act="orgFinish">✅ סיימתי ארגון</button></div>`);
@@ -1788,7 +1787,7 @@ function menuSheet(id) {
   const t = findTask(id); if (!t) return closeSheet();
   const v = t.visionId ? visionName(t.visionId) : '';
   sheet(`<h1>${esc(t.title)}</h1>
-   <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+   <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
    ${t.notes ? `<p class="sub" style="white-space:pre-wrap">${esc(t.notes)}</p>` : ''}
    ${t.done ? '' : '<div class="sub" style="margin:8px 0 4px">🧭 עדיפות</div>' + quadChips(t.id, t.quad || '', '') + '<div class="sub" style="margin:8px 0 2px">💗 כמה בא לי?</div>' + wantStars(t.id, t.want || 0, '')}
    <div class="grid2">
@@ -2020,7 +2019,7 @@ const A = {
       <h2>הכיוון שלי לשבוע</h2><div style="min-height:50px;white-space:pre-wrap">${esc(W.vision) || '<div class="lines"><div></div><div></div></div>'}</div>
       <h2>תוצאות מפתח</h2>${W.outcomes.map(o => pRow((o.done ? '✓ ' : '') + o.text)).join('') || '<div class="lines"><div></div><div></div><div></div></div>'}
       ${W.visionIds.length ? `<h2>החזון הגדול</h2><div>${W.visionIds.map(id => esc(visionName(id) || '')).filter(Boolean).join(' · ')}</div>` : ''}
-      <h2>פעולות פתוחות השבוע</h2>${wt.map(t => pRow(`${shortDate(t.date)} · ${t.title}${t.mins ? ` · ${t.mins} ד׳` : ''}${t.energy ? ' ' + stars(t.energy) : ''}`, true)).join('') || '<div class="pl">—</div>'}
+      <h2>פעולות פתוחות השבוע</h2>${wt.map(t => pRow(`${shortDate(t.date)} · ${t.title}${t.energy ? ' ' + stars(t.energy) : ''}`, true)).join('') || '<div class="pl">—</div>'}
       <h2>סיכום: מה עבד? מה לשפר?</h2><div class="lines">${'<div></div>'.repeat(5)}</div>`);
   },
   jShift: e => { const n = addDays(state.jDate, +e.n); if (n <= TODAY()) { state.jDate = n; render(); } },
@@ -2183,7 +2182,7 @@ const A = {
   rhythmDone: e => { $('#toast').hidden = true; const T = TODAY(), l = (D().rhythmLog[T] = D().rhythmLog[T] || {}); if (l[e.id]) delete l[e.id]; else l[e.id] = true; Store.save(); render(); },
   brainlessList: () => {
     const T = TODAY(), all = D().tasks.filter(t => !t.done && t.brainless), list = (all.filter(t => t.date === T).length ? all.filter(t => t.date === T) : all).slice(0, 12);
-    sheet(`<h1>⚡ פעולות brainless</h1>${list.length ? '<p class="sub">פעולות פשוטות שאפשר להעיף ברגע. בחר אחת להתחלה:</p><div class="grid2" style="grid-template-columns:1fr">' + list.map(t => '<button class="btn ghost" data-act="runStart" data-id="' + t.id + '">◀ ' + esc(t.title) + (t.mins ? ' · ' + t.mins + ' ד׳' : '') + '</button>').join('') + '</div>' : '<p class="sub">אין כרגע פעולות brainless פתוחות. אפשר לסמן פעולה כ-Brainless בעריכה שלה.</p>'}<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
+    sheet(`<h1>⚡ פעולות brainless</h1>${list.length ? '<p class="sub">פעולות פשוטות שאפשר להעיף ברגע. בחר אחת להתחלה:</p><div class="grid2" style="grid-template-columns:1fr">' + list.map(t => '<button class="btn ghost" data-act="runStart" data-id="' + t.id + '">◀ ' + esc(t.title) +  + '</button>').join('') + '</div>' : '<p class="sub">אין כרגע פעולות brainless פתוחות. אפשר לסמן פעולה כ-Brainless בעריכה שלה.</p>'}<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
   },
   rhythmDoneRun: () => { const T = TODAY(); if (Run.rhythmId) { (D().rhythmLog[T] = D().rhythmLog[T] || {})[Run.rhythmId] = true; Store.save(); } runClose(); },
   rhythmDel: e => { D().rhythm = D().rhythm.filter(r => r.id !== e.id); Store.save(); render(); },
@@ -2468,8 +2467,9 @@ function dragReset() {
   if (Drag.ghost) Drag.ghost.remove();
   if (Drag.el) Drag.el.classList.remove('dragging');
   if (Drag.over) Drag.over.classList.remove('over');
+  document.querySelectorAll('.nest-over').forEach(c => c.classList.remove('nest-over'));
   document.body.classList.remove('dragging-now');
-  Object.assign(Drag, { el: null, ghost: null, id: null, active: false, over: null, pid: null });
+  Object.assign(Drag, { nest: null, el: null, ghost: null, id: null, active: false, over: null, pid: null });
 }
 function dragStart(x, y) {
   clearTimeout(Drag.timer);
@@ -2486,7 +2486,12 @@ function dragStart(x, y) {
 function dragMove(x, y) {
   Drag.x = x; Drag.y = y;
   Drag.ghost.style.transform = `translate(${x - Drag.offX}px, ${y - Drag.offY}px)`;
-  const under = document.elementFromPoint(x, y), col = under && under.closest('[data-drop]');
+  const under = document.elementFromPoint(x, y);
+  // the centre band of another open card = turn the dragged action into its sub-action; elsewhere = the column / project / square under the pointer
+  document.querySelectorAll('.nest-over').forEach(c => c.classList.remove('nest-over')); Drag.nest = null;
+  const oc = under && under.closest('.ucard:not(.mini):not(.ghost)');
+  if (oc && oc !== Drag.el && oc.dataset.task && oc.dataset.task !== Drag.id) { const ot = findTask(oc.dataset.task), b = oc.getBoundingClientRect(), f = (y - b.top) / b.height; if (ot && !ot.done && f > .3 && f < .7) { oc.classList.add('nest-over'); Drag.nest = oc.dataset.task; } }
+  const col = Drag.nest ? null : under && under.closest('[data-drop]');
   if (Drag.over !== col) { if (Drag.over) Drag.over.classList.remove('over'); Drag.over = col; if (col) col.classList.add('over'); }
 }
 function dragLoop() { // auto-scroll the board sideways (works the same in RTL) and the page vertically near the edges
@@ -2501,10 +2506,11 @@ function dragLoop() { // auto-scroll the board sideways (works the same in RTL) 
   Drag.raf = requestAnimationFrame(dragLoop);
 }
 function dragEnd(drop) {
-  const was = Drag.active, id = Drag.id, col = Drag.over;
+  const was = Drag.active, id = Drag.id, col = Drag.over, nest = Drag.nest;
   dragReset();
   if (!was) return;
   Drag.suppressClick = true; setTimeout(() => { Drag.suppressClick = false; }, 60);
+  if (drop && nest) { nestInto(id, nest); return; }
   if (!drop || !col) return;
   const target = col.dataset.drop, t = findTask(id);
   if (!t || ['overdue', 'later', 'done'].includes(target)) return; // columns you cannot drop into
