@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-25.9'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-25.11'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -380,7 +380,7 @@ function ownerOpts(sel) { // "belongs to": no project, or a project
   return opt('', 'ללא פרויקט') + D().projects.map(p => opt('p:' + p.id, '📁 ' + esc(p.title))).join('') + '<option value="__new__">＋ פרויקט חדש...</option>';
 }
 const projCard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + '</div></div>';
-const allSeg = () => '<div class="seg"><button class="' + (state.allMode === 'list' ? 'on' : '') + '" data-act="allMode" data-m="list">📋 רשימה</button><button class="' + (state.allMode === 'projects' ? 'on' : '') + '" data-act="allMode" data-m="projects">📁 לפי פרויקטים</button></div>';
+const allSeg = () => '<div class="seg"><button class="' + (state.allMode === 'list' ? 'on' : '') + '" data-act="allMode" data-m="list">📋 רשימה</button><button class="' + (state.allMode === 'projects' ? 'on' : '') + '" data-act="allMode" data-m="projects">📁 לפי פרויקטים</button><button class="' + (state.allMode === 'matrix' ? 'on' : '') + '" data-act="allMode" data-m="matrix">🧭 לפי עדיפות</button></div>';
 function projectsBoard() { // "כל הפעולות" grouped by project: drag an action into a project square to assign it
   const open = D().tasks.filter(t => !t.done), cap = 8;
   const sec = p => { const ts = open.filter(t => t.projectId === p.id), s = projState(p);
@@ -778,7 +778,7 @@ function doView() { // do mode: only the current action, nothing else to distrac
     + modeSwitch()
     + '<div class="card"><div class="row"><b class="grow">' + done + '/' + ts.length + ' הושלמו' + (rem ? ' · נותרו ' + rem + ' ד׳' : '') + '</b><button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' + dayBtn + '</div><div class="bar"><div style="width:' + pct + '%"></div></div>' + (est ? '<div class="sub" style="margin-top:6px">סיום משוער ' + est + ' (כולל הפסקות)</div>' : '') + '</div>'
     + (cur ? nowCard(cur) : ts.length === 0 ? '<div class="card"><div class="t">עוד אין פעולות להיום</div><div class="sub" style="margin-top:6px">הוסף את הפעולה הראשונה, או בחר מהמאגר במצב תכנון.</div><button class="btn startnow" data-act="addTask" style="margin-top:8px">＋ פעולה חדשה</button><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px;width:100%">📋 למצב תכנון</button></div>' : '<div class="card"><div class="t">🎉 אין עוד פעולות פתוחות להיום</div><div class="sub" style="margin-top:6px">במצב תכנון אפשר להוסיף פעולות מהמאגר, או לסיים את היום.</div><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px">📋 למצב תכנון</button></div>')
-    + (queue.length ? '<h2>בתור</h2>' + queue.map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + quadChip(t) + '</div></div>').join('') : '')
+    + (queue.length ? '<h2>בתור</h2>' + queue.map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + '</div></div>').join('') : '')
     + energyBar(d)
     + '<button class="fab" data-act="addTask" aria-label="פעולה חדשה">+</button>';
 }
@@ -1115,11 +1115,11 @@ function taskRow(t, showDate) {
   const v = t.visionId ? visionName(t.visionId) : '';
   // Parent task; its subtasks are nested right under it.
   const subsHtml = (t.subs && t.subs.length && !t.collapsed) ? `<div class="subs">${t.subs.map(s => `<div class="row ${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${s.id}">${s.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(s.title)}${s.mins ? ` <span class="sub">· ${s.mins} ד׳</span>` : ''}</div></div>`).join('')}</div>` : '';
-  return `<div class="grp" data-tid="${t.id}"><div class="card row p${t.priority} ${t.done ? 'done' : ''}">
+  return `<div class="grp" data-tid="${t.id}"><div class="card row p${effQuad(t) === 'q1' ? 2 : t.priority} ${t.done ? 'done' : ''}">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${esc(t.title)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${quadChip(t)}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.notes ? '<span title="יש תיאור">📝</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${t.energy ? `<span style="color:var(--accent)">${stars(t.energy)}</span>` : ''}${t.mins ? `<span>${t.mins} ד׳</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.notes ? '<span title="יש תיאור">📝</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -1232,6 +1232,7 @@ const views = {
   },
   tasks() {
     if (state.allMode === 'projects') return projectsBoard();
+    if (state.allMode === 'matrix') return views.matrixBody();
     const f = state.taskFilter;
     let list = D().tasks.filter(filterOk);
     if (f === 'open') list = list.filter(t => !t.done);
@@ -1323,9 +1324,8 @@ const views = {
       ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
       ${item('dayrewards', '🎁', 'תגמולים יומיים', `${D().dayRewards.length} תגמולים ברשימה`)}
       <h2>תכנון</h2>
-      ${item('tasks', '✅', 'כל הפעולות והפרויקטים', `${D().tasks.filter(t => !t.done).length} פעולות פתוחות · ${D().projects.length} פרויקטים`)}
+      ${item('tasks', '✅', 'כל הפעולות והפרויקטים', `${D().tasks.filter(t => !t.done).length} פעולות פתוחות · ${D().projects.length} פרויקטים · ${D().tasks.filter(t => !t.done && !effQuad(t)).length} לא מסווגות`)}
       ${item('assistant', '🧠', 'עוזר התכנון שלי', `${D().topics.length} נושאים בזיכרון`)}
-      ${item('matrix', '🧭', 'מטריצת עדיפויות', `${D().tasks.filter(t => !t.done && !effQuad(t)).length} פעולות לא מסווגות`)}
       <h2>אישי</h2>
       ${item('habits', '🔁', 'הרגלים', `${D().habits.length} הרגלים`)}
       ${item('goals', '🎯', 'יעדים ותגמולים', `${activeG} פעילים${wait ? ` · 🎁 ${wait} ממתינים` : ''}`)}
@@ -1379,12 +1379,13 @@ const views = {
      ${L.map(r => `<div class="card row"><span style="font-size:22px">🎁</span><div class="t grow">${esc(r.title)}</div><button class="iconbtn" data-act="rewardDel" data-id="${r.id}" aria-label="מחק">✕</button></div>`).join('') || '<div class="empty">עדיין אין תגמולים. הוסף קפה, פרק שוקולד, סרט בערב...</div>'}
      <form id="rwForm" class="row" style="margin-top:10px"><input name="title" placeholder="תגמול חדש" required autocomplete="off"><button class="btn">הוסף</button></form>`;
   },
-  matrix() {
+  matrix() { state.tab = 'tasks'; state.allMode = 'matrix'; return views.matrixBody(); },
+  matrixBody() {
     const open = D().tasks.filter(t => !t.done), by = k => open.filter(t => effQuad(t) === k).sort((a, b) => (b.want || 0) - (a.want || 0) || (a.date || '9999').localeCompare(b.date || '9999')), none = open.filter(t => !effQuad(t));
     const items = k => D().projects.filter(p => p.quad === k).map(p => '<div class="sub">📁 ' + esc(p.title) + '</div>').join('') ;
     const mcard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.quad ? '' : (effQuad(t) ? '<span title="עדיפות שעברה בירושה">↳ בירושה</span>' : '')) + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + (t.mins ? '<span>' + t.mins + ' ד׳</span>' : '') + ((t.want || 0) >= 4 ? '<span>💗' + t.want + '</span>' : '') + '</div></div>';
     const cell = q => '<section class="mxcell ' + q[0] + '" data-drop="q:' + q[0] + '"><div class="mxh"><b>' + q[1] + '</b><span class="sub">' + by(q[0]).length + '</span></div>' + items(q[0]) + (by(q[0]).map(mcard).join('') || '<div class="sub mxempty">גרור לכאן</div>') + '</section>';
-    return `<div class="top"><h1>מטריצת עדיפויות</h1></div>
+    return `<div class="top"><h1>כל הפעולות</h1></div>${allSeg()}
      <p class="sub">גרור כל פעולה לריבוע שמתאים לה (בטלפון: לחיצה ארוכה ואז גרירה). לחיצה קצרה פותחת את התפריט שלה. פעולה שלא מסווגת יורשת את העדיפות של הפעולה או הפרויקט שלה.</p>
      <div class="mxaxis"><span>🔥 דחוף</span><span>⏳ לא דחוף</span></div>
      <div class="mx2">${QUADS.map(cell).join('')}</div>

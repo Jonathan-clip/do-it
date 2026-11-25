@@ -29,8 +29,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .t{font-size:16px;overflow-wrap:anywhere}
 .meta{font-size:13px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
 .chip{background:var(--soft);color:var(--brand);border-radius:20px;padding:1px 8px;font-size:13px}
-.p2{border-inline-start:4px solid var(--danger)}
-.p1{border-inline-start:4px solid var(--accent)}
+.p2{border-inline-start:3px solid color-mix(in srgb,var(--danger) 32%,transparent)}
+.p1{border-inline-start:0}
 .bar{height:8px;background:var(--line);border-radius:8px;overflow:hidden;margin:6px 0 4px}
 .bar>div{height:100%;background:var(--brand);transition:width .25s}
 #nav{position:fixed;bottom:0;inset-inline:0;max-width:640px;margin:0 auto;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
