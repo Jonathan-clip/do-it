@@ -315,3 +315,14 @@ body.miniRun #view{padding-bottom:170px}
 .ptag{font-weight:700;color:var(--info-ink)}
 .grp.drop-into>.card{outline:2px dashed var(--brand);background:var(--soft)}
 .ucard.nest-over{outline:2px dashed var(--brand);background:var(--soft)}
+.prow{padding:12px 0;border-bottom:1px solid var(--line);border-radius:0}
+.prow.over{background:var(--soft);outline:2px dashed var(--brand);border-radius:10px}
+.prh{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.prh b{font-size:16px;cursor:pointer}
+.bar.thin{height:3px;margin:0}
+.pbody{margin-top:10px}
+.pbody .lnk{margin-top:4px}
+.prh b,.ptag{unicode-bidi:isolate}.prh b{text-align:start}
+
+.cheerhero{background:var(--soft);color:var(--brand);border-radius:16px;padding:22px 18px;margin:0 0 10px;font-weight:700;font-size:20px;line-height:1.6;text-align:center;display:flex;flex-direction:column;gap:8px}
+.cheerhero .sub{font-weight:400;font-size:13px}

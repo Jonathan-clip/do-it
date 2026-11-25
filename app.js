@@ -1,9 +1,9 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-25.24'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.1'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
-const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
+const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
 const TS_KEY = DEMO ? 'doit-demo-updated-v1' : 'doit-updated-v1';
 const SYNC_KEY = DEMO ? 'doit-demo-synced-v1' : 'doit-synced-v1';
 // v2 structure: a task that had subtasks becomes a "job" (task) and each subtask an action; every other old task is already an action.
@@ -29,7 +29,7 @@ function migrate2(d) {
   });
   d.tasks = keep; d.v = 2; return d;
 }
-const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm', 'dayRewards', 'breakIdeas', 'topics', 'sessions'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual', 'assist'];
+const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm', 'dayRewards', 'breakIdeas', 'cheers', 'topics', 'sessions'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual', 'assist'];
 const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return h + ':' + str.length; };
 function itemHashes(d) { // one entry per collection item / per dated entry, so changes and deletions can be tracked
   const o = {};
@@ -179,7 +179,7 @@ const logoMark = (s = 32) => `<svg class="logo" width="${s}" height="${s}" viewB
 /* Projects: a project groups several tasks (task.projectId). Deleting a project keeps its tasks. */
 const projectName = id => (D().projects.find(p => p.id === id) || {}).title;
 // "Project: action" prefix for titles (skipped inside that project's own screen)
-const titleP = t => { const n = t.projectId && projectName(t.projectId); return (n && state.openProject !== t.projectId ? '<span class="ptag">' + esc(n) + ':</span> ' : '') + esc(t.title); };
+const titleP = t => { const n = t.projectId && projectName(t.projectId); return (n && state.openProject !== t.projectId ? '<span class="ptag"><bdi>' + esc(n) + '</bdi>:</span> ' : '') + esc(t.title); };
 const projectChip = t => t.projectId && projectName(t.projectId) ? `<span class="chip" style="background:var(--info-bg);color:var(--info-ink)">📁 ${esc(projectName(t.projectId))}</span>` : '';
 const projectOpts = sel => `<option value="">ללא פרויקט</option>${D().projects.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}<option value="__new__">＋ פרויקט חדש...</option>`;
 function newProject() {
@@ -360,9 +360,18 @@ function runTick() {
   if (Run.left <= 0) { clearInterval(Run.tick); Run.running = false; Run.ended = true; Run.mini = false; if (!Run.brk) { addWork(Run.total / 60); Work.skipId = Run.id; } runBeep(); runRender(); }
 }
 function runStartTimer() { Run.endAt = Date.now() + Run.left * 1000; Run.running = true; if (Run.brk) Run.brkStarted = true; clearInterval(Run.tick); Run.tick = setInterval(runTick, 250); runRender(); }
+function cheerSheet(id) {
+  const c = id ? cheerAll().find(x => x.id === id) : null; if (id && !c) return;
+  sheet(`<h1>${c ? '✏️ עריכת משפט' : '＋ משפט חדש'}</h1><form id="chForm"><textarea id="chText" rows="3" maxlength="240" placeholder="משפט שמחזק אותי" required>${esc(c ? c.text : '')}</textarea>
+   <label>קטגוריה</label><select id="chCat">${CHEER_CATS.map(([k, l]) => `<option value="${k}" ${(c ? c.cat : state.cheerCat || 'gen') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+   <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
+  const ta = $('#chText'); ta.focus();
+  $('#chForm').onsubmit = ev => { ev.preventDefault(); const t = ta.value.trim(); if (t) { if (c) { c.text = t; c.cat = $('#chCat').value; } else cheerAll().push({ id: uid(), cat: $('#chCat').value, text: t }); Store.save(); } closeSheet(); render(); };
+}
 function stuckSheet() {
+  state.stuckShift = Math.floor(Math.random() * 1000);
   const T = TODAY(), t = findTask(Run.id), easy = t && tasksOn(T).filter(x => !x.done && x.id !== t.id).sort((a, b) => (a.energy || 3) - (b.energy || 3))[0];
-  sheet(`<h1>זה קורה 🤝</h1><p class="sub">בוא נקל על זה. בחר מה מתאים עכשיו:</p>
+  sheet(`<h1>זה קורה 🤝</h1><div class="remind" id="stuckCheer" data-act="stuckCheer" title="לחץ למשפט אחר">💬 ${esc(stuckLine())}</div><p class="sub">בוא נקל על זה. בחר מה מתאים עכשיו:</p>
    <div class="grid2">
      <button class="btn ghost" data-act="stuckSmall">🔹 לפרק לצעד קטן יותר</button>
      <button class="btn ghost" data-act="stuckTwo">⏱ רק שתי דקות</button>
@@ -385,15 +394,16 @@ function ownerOpts(sel) { // "belongs to": no project, or a project
 }
 const projCard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + '</div></div>';
 const allSeg = () => '<div class="seg"><button class="' + (state.allMode === 'list' ? 'on' : '') + '" data-act="allMode" data-m="list">📋 רשימה</button><button class="' + (state.allMode === 'projects' ? 'on' : '') + '" data-act="allMode" data-m="projects">📁 לפי פרויקטים</button><button class="' + (state.allMode === 'matrix' ? 'on' : '') + '" data-act="allMode" data-m="matrix">🧭 לפי עדיפות</button><button class="' + (state.allMode === 'done' ? 'on' : '') + '" data-act="allMode" data-m="done">✅ בוצע</button></div>';
-function projectsBoard() { // "כל הפעולות" grouped by project: drag an action into a project square to assign it
-  const open = D().tasks.filter(t => !t.done), cap = 8;
-  const sec = p => { const ts = open.filter(t => t.projectId === p.id), s = projState(p);
-    return '<section class="mxcell prj" data-drop="p:' + p.id + '"><div class="mxh"><b class="grow" data-act="openProject" data-id="' + p.id + '">📁 ' + esc(p.title) + ' ›</b><span class="sub">' + s.done + '/' + s.total + '</span></div><div class="bar"><div style="width:' + s.pct + '%"></div></div>'
-      + ts.slice(0, cap).map(projCard).join('') + (ts.length > cap ? '<button class="lnk" data-act="openProject" data-id="' + p.id + '">עוד ' + (ts.length - cap) + ' פעולות ›</button>' : '') + (ts.length ? '' : '<div class="sub mxempty">גרור לכאן פעולה</div>') + '</section>'; };
+function projectsBoard() { // "כל הפעולות" grouped by project: compact rows, drag an action onto a row to assign it
+  const open = D().tasks.filter(t => !t.done), cap = 8, po = state.projOpen = state.projOpen || {};
+  const isOpen = id => po[id] === undefined ? id === 'none' : po[id];
+  const sec = p => { const ts = open.filter(t => t.projectId === p.id), s = projState(p), o = isOpen(p.id);
+    return '<section class="prow" data-drop="p:' + p.id + '"><div class="prh"><b class="grow" data-act="projToggle" data-id="' + p.id + '"><bdi>' + esc(p.title) + '</bdi></b><span class="sub">' + s.done + '/' + s.total + '</span><button class="lnk" data-act="renameProject" data-id="' + p.id + '">עריכה</button></div><div class="bar thin"><div style="width:' + s.pct + '%"></div></div>'
+      + (o ? '<div class="pbody">' + ts.slice(0, cap).map(projCard).join('') + (ts.length > cap ? '<div class="sub">ועוד ' + (ts.length - cap) + ' פעולות</div>' : '') + (ts.length ? '' : '<div class="sub mxempty">גרור לכאן פעולה</div>') + '<button class="lnk" data-act="openProject" data-id="' + p.id + '">פתח את הפרויקט</button></div>' : '') + '</section>'; };
   const free = open.filter(t => !t.projectId || !D().projects.some(p => p.id === t.projectId)).sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
   return '<div class="top"><h1>כל הפעולות</h1><div class="sw"><button class="iconbtn" data-act="addProject">＋ פרויקט</button></div></div>' + allSeg()
-    + '<div class="sub" style="margin:6px 0">גרור פעולה (בטלפון: לחיצה ארוכה ואז גרירה) לתוך פרויקט כדי לשייך אותה. לחיצה על שם פרויקט פותחת אותו.</div>'
-    + D().projects.map(sec).join('') + '<section class="mxcell mxnone" data-drop="p:none"><div class="mxh"><b>📥 ללא פרויקט</b><span class="sub">' + free.length + '</span></div>' + (free.slice(0, 40).map(projCard).join('') || '<div class="sub mxempty">כל הפעולות משויכות לפרויקט</div>') + (free.length > 40 ? '<div class="sub">ועוד ' + (free.length - 40) + '. עבור לתצוגת רשימה כדי לראות הכל.</div>' : '') + '</section>'
+    + '<div class="sub" style="margin:6px 0">לחיצה על שם פרויקט פותחת את הפעולות שלו. גרור פעולה (בטלפון: לחיצה ארוכה ואז גרירה) אל שורת פרויקט כדי לשייך אותה.</div>'
+    + D().projects.map(sec).join('') + '<section class="prow none" data-drop="p:none"><div class="prh"><b class="grow" data-act="projToggle" data-id="none">ללא פרויקט</b><span class="sub">' + free.length + '</span></div>' + (isOpen('none') ? '<div class="pbody">' + (free.slice(0, 40).map(projCard).join('') || '<div class="sub mxempty">כל הפעולות משויכות לפרויקט</div>') + (free.length > 40 ? '<div class="sub">ועוד ' + (free.length - 40) + '. עבור לתצוגת רשימה כדי לראות הכל.</div>' : '') + '</div>' : '') + '</section>'
     + '<button class="fab" data-act="addTask">+</button>';
 }
 /* ---------- Wellbeing: energy states with suggestions, rhythm (meals / rest / hourly break), day start & end, deferral nudge, morning review ---------- */
@@ -1063,8 +1073,18 @@ function asstMemView() {
 }
 /* ---------- Personal reminders: two sentences shown on the daily screen and while working ---------- */
 const REMINDERS = ['להרגיש את הכאב של הצמיחה, לצאת מאזור הנוחות.', 'האדם היחיד שאני רוצה להרשים הוא אני, בהשוואה לעצמי בלבד.', 'אני מזהה שיש בי פחד להישאר מאחור, אבל אני לא חייב לפעול מתוך הפחד הזה.'];
-const remIndex = () => { const n = Math.floor(parse(TODAY()).getTime() / 864e5) + (state.remShift || 0); return ((n % REMINDERS.length) + REMINDERS.length) % REMINDERS.length; };
-const reminder = () => REMINDERS[remIndex()];
+/* Encouragement: the user's own sentences (D().cheers, with a category), seeded once from the first three; shown on Today, in the focus sheet, while working, in the "עידוד" tab and when stuck */
+const CHEER_CATS = [['gen', 'כללי'], ['fear', 'פחד והשוואה'], ['delay', 'דחיינות'], ['tired', 'עייפות וקושי'], ['win', 'הצלחה']];
+const CHEER_SEED = [['c_seed1', 'gen', REMINDERS[0]], ['c_seed2', 'fear', REMINDERS[1]], ['c_seed3', 'fear', REMINDERS[2]]];
+const cheerCatName = k => (CHEER_CATS.find(x => x[0] === k) || [0, 'כללי'])[1];
+function cheerAll() {
+  const d = D(); d.cheers = d.cheers || []; d.assist = d.assist || {};
+  if (!d.assist.cheersSeeded) { CHEER_SEED.forEach(([id, cat, text]) => { if (!d.cheers.some(c => c.id === id)) d.cheers.push({ id, cat, text }); }); d.assist.cheersSeeded = 1; Store.save(); }
+  return d.cheers;
+}
+const cheerPick = (L, shift) => { if (!L.length) return null; const n = Math.floor(parse(TODAY()).getTime() / 864e5) + (shift || 0); return L[((n % L.length) + L.length) % L.length]; };
+const reminder = () => { const c = cheerPick(cheerAll(), state.remShift); return c ? c.text : REMINDERS[0]; };
+const stuckLine = () => { const a = cheerAll(), h = a.filter(c => ['delay', 'tired', 'fear'].includes(c.cat)), L = h.length ? h : a, c = L.length ? L[((state.stuckShift || 0) % L.length + L.length) % L.length] : null; return c ? c.text : REMINDERS[0]; };
 /* ---------- Daily focus: the most important task and the "fun" of the day; asked at the start of the day when missing ---------- */
 const focusOn = d => { const f = D().focus[d] || {}, t = f.mitId ? D().tasks.find(x => x.id === f.mitId) : null; return { mit: t ? t.title : (f.mit || ''), mitId: t ? t.id : '', fun: f.fun || '', energy: normEnergy(f.energy) }; };
 function focusCard(d) {
@@ -1409,6 +1429,16 @@ const views = {
   },
   assistant() { return asstView(); },
   assistmem() { return asstMemView(); },
+  cheer() {
+    const all = cheerAll(), cat = state.cheerCat || '', list = cat ? all.filter(c => c.cat === cat) : all, cur = cheerPick(list, state.remShift);
+    return `<div class="top"><h1>💪 עידוד</h1></div><p class="sub">המשפטים שלי, שמזכירים לי מי אני רוצה להיות. אני מחליט מה כתוב כאן.</p>
+      <div class="cheerhero">${cur ? esc(cur.text) : 'אין עדיין משפטים בקטגוריה הזו'}${cur ? '<span class="sub">' + esc(cheerCatName(cur.cat)) + '</span>' : ''}</div>
+      <button class="btn" style="width:100%;margin-bottom:12px" data-act="nextReminder" ${list.length > 1 ? '' : 'disabled'}>🔄 עוד משפט</button>
+      <div class="opt" style="margin-bottom:8px"><button class="${cat ? '' : 'on'}" data-act="cheerCat" data-c="">הכל (${all.length})</button>${CHEER_CATS.map(([k, l]) => `<button class="${cat === k ? 'on' : ''}" data-act="cheerCat" data-c="${k}">${l} (${all.filter(c => c.cat === k).length})</button>`).join('')}</div>
+      <h2>הרשימה שלי (${list.length})</h2>
+      ${list.map(c => `<div class="card row"><div class="grow"><div class="t">${esc(c.text)}</div><div class="meta"><span class="chip">${esc(cheerCatName(c.cat))}</span></div></div><button class="iconbtn" data-act="cheerEdit" data-id="${c.id}" aria-label="עריכה">✏️</button><button class="iconbtn" data-act="cheerDel" data-id="${c.id}" aria-label="מחיקה">🗑</button></div>`).join('') || '<div class="empty">אין משפטים בקטגוריה הזו עדיין</div>'}
+      <button class="btn ghost" style="width:100%;margin-top:10px" data-act="cheerAdd">＋ משפט חדש</button>`;
+  },
   goals() {
     const F = state.goalFilter, all = D().goals.map(g => ({ g, s: goalState(g) }));
     const active = all.filter(x => !x.s.achieved && !x.s.missed), done = all.filter(x => x.s.achieved), missed = all.filter(x => x.s.missed);
@@ -1909,7 +1939,7 @@ function accountSheet() {
 }
 
 /* ---------- Print ---------- */
-const pTitle = t => { const n = t.projectId && projectName(t.projectId); return (n ? n + ': ' : '') + t.title; };
+const pTitle = t => { const n = t.projectId && projectName(t.projectId); return (n ? '⁧' + n + '⁩: ' : '') + t.title; };
 function printHTML(html) {
   $('#print').innerHTML = html;
   setTimeout(() => window.print(), 50);
@@ -2032,7 +2062,14 @@ const A = {
   addProject: () => projectForm(),
   openProject: e => { state.openProject = e.id; render(); window.scrollTo(0, 0); },
   backProjects: () => { state.openProject = null; state.openJob = null; render(); },
-  renameProject: e => { const p = D().projects.find(x => x.id === e.id), n = (prompt('שם הפרויקט', p.title) || '').trim(); if (n) { p.title = n; Store.save(); render(); } },
+  projToggle: e => { const po = state.projOpen = state.projOpen || {}; po[e.id] = !(po[e.id] === undefined ? e.id === 'none' : po[e.id]); render(); },
+  renameProject: e => {
+    const p = D().projects.find(x => x.id === e.id); if (!p) return;
+    sheet(`<h1>✏️ שם הפרויקט</h1><form id="rnForm"><input id="rnText" value="${esc(p.title)}" maxlength="80" autocomplete="off" required>
+      <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
+    const inp = $('#rnText'); inp.focus(); inp.select();
+    $('#rnForm').onsubmit = ev => { ev.preventDefault(); const n = inp.value.trim(); if (n) { p.title = n; Store.save(); } closeSheet(); render(); };
+  },
   delProject: e => { if (confirm('למחוק את הפרויקט? הפעולות שלו יישארו, בלי פרויקט.')) { D().tasks.forEach(t => { if (t.projectId === e.id) t.projectId = ''; }); D().jobs.forEach(j => { if (j.projectId === e.id) j.projectId = ''; }); D().projects = D().projects.filter(p => p.id !== e.id); state.openProject = null; Store.save(); render(); } },
   projAddTask: e => taskForm(undefined, null, e.id),
   newProjectForm: () => projectForm(),
@@ -2055,6 +2092,12 @@ const A = {
     habBulk = []; Store.save(); closeSheet(); render();
   },
   capture: () => captureSheet(),
+  cheerCat: e => { state.cheerCat = e.c || ''; render(); },
+  cheerAdd: () => cheerSheet(''),
+  cheerEdit: e => cheerSheet(e.id),
+  cheerDel: e => { const a = cheerAll(), i = a.findIndex(x => x.id === e.id); if (i < 0) return; state.cheerUndo = { it: a.splice(i, 1)[0], i }; Store.save(); render(); toast('<span>המשפט נמחק</span><button class="btn" data-act="cheerUndo">בטל</button><button data-act="toastClose">✕</button>', 6000); },
+  cheerUndo: () => { const u = state.cheerUndo; if (u) { cheerAll().splice(u.i, 0, u.it); state.cheerUndo = null; Store.save(); } $('#toast').hidden = true; render(); },
+  stuckCheer: () => { state.stuckShift = (state.stuckShift || 0) + 1; const el = $('#stuckCheer'); if (el) el.textContent = '💬 ' + stuckLine(); },
   nextReminder: () => { state.remShift = (state.remShift || 0) + 1; render(); },
   runBreakMin: e => runOpen(null, true, +e.m, e.l),
   focusMethod: e => focusMethod(e.k),
