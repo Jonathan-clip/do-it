@@ -386,3 +386,19 @@ body.miniRun #view{padding-bottom:170px}
 .pmcb.sw input:checked+span{border-color:var(--ink)}
 .pmcb{position:relative}
 @media (prefers-reduced-motion:reduce){.pmarc,.pmfocusbig{animation:none}}
+.pmrevs{margin-bottom:10px}
+.pmrevrow{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:14px;align-items:center}
+.pmrevrow:first-of-type{margin-top:6px}
+.pmrevrow.col{flex-direction:column;align-items:flex-start;gap:4px}
+.pmup{color:var(--brand)}
+.pmover{color:var(--danger);font-weight:600;font-size:14px}
+.pmload{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--line);margin-top:8px}
+.pmseg{height:100%}
+.pmcap{position:relative;height:0}
+.pmcap::after{content:"";position:absolute;top:-22px;width:2px;height:28px;background:var(--ink)}
+.pmdot{display:inline-block;width:10px;height:10px;border-radius:50%}
+.pmweeks{display:flex;gap:6px;align-items:flex-end;height:90px;margin:8px 0 12px}
+.pmweeks>div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:2px}
+.pmweeks i{display:block;width:100%;min-height:3px;border-radius:5px 5px 0 0;opacity:.85}
+.pmweeks small{font-size:11px;color:var(--ink)}.pmweeks em{font-size:10px;color:var(--muted);font-style:normal}
+.pmhday{margin-top:8px}.pmhrow{padding:3px 0;font-size:14px}
