@@ -264,3 +264,27 @@ html[data-design="spatial"] .hxproj .bar{margin:5px 0 2px}
 html[data-design="spatial"] .isle .isleps{display:block;max-width:100%;font-size:11px;color:var(--ink);opacity:.8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html[data-design="spatial"] .pmassign,.pmassign{display:flex;align-items:center;gap:10px}
 .pmassign .btn{flex:none;padding:10px 14px}
+
+/* ---------- Calm by default: colour and motion live where you look around (map, projects); work screens stay quiet ---------- */
+html[data-design="spatial"]{--glass:.9}
+html[data-design="spatial"] body.skyfull{--glass:.62}
+html[data-design="spatial"][data-fx="immersive"] body.skyfull{--glass:.5}
+html[data-design="spatial"] body::before{filter:blur(28px) saturate(.75);transform:scale(1.2);opacity:.5}
+html[data-design="spatial"] body.skyfull::before{filter:none;transform:none;opacity:1}
+html[data-design="spatial"] body.running::before{opacity:0}
+html[data-design="spatial"] body{transition:none}
+/* no entrance choreography on work screens; only the map eases in */
+html[data-design="spatial"][data-fx] #view.enter>*{animation:none}
+html[data-design="spatial"][data-fx="spatial"] body.skyfull #view.enter>*,html[data-design="spatial"][data-fx="immersive"] body.skyfull #view.enter>*{animation:sx-rise .5s var(--ease) both;animation-delay:calc(var(--i,0)*35ms)}
+/* islands stay still until you point at them */
+html[data-design="spatial"][data-fx] .isle{animation:none}
+/* lists do not jump around under the pointer */
+html[data-design="spatial"] body:not(.skyfull) .card[data-act]:hover,html[data-design="spatial"] body:not(.skyfull) .card.row:hover{transform:none}
+html[data-design="spatial"] body:not(.skyfull) .fab:hover{transform:none}
+/* one icon family: emoji become single-colour glyphs (project icons keep their colour) */
+html[data-design="spatial"] #view,html[data-design="spatial"] #nav,html[data-design="spatial"] .sheet,html[data-design="spatial"] #run{font-variant-emoji:text}
+html[data-design="spatial"] .pmicon,html[data-design="spatial"] .pmhero .pmicon,html[data-design="spatial"] .pmface{font-variant-emoji:emoji}
+@supports not (font-variant-emoji:text){
+  html[data-design="spatial"] .card.row>span:first-child,html[data-design="spatial"] .iconbtn,html[data-design="spatial"] .seg button{filter:grayscale(1) opacity(.8)}
+  html[data-design="spatial"] .pmicon{filter:none!important}
+}
