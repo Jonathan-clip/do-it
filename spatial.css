@@ -159,3 +159,15 @@ html[data-design="spatial"] .pmviewseg{margin-bottom:8px}
 html[data-design="spatial"] .pmimg{display:block;object-fit:contain;filter:drop-shadow(0 10px 12px color-mix(in srgb,var(--pc,var(--brand)) 22%,transparent));user-select:none;-webkit-user-drag:none}
 html[data-design="spatial"] .isle .isleimg{width:100%;height:auto;aspect-ratio:1}
 html[data-design="spatial"] .isle b{margin-top:-14px}
+
+/* theme tint: the illustrations are painted in natural colours; a colour-blend layer clipped to the picture's own shape recolours them to the chosen theme */
+html[data-design="spatial"] .pmimgw{position:relative;display:block;flex:none;isolation:isolate}
+html[data-design="spatial"] .pmimgw>img{width:100%;height:100%}
+html[data-design="spatial"] .pmimgw::after{content:"";position:absolute;inset:0;pointer-events:none;background:var(--tint,var(--brand));mix-blend-mode:color;opacity:var(--tintop,.6);-webkit-mask:var(--src) center/contain no-repeat;mask:var(--src) center/contain no-repeat}
+html[data-design="spatial"][data-theme="nature"]{--tintop:0}
+html[data-design="spatial"][data-theme="lavender"]{--tint:#8a6cf0;--tintop:.62}
+html[data-design="spatial"][data-theme="ocean"]{--tint:#1596c0;--tintop:.6}
+html[data-design="spatial"][data-theme="sunset"]{--tint:#f0743a;--tintop:.58}
+html[data-design="spatial"][data-theme="midnight"]{--tint:#7f7cf0;--tintop:.6}
+html[data-design="spatial"][data-theme="midnight"] .pmimgw>img{filter:brightness(.82) saturate(1.1) drop-shadow(0 10px 12px rgba(0,0,0,.45))}
+html[data-design="spatial"] .isle .isleimg,html[data-design="spatial"] .isle .pmimgw{width:100%!important;height:auto!important;aspect-ratio:1}

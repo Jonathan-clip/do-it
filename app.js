@@ -1238,7 +1238,7 @@ const pmStageOf = pr => pr >= 100 ? 5 : pr >= 75 ? 4 : pr >= 50 ? 3 : pr >= 25 ?
 const pmHigh = p => { const pr = pmPct(p) || 0; if (pr > (p.pmMax || 0)) p.pmMax = pr; return p.pmMax || 0; }; // a quiet week never shrinks the object
 const pmObjInner = (kind, stage) => '<ellipse cx="32" cy="56" rx="24" ry="5" fill="currentColor" opacity=".16"/>' + PM_OBJ[kind].filter(x => x[0] <= stage).map(x => x[1]).join('');
 const pmLevel = pr => pr >= 70 ? 3 : pr >= 30 ? 2 : 1;
-const pmImg = (kind, level, size, cls) => `<img class="pmobj pmimg ${cls || ''}" src="assets/obj/${kind}${level}.png" width="${size}" height="${size}" alt="" loading="lazy" decoding="async" draggable="false">`;
+const pmImg = (kind, level, size, cls) => { const u = "assets/obj/" + kind + level + ".png"; return `<span class="pmimgw ${cls || ''}" style="--src:url(${u});width:${size}px;height:${size}px"><img class="pmobj pmimg" src="${u}" width="${size}" height="${size}" alt="" loading="lazy" decoding="async" draggable="false"></span>`; };
 const pmObj = (p, size) => pmImg(pmKind(p.area), pmLevel(pmHigh(p)), size);
 const pmObjSvg = (p, size) => `<svg class="pmobj" style="width:${size}px;height:${size}px" viewBox="0 0 64 64" aria-hidden="true">${pmObjInner(pmKind(p.area), pmStageOf(pmHigh(p)))}</svg>`;
 const pmNextMile = p => { const t = pmOrdered(p).find(x => x.milestone); return t ? t.title : ''; };
