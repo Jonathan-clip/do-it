@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.4'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.5'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -157,8 +157,9 @@ function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in lo
   }; im.src = r.result; };
   r.readAsDataURL(file);
 }
-const MORE_TABS = ['journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
+const MORE_TABS = ['week', 'journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
 const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', allMode: 'list', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
+try { if (D().assist && D().assist.homeTab === 'map') state.tab = 'map'; } catch (e) {}
 state.mode = (() => { try { const m = localStorage.getItem('doit-mode'); if (m === 'plan' || m === 'do') return m; } catch (e) {} return window.matchMedia && matchMedia('(max-width: 700px)').matches ? 'do' : 'plan'; })();
 // Weekly vision data lives in D().weeks[<Sunday date>]; created lazily on first edit.
 const weekData = ws => (D().weeks[ws] = D().weeks[ws] || { vision: '', outcomes: [], visionIds: [], worked: '', improve: '' });
@@ -1192,6 +1193,182 @@ const filterBar = () => '<details class="fdet" ' + (state.fQuad || state.fWant ?
   + '<div class="opt fq"><span class="sub">🧭</span>' + [['', 'הכל']].concat(QUADS.map(q => [q[0], q[1]]), [['none', 'ללא סיווג']]).map(([k, l]) => '<button class="' + ((state.fQuad || '') === k ? 'on' : '') + '" data-act="filterQuad" data-q="' + k + '">' + l + '</button>').join('') + '</div>'
   + '<div class="opt fq"><span class="sub">💗</span>' + [[0, 'הכל'], [3, '3 ומעלה'], [4, '4 ומעלה'], [5, '5']].map(([n, l]) => '<button class="' + ((state.fWant || 0) === n ? 'on' : '') + '" data-act="filterWant" data-n="' + n + '">' + l + '</button>').join('') + '</div>'
   + (state.fQuad || state.fWant ? '<button class="lnk" data-act="filterReset">נקה סינון</button>' : '') + '</details>';
+/* ---------- Project map: a calm overview of the projects I promote (why, values, progress, weekly focus) ---------- */
+const PM_STATUS = [['focus', '🎯', 'במיקוד כרגע'], ['active', '🌱', 'פעיל'], ['paused', '⏸️', 'מושהה'], ['future', '🔭', 'עתידי'], ['done', '🏁', 'הושלם']];
+const PM_AREAS0 = [['a1', '💼', 'עסקים וקריירה'], ['a2', '🚀', 'יזמות'], ['a3', '📚', 'למידה והתפתחות מקצועית'], ['a4', '💰', 'כלכלה והשקעות'], ['a5', '🏃', 'בריאות וספורט'], ['a6', '🤝', 'מערכות יחסים וחיים חברתיים'], ['a7', '🌱', 'התפתחות אישית'], ['a8', '🎈', 'פנאי וחוויות'], ['a9', '🌟', 'חלומות ושאיפות עתידיות']];
+const PM_VALUES0 = ['סקרנות', 'יצירתיות', 'יזמות', 'למידה', 'אומץ', 'הנאה', 'חופש', 'נוכחות'];
+const PM_COLORS = ['#1f6f5c', '#e8a33d', '#3b6fd4', '#c0453a', '#8a5cc2', '#2f9aa8', '#d46a9c', '#6f8f2f'];
+const PM_ICONS = ['🚀', '💼', '📚', '💰', '🏃', '❤️', '🌱', '🎨', '🏠', '✈️', '🎯', '💡', '🛠️', '🎓', '🧘', '🌟'];
+const PM_RANGES = [['m1', 'עד חודש'], ['m3', 'עד 3 חודשים'], ['m6', 'עד חצי שנה'], ['y1', 'עד שנה'], ['long', 'טווח ארוך']];
+const PM_PRIO = [['high', 'גבוהה'], ['mid', 'בינונית'], ['low', 'נמוכה']];
+const pmAreas = () => (D().assist.areas && D().assist.areas.length ? D().assist.areas : PM_AREAS0.map(([id, icon, name]) => ({ id, icon, name })));
+const pmValues = () => D().assist.values || PM_VALUES0;
+const pmSaveAreas = a => { D().assist.areas = a; Store.save(); };
+const pmArea = p => pmAreas().find(a => a.id === p.area);
+const pmStatus = p => p.status || 'active';
+const pmColor = p => p.color || PM_COLORS[Math.max(0, D().projects.indexOf(p)) % PM_COLORS.length];
+const pmIcon = p => p.icon || '📁';
+const pmPct = p => { const s = projState(p); return s.total ? s.pct : null; }; // main actions only; sub-actions are not counted twice
+const pmDays = p => p.due ? Math.round((parse(p.due) - parse(TODAY())) / 864e5) : null;
+const pmLeft = p => { const n = pmDays(p); if (n === null) return 'ללא תאריך יעד'; if (n < 0) return `עברו ${-n} ימים מהיעד`; if (n === 0) return 'היעד היום'; if (n <= 45) return `נותרו ${n} ימים`; const m = Math.round(n / 30.4); if (m < 18) return `נותרו כ-${m} חודשים`; return `נותרו כ-${(n / 365).toFixed(1).replace('.0', '')} שנים`; };
+const pmInRange = (p, r) => { if (!r) return true; const n = pmDays(p); if (r === 'long') return n === null || n > 366; return n !== null && n <= { m1: 31, m3: 92, m6: 183, y1: 366 }[r]; };
+const pmFocusTask = p => { const t = p.focusTaskId && findTask(p.focusTaskId); return t && t.projectId === p.id && !t.done ? t : null; };
+const pmOrdered = p => D().tasks.filter(t => t.projectId === p.id && !t.done).map((t, i) => [t, i]).sort((a, b) => (a[0].pord ?? 1e6 + a[1]) - (b[0].pord ?? 1e6 + b[1])).map(x => x[0]);
+const pmRing = (p, size) => {
+  const pr = pmPct(p), r = 26, c = 2 * Math.PI * r;
+  if (pr === null) return `<div class="pmring none" style="width:${size}px;height:${size}px"><small>התקדמות<br>טרם הוגדרה</small></div>`;
+  return `<div class="pmring" style="width:${size}px;height:${size}px"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--line)" stroke-width="7"/><circle class="pmarc" cx="32" cy="32" r="${r}" fill="none" stroke="${pmColor(p)}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - pr / 100)).toFixed(1)}" style="--c:${c.toFixed(1)}" transform="rotate(-90 32 32)"/></svg><b>${pr}%</b></div>`;
+};
+const pmChips = p => (p.values || []).map(v => `<span class="pmval">${esc(v)}</span>`).join('');
+function pmCard(p) {
+  const f = pmFocusTask(p), st = PM_STATUS.find(x => x[0] === pmStatus(p)), a = pmArea(p), live = ['focus', 'active'].includes(pmStatus(p));
+  return `<div class="pmcard" style="--pc:${pmColor(p)}" data-act="pmOpen" data-id="${p.id}">
+    <div class="pmhead"><span class="pmicon">${pmIcon(p)}</span><div class="grow"><b class="pmname">${esc(p.title)}</b><div class="sub">${a ? esc(a.icon + ' ' + a.name) + ' · ' : ''}${st[1]} ${st[2]}</div></div>${pmRing(p, 68)}</div>
+    <div class="pmleft">⏳ ${pmLeft(p)}${p.due ? ' · ' + shortDate(p.due) : ''}</div>
+    ${p.why ? `<div class="pmwhy">“${esc(p.why)}”</div>` : `<div class="pmwhy none">אפשר להוסיף כאן את ה״למה״ שלך (✏️ בתוך הפרויקט)</div>`}
+    ${p.values && p.values.length ? `<div class="pmvals">${pmChips(p)}</div>` : ''}
+    ${f ? `<div class="pmfocus">🎯 <span>המיקוד השבוע</span><b>${esc(f.title)}</b></div>` : (live ? `<button class="lnk pmpick" data-act="pmFocusSet" data-id="${p.id}">＋ בחר מיקוד לשבוע</button>` : '')}
+    <div class="pmopen">לפתיחת הפרויקט ${chev('l')}</div></div>`;
+}
+function pmVisible() {
+  const S = state.pmStatus || 'live', A = state.pmArea || '', R = state.pmRange || '';
+  const rank = p => ({ focus: 0, active: 1, future: 2, paused: 3, done: 4 }[pmStatus(p)]), pr = p => ({ high: 0, mid: 1, low: 2 }[p.prio] ?? 1);
+  return D().projects.filter(p => (S === 'all' || (S === 'live' ? ['focus', 'active'].includes(pmStatus(p)) : pmStatus(p) === S)) && (!A || p.area === A) && pmInRange(p, R))
+    .sort((a, b) => rank(a) - rank(b) || pr(a) - pr(b) || (a.due || '9999').localeCompare(b.due || '9999'));
+}
+function pmMap() {
+  const S = state.pmStatus || 'live', list = pmVisible(), home = D().assist.homeTab === 'map', live = D().projects.filter(p => ['focus', 'active'].includes(pmStatus(p)));
+  const sel = (key, cur, opts, all) => `<select data-pmf="${key}" aria-label="${all}"><option value="">${all}</option>${opts.map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  return `<div class="top"><h1>🗺️ מפת הפרויקטים שלי</h1><div class="sw"><button class="iconbtn" data-act="pmHome" aria-label="מסך הבית" title="${home ? 'זה מסך הבית. לחץ לביטול' : 'הפוך למסך הבית'}">${home ? '🏠' : '🏡'}</button><button class="iconbtn" data-act="pmNew" aria-label="פרויקט חדש">＋</button></div></div>
+    <div class="sub" style="margin:-4px 0 12px">לאן אני הולך, ולמה זה חשוב לי</div>
+    <div class="seg">${[['live', 'פעילים'], ...PM_STATUS.map(x => [x[0], x[1] + ' ' + x[2]]), ['all', 'הכל']].map(([k, l]) => `<button class="${S === k ? 'on' : ''}" data-act="pmStatusF" data-k="${k}">${l}</button>`).join('')}</div>
+    <div class="pmfilters">${sel('pmArea', state.pmArea || '', pmAreas().map(a => [a.id, a.icon + ' ' + a.name]), 'כל התחומים')}${sel('pmRange', state.pmRange || '', PM_RANGES, 'כל טווח זמן')}<button class="iconbtn" data-act="pmAreasSheet" aria-label="עריכת תחומי חיים" title="תחומי חיים">⚙️</button></div>
+    ${live.length ? `<button class="btn ghost pmweek" data-act="pmWalk">🧭 כוונון שבוע: מה אני מקדם בכל פרויקט</button>` : ''}
+    ${list.map(pmCard).join('') || `<div class="empty">${D().projects.length ? 'אין פרויקטים שמתאימים לסינון הזה' : 'עוד אין פרויקטים. אפשר להתחיל מאחד שחשוב לך'}</div>`}`;
+}
+function pmDetail(p) {
+  const f = pmFocusTask(p), st = pmStatus(p), s = projState(p), open = pmOrdered(p), done = s.ts.filter(t => t.done), a = pmArea(p), wasF = p.focusTaskId && !f && findTask(p.focusTaskId);
+  const rowH = t => {
+    const subs = (t.subs && t.subs.length && !t.collapsed) ? `<div class="subs">${t.subs.map(x => `<div class="row ${x.done ? 'done' : ''}"><button class="check ${x.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${x.id}">${x.done ? '✓' : ''}</button><div class="t grow" data-act="taskMenu" data-id="${t.id}">${esc(x.title)}</div></div>`).join('')}</div>` : '';
+    return `<div class="pmrow ${p.focusTaskId === t.id ? 'isfocus' : ''}" data-tid="${t.id}"><div class="card row ${t.milestone ? 'mile' : ''}"><span class="pmgrip" aria-label="גרור לשינוי סדר" title="גרור לשינוי סדר">⋮⋮</span>
+      <button class="check" data-act="toggleTask" data-id="${t.id}"></button>
+      <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${t.milestone ? '⭐ ' : ''}${esc(t.title)}</div><div class="meta">${t.date ? `<span>📅 ${t.date === TODAY() ? 'היום' : shortDate(t.date)}</span>` : ''}${subToggle(t)}${p.focusTaskId === t.id ? '<span class="chip">🎯 מיקוד השבוע</span>' : ''}</div></div>
+      <div class="pmtools"><button class="pmmini ${t.milestone ? 'on' : ''}" data-act="pmMile" data-id="${t.id}" aria-label="אבן דרך" title="אבן דרך">⭐</button><button class="pmmini ${p.focusTaskId === t.id ? 'on' : ''}" data-act="pmFocusTask" data-id="${t.id}" aria-label="מיקוד השבוע" title="מיקוד השבוע">🎯</button><button class="pmmini" data-act="pmToday" data-id="${t.id}" aria-label="העבר להיום" title="העבר למשימות היום">📥</button></div></div>${subs}</div>`;
+  };
+  const field = (l, v) => v ? `<div class="pmfield"><span>${l}</span><div>${v}</div></div>` : '';
+  return `<div class="top"><div class="row"><button class="iconbtn" data-act="pmBack" aria-label="חזרה למפה">${chev('r')}</button><h1>${esc(p.title)}</h1></div><div class="sw"><button class="iconbtn" data-act="pmEdit" data-id="${p.id}" aria-label="עריכה">✏️</button></div></div>
+    <div class="pmhero" style="--pc:${pmColor(p)}"><span class="pmicon big">${pmIcon(p)}</span><div class="grow"><div class="sub">${a ? esc(a.icon + ' ' + a.name) : 'ללא תחום'}</div><div class="pmoutcome">${p.outcome ? esc(p.outcome) : '<span class="sub">עוד לא הוגדרה תוצאה רצויה</span>'}</div><div class="pmleft">⏳ ${pmLeft(p)}</div></div>${pmRing(p, 92)}</div>
+    <div class="card pminfo">${p.why ? `<div class="pmwhy big">“${esc(p.why)}”</div>` : ''}
+      ${p.values && p.values.length ? `<div class="pmvals">${pmChips(p)}</div>` : ''}
+      ${field('איך אני רוצה להרגיש', esc(p.feel || ''))}${field('התחלה', p.start ? longDate(p.start) : '')}${field('יעד', p.due ? longDate(p.due) : '')}
+      ${field('שעות בשבוע', p.hours ? p.hours + ' שעות' : '')}
+      <div class="pmfield"><span>סטטוס</span><div><select data-pmset="status">${PM_STATUS.map(x => `<option value="${x[0]}" ${x[0] === st ? 'selected' : ''}>${x[1]} ${x[2]}</option>`).join('')}</select></div></div>
+      <div class="pmfield"><span>עדיפות</span><div><select data-pmset="prio"><option value="">לא הוגדרה</option>${PM_PRIO.map(([k, l]) => `<option value="${k}" ${p.prio === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div></div>
+    ${f ? `<div class="pmfocusbig" style="--pc:${pmColor(p)}"><div class="sub">🎯 המיקוד של השבוע</div><div class="row"><button class="check" data-act="toggleTask" data-id="${f.id}"></button><b class="grow" data-act="taskMenu" data-id="${f.id}">${esc(f.title)}</b></div>${p.focusSuccess ? `<div class="sub">הצלחה בסוף השבוע: ${esc(p.focusSuccess)}</div>` : ''}${p.focusValue ? `<div class="sub">מתוך הערך: <span class="pmval">${esc(p.focusValue)}</span></div>` : ''}<button class="lnk" data-act="pmFocusSet" data-id="${p.id}">החלפת מיקוד</button></div>`
+      : `<div class="pmfocusbig empty" style="--pc:${pmColor(p)}">${wasF ? '<b>🎉 הפעולה המרכזית של השבוע הושלמה</b>' : '<div class="sub">אין מיקוד לשבוע הזה (וזה בסדר)</div>'}<button class="btn ghost" data-act="pmFocusSet" data-id="${p.id}">${wasF ? 'בחר מיקוד חדש' : '🎯 בחר מיקוד לשבוע'}</button></div>`}
+    <div class="row" style="margin-top:18px"><h2 class="grow" style="margin:0">תוכנית פעולה (${open.length})</h2></div>
+    <div class="opt" style="margin:8px 0"><button data-act="projAddTask" data-id="${p.id}">＋ פעולה</button><button data-act="projBulk" data-id="${p.id}">📋 הזנה מרוכזת</button><button data-act="projAssign" data-id="${p.id}">🔗 שייך פעולות קיימות</button></div>
+    <div id="pmlist">${open.map(rowH).join('') || '<div class="empty">אין עדיין פעולות. התקדמות תוצג כשיהיו</div>'}</div>
+    ${open.length > 1 ? '<div class="sub" style="text-align:center">גרור את ⋮⋮ כדי לשנות סדר · ⭐ אבן דרך · 🎯 מיקוד · 📥 למשימות היום</div>' : ''}
+    ${done.length ? `<details class="pmdone"><summary>הושלמו (${done.length})</summary>${done.map(t => `<div class="card row done"><button class="check on" data-act="toggleTask" data-id="${t.id}">✓</button><div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${t.milestone ? '⭐ ' : ''}${esc(t.title)}</div></div></div>`).join('')}</details>` : ''}`;
+}
+function pmForm(id) {
+  const p = id ? D().projects.find(x => x.id === id) : { title: '', icon: PM_ICONS[0], color: '', status: 'active', values: [], prio: 'mid' };
+  if (!p) return;
+  const vals = [...new Set([...pmValues(), ...(p.values || [])])], col = p.color || (id ? pmColor(p) : PM_COLORS[D().projects.length % PM_COLORS.length]);
+  sheet(`<h1>${id ? '✏️ עריכת פרויקט' : '🗺️ פרויקט חדש'}</h1><form id="pmForm">
+    <label>שם הפרויקט</label><input name="title" required maxlength="80" value="${esc(p.title)}" autocomplete="off">
+    <label>מה אני רוצה להשיג? (התוצאה הרצויה)</label><textarea name="outcome" rows="2">${esc(p.outcome || '')}</textarea>
+    <label>למה זה חשוב לי? מה זה יתרום לחיים שלי?</label><textarea name="why" rows="2" placeholder="משפט קצר, בשפה שלי">${esc(p.why || '')}</textarea>
+    <label>מתוך אילו ערכים אני רוצה לפעול?</label><div class="pmpick2">${vals.map(v => `<label class="pmcb"><input type="checkbox" name="val" value="${esc(v)}" ${(p.values || []).includes(v) ? 'checked' : ''}><span>${esc(v)}</span></label>`).join('')}</div>
+    <input name="newval" placeholder="ערך משלי (אפשר כמה, מופרדים בפסיק)" autocomplete="off">
+    <label>איך אני רוצה להרגיש כשאני עובד על זה?</label><input name="feel" value="${esc(p.feel || '')}" placeholder="רגוע, סקרן, בשליטה..." autocomplete="off">
+    <div class="row" style="gap:10px"><div class="grow"><label>תאריך התחלה</label><input type="date" name="start" value="${p.start || ''}"></div><div class="grow"><label>תאריך יעד</label><input type="date" name="due" value="${p.due || ''}"></div></div>
+    <div class="row" style="gap:10px"><div class="grow"><label>תחום חיים</label><select name="area" onchange="pmAreaNew(this)"><option value="">ללא תחום</option>${pmAreas().map(a => `<option value="${a.id}" ${a.id === p.area ? 'selected' : ''}>${esc(a.icon + ' ' + a.name)}</option>`).join('')}<option value="__new__">＋ תחום חדש...</option></select></div>
+    <div class="grow"><label>סטטוס</label><select name="status">${PM_STATUS.map(x => `<option value="${x[0]}" ${x[0] === (p.status || 'active') ? 'selected' : ''}>${x[1]} ${x[2]}</option>`).join('')}</select></div></div>
+    <div class="row" style="gap:10px"><div class="grow"><label>עדיפות</label><select name="prio">${PM_PRIO.map(([k, l]) => `<option value="${k}" ${(p.prio || 'mid') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    <div class="grow"><label>שעות בשבוע</label><input type="number" name="hours" min="0" max="80" step="0.5" value="${p.hours || ''}"></div></div>
+    <label>אייקון</label><div class="pmpick2">${PM_ICONS.map(i => `<label class="pmcb ic"><input type="radio" name="icon" value="${i}" ${i === (p.icon || PM_ICONS[0]) ? 'checked' : ''}><span>${i}</span></label>`).join('')}</div>
+    <label>צבע</label><div class="pmpick2">${PM_COLORS.map(c => `<label class="pmcb sw"><input type="radio" name="color" value="${c}" ${c === col ? 'checked' : ''}><span style="background:${c}"></span></label>`).join('')}</div>
+    <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>
+    ${id ? `<button type="button" class="btn danger" style="width:100%;margin-top:10px" data-act="delProjectSheet" data-id="${id}">🗑 מחק את הפרויקט</button>` : ''}`);
+  $('#pmForm').onsubmit = ev => {
+    ev.preventDefault(); const f = new FormData(ev.target), title = (f.get('title') || '').trim(); if (!title) return;
+    const extra = (f.get('newval') || '').split(/[,،]/).map(x => x.trim()).filter(Boolean), values = [...new Set([...f.getAll('val'), ...extra])];
+    if (extra.length) D().assist.values = [...new Set([...pmValues(), ...extra])];
+    const q = p.id ? p : { id: uid(), createdAt: TODAY() };
+    Object.assign(q, { title, outcome: (f.get('outcome') || '').trim(), why: (f.get('why') || '').trim(), values, feel: (f.get('feel') || '').trim(), start: f.get('start') || '', due: f.get('due') || '', area: f.get('area') === '__new__' ? '' : (f.get('area') || ''), status: f.get('status') || 'active', prio: f.get('prio') || 'mid', hours: +f.get('hours') || 0, icon: f.get('icon') || PM_ICONS[0], color: f.get('color') || '' });
+    if (!p.id) D().projects.push(q);
+    Store.save(); closeSheet(); if (!p.id) state.pmOpen = q.id; render(); window.scrollTo(0, 0);
+  };
+}
+window.pmAreaNew = sel => { // "＋ תחום חדש..." inside the project form
+  if (sel.value !== '__new__') return;
+  const name = (prompt('שם תחום החיים החדש') || '').trim();
+  if (!name) { sel.value = ''; return; }
+  const a = { id: uid(), icon: '📌', name }; pmSaveAreas([...pmAreas(), a]);
+  sel.add(new Option(a.icon + ' ' + a.name, a.id), sel.options[sel.options.length - 1]); sel.value = a.id;
+};
+function pmAreasSheet() {
+  sheet(`<h1>⚙️ תחומי חיים</h1><div class="sub" style="margin-bottom:8px">אפשר להוסיף, לשנות שם ולמחוק. פרויקטים לא נמחקים כשמוחקים תחום.</div>
+    ${pmAreas().map(a => `<div class="card row"><span style="font-size:22px">${esc(a.icon)}</span><div class="grow">${esc(a.name)}</div><button class="iconbtn" data-act="pmAreaEdit" data-id="${a.id}" aria-label="שנה שם">✏️</button><button class="iconbtn" data-act="pmAreaDel" data-id="${a.id}" aria-label="מחק">🗑</button></div>`).join('')}
+    <div class="actions"><button class="btn ghost" data-act="close">סגור</button><button class="btn" data-act="pmAreaAdd">＋ תחום חדש</button></div>`);
+}
+function pmFocusSheet(id) {
+  const p = D().projects.find(x => x.id === id); if (!p) return;
+  const open = pmOrdered(p), vals = p.values && p.values.length ? p.values : pmValues(), q = state.pmQueue, pos = q ? `(${q.i + 1} מתוך ${q.ids.length}) ` : '';
+  sheet(`<h1>🎯 ${pos}${pmIcon(p)} ${esc(p.title)}</h1><div class="sub" style="margin-bottom:6px">אפשר גם לא לבחור כלום לפרויקט הזה השבוע</div>
+    <form id="pmFocusForm"><label>מה הדבר החשוב ביותר שאני רוצה לקדם השבוע?</label>
+    <select name="task"><option value="">ללא מיקוד השבוע</option>${open.map(t => `<option value="${t.id}" ${t.id === p.focusTaskId ? 'selected' : ''}>${esc(t.title)}</option>`).join('')}</select>
+    <input name="newtask" placeholder="או פעולה חדשה (מתחילה בפועל)" autocomplete="off">
+    <label>מה ייחשב לי להצלחה בסוף השבוע?</label><input name="success" value="${esc(p.focusSuccess || '')}" autocomplete="off">
+    <label>מתוך איזה ערך אני רוצה לפעול השבוע?</label>
+    <select name="value"><option value="">לא בחרתי</option>${vals.map(v => `<option value="${esc(v)}" ${v === p.focusValue ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
+    <div class="actions"><button type="button" class="btn ghost" data-act="${q ? 'pmWalkSkip' : 'close'}">${q ? 'דלג' : 'ביטול'}</button><button class="btn">${q && q.i < q.ids.length - 1 ? 'שמור והבא' : 'שמור'}</button></div></form>`);
+  $('#pmFocusForm').onsubmit = ev => {
+    ev.preventDefault(); const f = new FormData(ev.target), nt = (f.get('newtask') || '').trim();
+    let tid = f.get('task') || '';
+    if (nt) { const t = { id: uid(), title: nt, date: null, done: false, priority: 0, energy: 3, mins: 15, brainless: false, print: false, visionId: '', projectId: p.id, notes: '', subs: [], jobId: '' }; D().tasks.push(t); tid = t.id; }
+    Object.assign(p, { focusTaskId: tid, focusSuccess: tid ? (f.get('success') || '').trim() : '', focusValue: tid ? (f.get('value') || '') : '', focusWeek: tid ? weekStart(TODAY()) : '' });
+    Store.save(); pmWalkNext();
+  };
+}
+function pmWalkNext() { // after saving / skipping one project in the weekly tune-up: the next one, or finish
+  const q = state.pmQueue; closeSheet();
+  if (q && q.i < q.ids.length - 1) { q.i++; render(); pmFocusSheet(q.ids[q.i]); return; }
+  state.pmQueue = null; render();
+}
+// drag the ⋮⋮ handle to reorder the actions inside a project
+const PMD = {};
+document.addEventListener('pointerdown', e => {
+  const g = e.target.closest('.pmgrip'); if (!g) return; const row = g.closest('.pmrow'); if (!row) return;
+  e.preventDefault(); Object.assign(PMD, { row, sy: e.clientY, pid: e.pointerId, t: null, before: true }); row.classList.add('pmdrag'); try { g.setPointerCapture(e.pointerId); } catch (_) {}
+});
+document.addEventListener('pointermove', e => {
+  if (!PMD.row || e.pointerId !== PMD.pid) return;
+  PMD.row.style.transform = `translateY(${e.clientY - PMD.sy}px)`;
+  const rows = [...document.querySelectorAll('#pmlist .pmrow')].filter(r => r !== PMD.row); rows.forEach(r => r.classList.remove('pmbefore', 'pmafter'));
+  if (!rows.length) return; PMD.before = true;
+  let t = rows.find(r => { const b = r.getBoundingClientRect(); return e.clientY < b.top + b.height / 2; }); if (!t) { t = rows[rows.length - 1]; PMD.before = false; }
+  PMD.t = t; t.classList.add(PMD.before ? 'pmbefore' : 'pmafter');
+  if (e.clientY < 90) window.scrollBy(0, -10); else if (e.clientY > innerHeight - 90) window.scrollBy(0, 10);
+});
+const pmDragEnd = commit => {
+  const { row, t, before } = PMD; if (!row) return; PMD.row = null; row.classList.remove('pmdrag'); row.style.transform = '';
+  document.querySelectorAll('.pmbefore,.pmafter').forEach(r => r.classList.remove('pmbefore', 'pmafter'));
+  if (!commit || !t) return;
+  const ids = [...document.querySelectorAll('#pmlist .pmrow')].map(r => r.dataset.tid).filter(i => i !== row.dataset.tid);
+  ids.splice(ids.indexOf(t.dataset.tid) + (before ? 0 : 1), 0, row.dataset.tid);
+  ids.forEach((id, i) => { const x = findTask(id); if (x) x.pord = i; }); Store.save(); render();
+};
+document.addEventListener('pointerup', e => { if (PMD.row && e.pointerId === PMD.pid) pmDragEnd(true); });
+document.addEventListener('pointercancel', e => { if (PMD.row && e.pointerId === PMD.pid) pmDragEnd(false); });
+document.addEventListener('change', e => {
+  const f = e.target.closest('[data-pmf]'), s = e.target.closest('[data-pmset]');
+  if (f) { state[f.dataset.pmf] = f.value; render(); }
+  if (s) { const p = D().projects.find(x => x.id === state.pmOpen); if (p) { p[s.dataset.pmset] = s.value; Store.save(); render(); } }
+});
+
 const views = {
   today() {
     if (state.mode === 'do' && state.date === TODAY()) return doView();
@@ -1342,6 +1519,11 @@ const views = {
       <label>מה עבד השבוע?</label><textarea data-weekfield="worked" placeholder="מה הלך טוב ורוצה להמשיך">${esc(W.worked)}</textarea>
       <label>מה לשפר בשבוע הבא?</label><textarea data-weekfield="improve" placeholder="מה לשנות, לפשט או להפסיק">${esc(W.improve)}</textarea>`;
   },
+  map() {
+    const p = state.pmOpen && D().projects.find(x => x.id === state.pmOpen);
+    if (p) return pmDetail(p);
+    state.pmOpen = null; return pmMap();
+  },
   projects() {
     if (state.openProject) {
       const p = D().projects.find(x => x.id === state.openProject);
@@ -1366,6 +1548,7 @@ const views = {
       <h2>יומי</h2>
       ${item('journal', '📓', 'יומן', `${journalDays().length} ימים עם רישום`)}
       ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
+      ${item('week', '🧭', 'חזון שבועי', 'תוצאות השבוע, סיכום ותכנון')}
       ${item('dayrewards', '🎁', 'תגמולים יומיים', `${D().dayRewards.length} תגמולים ברשימה`)}
       <h2>תכנון</h2>
       ${item('tasks', '✅', 'כל הפעולות והפרויקטים', `${D().tasks.filter(t => !t.done).length} פעולות פתוחות · ${D().projects.length} פרויקטים · ${D().tasks.filter(t => !t.done && !effQuad(t)).length} לא מסווגות`)}
@@ -1498,7 +1681,7 @@ function render() {
   if (boardScroll === null && $('#uboard') && state.tab === 'upcoming' && state.upMode !== 'month') { const b = $('#uboard'), c = [...b.querySelectorAll('.ucol[data-drop]')].find(x => /^[0-9]{4}-/.test(x.dataset.drop)); if (c) b.scrollLeft += c.getBoundingClientRect().right - b.getBoundingClientRect().right + 16; }
   if (boardScroll !== null && $('#uboard')) $('#uboard').scrollLeft = boardScroll;
   // Entrance animation (FitMe-style soft rise, staggered) only when the screen changes, not on every re-render.
-  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.openList || '') + (state.openProject || '') + (state.openJob || '');
+  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.openList || '') + (state.openProject || '') + (state.openJob || '') + (state.pmOpen || '');
   const enter = state.viewKey !== key; state.viewKey = key;
   if (!enter) { // same screen: put back what was typed, and the cursor
     document.querySelectorAll('#view input, #view select, #view textarea').forEach(el => {
@@ -2069,7 +2252,7 @@ const A = {
   jPhotoPick: () => $('#jphoto').click(),
   jPhotoDel: () => { jSet(state.jDate).photo = ''; Store.save(); render(); },
   jWinDel: e => { const J = jSet(state.jDate); J.wins = J.wins.filter(w => w.id !== e.id); Store.save(); render(); },
-  goTab: e => { state.tab = e.t; state.openList = null; state.openProject = null; state.openJob = null; render(); window.scrollTo(0, 0); },
+  goTab: e => { state.tab = e.t; state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; render(); window.scrollTo(0, 0); },
   addProject: () => projectForm(),
   openProject: e => { state.openProject = e.id; render(); window.scrollTo(0, 0); },
   backProjects: () => { state.openProject = null; state.openJob = null; render(); },
@@ -2082,7 +2265,23 @@ const A = {
     $('#rnForm').onsubmit = ev => { ev.preventDefault(); const n = inp.value.trim(); if (n) { p.title = n; Store.save(); } closeSheet(); render(); };
   },
   delProjectSheet: e => { closeSheet(); A.delProject(e); },
-  delProject: e => { if (confirm('למחוק את הפרויקט? הפעולות שלו יישארו, בלי פרויקט.')) { D().tasks.forEach(t => { if (t.projectId === e.id) t.projectId = ''; }); D().jobs.forEach(j => { if (j.projectId === e.id) j.projectId = ''; }); D().projects = D().projects.filter(p => p.id !== e.id); state.openProject = null; Store.save(); render(); } },
+  delProject: e => { if (confirm('למחוק את הפרויקט? הפעולות שלו יישארו, בלי פרויקט.')) { D().tasks.forEach(t => { if (t.projectId === e.id) t.projectId = ''; }); D().jobs.forEach(j => { if (j.projectId === e.id) j.projectId = ''; }); D().projects = D().projects.filter(p => p.id !== e.id); state.openProject = null; state.pmOpen = null; Store.save(); render(); } },
+  pmOpen: e => { state.pmOpen = e.id; render(); window.scrollTo(0, 0); },
+  pmBack: () => { state.pmOpen = null; render(); window.scrollTo(0, 0); },
+  pmNew: () => pmForm(),
+  pmEdit: e => pmForm(e.id),
+  pmStatusF: e => { state.pmStatus = e.k; render(); },
+  pmHome: () => { D().assist.homeTab = D().assist.homeTab === 'map' ? '' : 'map'; Store.save(); render(); toast('<span>' + (D().assist.homeTab === 'map' ? '🏠 המפה תיפתח ראשונה בכל כניסה' : 'מסך הבית חזר להיות "היום"') + '</span><button data-act="toastClose" aria-label="סגור">✕</button>', 3500); },
+  pmFocusSet: e => pmFocusSheet(e.id),
+  pmWalk: () => { const ids = pmVisible().filter(p => ['focus', 'active'].includes(pmStatus(p))).map(p => p.id); if (!ids.length) return; state.pmQueue = { ids, i: 0 }; pmFocusSheet(ids[0]); },
+  pmWalkSkip: () => pmWalkNext(),
+  pmFocusTask: e => { const t = findTask(e.id), p = t && D().projects.find(x => x.id === t.projectId); if (!p) return; if (p.focusTaskId === t.id) { p.focusTaskId = ''; } else { p.focusTaskId = t.id; p.focusWeek = weekStart(TODAY()); } Store.save(); render(); },
+  pmMile: e => { const t = findTask(e.id); if (!t) return; t.milestone = !t.milestone; Store.save(); render(); },
+  pmToday: e => { const t = findTask(e.id); if (!t) return; t.date = TODAY(); classify(t); delete t.ord; Store.save(); render(); toast('<span>📥 הועברה למשימות היום: <b>' + esc(t.title) + '</b></span><button data-act="toastClose" aria-label="סגור">✕</button>', 3500); },
+  pmAreasSheet: () => pmAreasSheet(),
+  pmAreaAdd: () => { const n = (prompt('שם התחום החדש') || '').trim(); if (!n) return; pmSaveAreas([...pmAreas(), { id: uid(), icon: '📌', name: n }]); pmAreasSheet(); render(); },
+  pmAreaEdit: e => { const L = pmAreas().map(a => ({ ...a })), a = L.find(x => x.id === e.id); if (!a) return; const n = (prompt('שם התחום', a.name) || '').trim(); if (!n) return; a.name = n; pmSaveAreas(L); pmAreasSheet(); render(); },
+  pmAreaDel: e => { if (!confirm('למחוק את התחום? הפרויקטים לא יימחקו.')) return; pmSaveAreas(pmAreas().filter(a => a.id !== e.id)); if (state.pmArea === e.id) state.pmArea = ''; pmAreasSheet(); render(); },
   projAddTask: e => taskForm(undefined, null, e.id),
   newProjectForm: () => projectForm(),
   newActionForm: () => taskForm(),
@@ -2377,7 +2576,7 @@ document.addEventListener('click', ev => {
   const el = ev.target.closest('[data-act]');
   if (el) { const fn = A[el.dataset.act]; if (fn) { ev.preventDefault(); fn({ ...el.dataset }, el); } return; }
   const nav = ev.target.closest('#nav button');
-  if (nav) { state.tab = nav.dataset.tab; state.openList = null; state.openProject = null; state.openJob = null; render(); window.scrollTo(0, 0); }
+  if (nav) { state.tab = nav.dataset.tab; state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; render(); window.scrollTo(0, 0); }
 });
 document.addEventListener('change', ev => {
   if (ev.target.id === 'notifySel') { try { localStorage.setItem('doit-notify', ev.target.value); } catch (e) {} const d = $('#notifyDesc'); if (d) d.textContent = (NOTIFY.find(x => x[0] === ev.target.value) || NOTIFY[1])[2]; return; }
@@ -2609,7 +2808,7 @@ function seedDemo() {
   d.dayRewards = [{ id: id(), title: 'קפה בבית קפה' }, { id: id(), title: 'פרק שוקולד' }, { id: id(), title: 'סרט בערב' }];
   d.rhythm = [{ id: id(), label: 'ארוחת צהריים', time: '13:00', mins: 30, kind: 'meal' }, { id: id(), label: 'מנוחה קצרה', time: '16:00', mins: 20, kind: 'rest' }];
   d.dayLog[ago(1)] = { start: '08:10', end: '18:40' }; d.dayLog[ago(2)] = { start: '08:30', end: '17:55' };
-  d.projects = [{ id: p1, title: 'השקת האתר החדש', createdAt: ago(5) }, { id: j2, title: 'לפרסם פוסט על הפרויקט', createdAt: ago(2) }];
+  d.projects = [{ id: p1, title: 'השקת האתר החדש', createdAt: ago(5), icon: '🚀', status: 'focus', why: 'כדי שאנשים יגיעו אליי בלי שאצטרך לרדוף אחריהם', outcome: 'אתר חי שמביא פניות', values: ['יצירתיות', 'חופש'], feel: 'רגוע וסקרן', due: addDays(TODAY(), 40), prio: 'high', hours: 4, area: 'a2' }, { id: j2, title: 'לפרסם פוסט על הפרויקט', createdAt: ago(2) }];
   d.jobs = [];
   d.habits = [
     { id: h1, title: 'פעילות גופנית', task: 'ללכת 15 דקות סביב הבלוק', days: [0, 1, 2, 3, 4, 5, 6], mins: 15, energy: 4, visionId: v1, log: { [ago(1)]: true, [ago(2)]: true, [ago(3)]: true, [ago(5)]: true } },
