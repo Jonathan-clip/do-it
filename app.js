@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.9-world'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.10-world'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -1254,7 +1254,7 @@ const pmIsles = () => {
   });
 };
 function pmWorld() {
-  const I = pmIsles(), cols = 3, iw = Math.round(.3 * Math.min(innerWidth - 32, 616)), rowH = iw + 74, rows = Math.ceil(I.length / cols), H = rows * rowH + 30 + Math.round(iw * .22);
+  const I = pmIsles(), cols = 3, iw = Math.round(.3 * Math.min(innerWidth - 32, 616)), rowH = iw + 92, rows = Math.ceil(I.length / cols), H = rows * rowH + 30 + Math.round(iw * .22);
   const pos = I.map((a, k) => { const r = Math.floor(k / cols), c = k % cols, inRow = Math.min(cols, I.length - r * cols), x = (c + .5) * (100 / inRow); return { x: r % 2 ? 100 - x : x, y: r * rowH + 8 + (c % 2 ? Math.round(iw * .22) : 0) }; });
   const path = pos.map((p, k) => `${k ? 'L' : 'M'}${(p.x * 3).toFixed(0)} ${p.y + Math.round(iw * .45)}`).join(' ');
   return `<div class="world" id="world" style="height:${H}px"><svg class="wpaths" viewBox="0 0 300 ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" fill="none" stroke="var(--brand)" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity=".35" vector-effect="non-scaling-stroke"/></svg>
