@@ -323,3 +323,22 @@ body.miniRun #edock{bottom:calc(220px + env(safe-area-inset-bottom))}
 .eopt .enoimg{display:inline-block;width:40px;flex:none}
 .eopt.sm{font-size:13.5px;padding:7px 10px}
 .eopt.sm .enoimg{width:40px}
+
+/* energy menu v3: illustrated people (man / woman), big tiles in two columns */
+.ecirc{width:56px;height:56px;overflow:hidden;padding:0;border-radius:50%}
+.ecirc .enimg{width:70px;height:70px;max-width:none;margin-top:8px;filter:none}
+.epop{min-width:300px;max-width:min(340px,86vw);padding:12px}
+.ehead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 4px 8px}
+.egend{display:inline-flex;gap:4px}
+.egend button{border:1px solid var(--line);background:transparent;border-radius:999px;padding:4px 12px;font-size:13px;color:var(--muted)}
+.egend button.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);font-weight:700}
+.egrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.etile{display:flex;flex-direction:column;align-items:center;gap:2px;border:1px solid var(--line);background:color-mix(in srgb,var(--card) 70%,transparent);border-radius:18px;padding:8px 4px 10px;font-size:14px;color:var(--ink);transition:transform .2s var(--ease),border-color .2s,background .2s}
+.etile:hover{transform:translateY(-2px)}
+.etile.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 14%,transparent);font-weight:700}
+.etile .enimg{width:84px;height:84px;object-fit:contain}
+.efoot{display:flex;justify-content:space-between;gap:8px;padding-top:8px}
+.efoot .eopt.sm{width:auto;padding:7px 12px}
+.epop{max-height:calc(100vh - 230px);max-height:calc(100dvh - 230px);overflow-y:auto;overscroll-behavior:contain}
+.etile .enimg{width:68px;height:68px}
+.etile{padding:6px 4px 8px;font-size:13.5px}
