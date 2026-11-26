@@ -1578,7 +1578,7 @@ const views = {
     const ymList = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 2 + i); return fmt(d).slice(0, 7); });
     if (!ymList.includes(curYM)) { ymList.push(curYM); ymList.sort(); }
     const monthSel = `<select id="upMonth" style="width:auto">${ymList.map(v => { const [y, m] = v.split('-').map(Number); return `<option value="${v}" ${v === curYM ? 'selected' : ''}>${MONTHS[m - 1]} ${y}</option>`; }).join('')}</select>`;
-    const navRow = lbl => `<div class="row" style="margin:6px 0 10px"><button class="iconbtn" data-act="upNav" data-n="-1" aria-label="הקודם">${chev('r')}</button><b class="grow" style="text-align:center">${lbl}</b><button class="iconbtn" data-act="upNav" data-n="1" aria-label="הבא">${chev('l')}</button><button class="iconbtn" data-act="upToday">היום</button></div>`;
+    const navRow = lbl => `<div class="row" style="margin:6px 0 10px"><button class="iconbtn" data-act="upNav" data-n="-1" aria-label="הקודם">${chev('r')}</button><b class="grow" style="text-align:center">${lbl}</b><button class="iconbtn" data-act="upNav" data-n="1" aria-label="הבא">${chev('l')}</button></div>`;
     let nav = '', body = '';
     if (mode === 'week') {
       const ws = state.upWeek;
@@ -1602,6 +1602,7 @@ const views = {
         <section class="ucol msel" data-drop="${sel}"><button class="uadd" data-act="addTaskOn" data-date="${sel}">＋ הוסף פעולה</button>${sts.map(t => upCard(t)).join('') || '<div class="empty">אין פעולות ליום הזה</div>'}</section>`;
     } else {
       const start = state.upStart, days = Array.from({ length: state.upDays }, (_, i) => addDays(start, i));
+      nav = navRow(`${shortDate(start)} – ${shortDate(addDays(start, 13))}`);
       body = `<div class="uboard" id="uboard">
         ${poolCol()}
         ${days.map(dayCol).join('')}
@@ -1609,7 +1610,7 @@ const views = {
       </div>`;
     }
     return `<div class="top"><h1>בקרוב</h1><div class="sw">${mode === 'week' || mode === 'three' ? '' : monthSel}<button class="iconbtn" data-act="printWeek">🖨 שבוע</button></div></div>
-      <div class="seg">${[['three', '3 ימים'], ['week', 'שבוע'], ['month', 'חודש'], ['days', 'כל הימים']].map(([k, l]) => `<button class="${mode === k ? 'on' : ''}" data-act="upMode" data-m="${k}">${l}</button>`).join('')}</div>
+      <div class="seg"><button class="segtoday" data-act="upToday">היום</button>${[['three', '3 ימים'], ['week', 'שבוע'], ['month', 'חודש'], ['days', 'כל הימים']].map(([k, l]) => `<button class="${mode === k ? 'on' : ''}" data-act="upMode" data-m="${k}">${l}</button>`).join('')}</div>
       ${filterBar()}
       ${mode === 'month' ? '' : '<div class="opt" style="margin:6px 0"><button data-act="upJump" data-c="none">📥 ללא תאריך (' + D().tasks.filter(t => !t.date && !t.done && filterOk(t)).length + ')</button></div>'}
       ${nav}${body}
@@ -2373,15 +2374,13 @@ const A = {
   upPick: e => { state.upSel = e.date; render(); },
   upNav: e => {
     const n = +e.n, m = state.upMode;
-    if (m === 'three') state.up3 = addDays(state.up3, 3 * n);
-    else if (m === 'week') state.upWeek = addDays(state.upWeek, n); // rolling 7 days, one day per step
-    else if (m === 'month') { state.upMonth = shiftMonth(state.upMonth, n); state.upSel = state.upMonth === TODAY().slice(0, 7) ? TODAY() : state.upMonth + '-01'; }
-    render();
+    if (m === 'month') { state.upMonth = shiftMonth(state.upMonth, n); state.upSel = state.upMonth === TODAY().slice(0, 7) ? TODAY() : state.upMonth + '-01'; render(); return; }
+    upShift(n); // one day per press, the board slides
   },
   upToday: () => {
     const T = TODAY(), m = state.upMode;
-    if (m === 'three') state.up3 = T; else if (m === 'week') state.upWeek = T; else if (m === 'month') { state.upMonth = T.slice(0, 7); state.upSel = T; } else state.upStart = T;
-    render();
+    if (m === 'month') { state.upMonth = T.slice(0, 7); state.upSel = T; render(); return; }
+    const cur = state[UP_KEY[m]]; upShift(Math.round((parse(T) - parse(cur)) / 864e5)); // glides back to today
   },
   addGoal: () => goalForm(), editGoal: e => goalForm(e.id),
   goalAdd: e => goalProgressSheet(e.id),
@@ -2980,6 +2979,56 @@ document.addEventListener('pointercancel', e => { if (Drag.el && e.pointerId ===
 document.addEventListener('touchmove', e => { if (Drag.active) e.preventDefault(); }, { passive: false });
 document.addEventListener('click', e => { if (Drag.suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
 document.addEventListener('contextmenu', e => { if (Drag.el && e.target.closest('.ucard')) e.preventDefault(); });
+
+/* ---------- "בקרוב" board: one day per step, with a soft slide (arrows, swipe, mouse drag, trackpad). ---------- */
+const UP_KEY = { three: 'up3', week: 'upWeek', days: 'upStart' };
+const upDaysCols = () => [...document.querySelectorAll('#uboard .ucol[data-drop^="20"]')]; // the dated columns only; the "no date" pool stays put
+const upSlot = () => { const c = upDaysCols(); return c.length > 1 ? c[1].getBoundingClientRect().left - c[0].getBoundingClientRect().left : 0; }; // signed distance between two neighbouring days
+const UP_EASE = 'cubic-bezier(.22,.8,.24,1)';
+function upShift(n, dx = 0) {
+  const key = UP_KEY[state.upMode]; if (!n || !key) return;
+  const W = upSlot();
+  state[key] = addDays(state[key], n);
+  render();
+  const cols = upDaysCols(); if (!W || !cols.length || matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  const k = Math.max(-3, Math.min(3, n)), far = Math.abs(n) > 3; // a long jump (e.g. "today") glides over at most three columns and fades in
+  cols.forEach(c => c.animate([{ transform: `translateX(${k * W + dx}px)`, opacity: far ? .25 : 1 }, { transform: 'none', opacity: 1 }], { duration: far ? 480 : 380, easing: UP_EASE }));
+}
+(() => {
+  let g = null, wacc = 0, wlock = 0;
+  const modes = ['three', 'week', 'days'], skip = 'a,button,input,select,textarea,.uadd,.check';
+  document.addEventListener('pointerdown', e => {
+    const b = e.target.closest && e.target.closest('#uboard'); if (!b || state.tab !== 'upcoming' || !modes.includes(state.upMode)) return;
+    if (e.pointerType === 'mouse' ? (e.button !== 0 || e.target.closest(skip + ',.ucard')) : e.target.closest(skip)) return; // a mouse press on a card starts the card drag instead
+    g = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, on: false, W: upSlot(), cols: [] };
+  });
+  document.addEventListener('pointermove', e => {
+    if (!g || e.pointerId !== g.id) return;
+    if (Drag.active || RDrag.active) { g = null; return; }
+    const dx = e.clientX - g.x, dy = e.clientY - g.y;
+    if (!g.on) {
+      if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { g = null; return; }
+      if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.2 || !g.W) return;
+      g.on = true; g.cols = upDaysCols(); clearTimeout(Drag.timer);
+    }
+    g.dx = dx; g.cols.forEach(c => { c.style.transform = `translateX(${dx}px)`; });
+  }, { passive: true });
+  const end = e => {
+    if (!g || e.pointerId !== g.id) return;
+    const s = g; g = null; if (!s.on) return;
+    Drag.suppressClick = true; setTimeout(() => { Drag.suppressClick = false; }, 80);
+    s.cols.forEach(c => { c.style.transform = ''; });
+    let n = Math.round(s.dx / -s.W); if (!n && Math.abs(s.dx) > Math.abs(s.W) * .22) n = s.dx > 0 === s.W < 0 ? 1 : -1; // dragging the board towards the "pool" side = later days (RTL)
+    if (!n) return s.cols.forEach(c => c.animate([{ transform: `translateX(${s.dx}px)` }, { transform: 'none' }], { duration: 280, easing: UP_EASE }));
+    upShift(n, s.dx);
+  };
+  document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+  document.addEventListener('wheel', e => { // a sideways trackpad swipe moves one day at a time
+    const b = e.target.closest && e.target.closest('#uboard'); if (!b || !modes.includes(state.upMode) || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    e.preventDefault(); const now = Date.now(); if (now < wlock) return;
+    wacc += e.deltaX; if (Math.abs(wacc) > 60) { upShift(wacc > 0 ? -1 : 1); wacc = 0; wlock = now + 420; }
+  }, { passive: false });
+})();
 
 /* ---------- Demo mode (?demo): fictional data, own storage key, cloud disabled. The real data is never touched. ---------- */
 function seedDemo() {
