@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.10-world'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.11-focus'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -344,6 +344,7 @@ function runRender() {
     return;
   }
   el.classList.remove('mini'); document.body.classList.remove('miniRun'); document.body.classList.add('running');
+  el.style.setProperty('--rp', (runPct() / 100).toFixed(3));
   const step = t ? ((t.subs || []).find(s => !s.done) || {}).title || t.first || '' : '';
   const mins = Run.brk ? [...new Set([5, 10, Math.round(Run.total / 60)])].sort((a, b) => a - b) : [5, 15, 25];
   el.innerHTML = `<div class="runbox">
@@ -354,8 +355,8 @@ function runRender() {
     ${!Run.brk && t && t.notes ? '<div class="sub" style="white-space:pre-wrap;margin:-6px 0 12px">' + esc(t.notes) + '</div>' : ''}
     ${Run.brk ? '' : `<label class="sub">הצעד הראשון</label><input id="runStep" value="${esc(step)}" placeholder="מה הדבר הראשון והקטן שעושים?" autocomplete="off" ${(t.subs || []).some(s => !s.done) ? 'readonly' : ''}>`}
     <div class="opt runmins">${mins.map(m => `<button class="${Run.total === m * 60 ? 'on' : ''}" data-act="runMins" data-m="${m}" ${Run.running ? 'disabled' : ''}>${m} ד׳</button>`).join('')}</div>
-    <div class="remind" style="margin-top:14px">💬 ${esc(reminder())}</div>
-    <div class="runtime ${Run.ended ? 'end' : ''}" id="runTime">${mmss(Run.left)}</div>
+    <div class="remind runrem" style="margin-top:14px">💬 ${esc(reminder())}</div>
+    <div class="runwrap ${Run.ended ? 'end' : ''}" id="runWrap" style="--pp:${runPct()}"><svg class="rr" viewBox="0 0 120 120" aria-hidden="true"><circle class="rrbg" cx="60" cy="60" r="54"/><circle class="rrfg" cx="60" cy="60" r="54" pathLength="100"/></svg><div class="runtime ${Run.ended ? 'end' : ''}" id="runTime">${mmss(Run.left)}</div></div>
     ${Run.ended ? `<div class="sub" style="text-align:center">${Run.brk ? 'ההפסקה נגמרה' : 'הזמן נגמר. איך הלך?'}</div>` : ''}
     <div class="grid2">
       ${Run.ended ? (Run.brk ? '<button class="btn" data-act="runNext">חזרה לעבודה</button>' : '<button class="btn" data-act="runDone">✓ סיימתי</button><button class="btn ghost" data-act="runMore">עוד 5 דקות</button>' + (Run.pomo ? '<button class="btn ghost" data-act="runBreakMin" data-m="5" data-l="🍅 הפסקת פומודורו">☕ הפסקה 5 דקות</button>' : ''))
@@ -364,9 +365,11 @@ function runRender() {
     </div></div>`;
   const si = $('#runStep'); if (si) si.oninput = () => { t.first = si.value; Store.save(); };
 }
+const runPct = () => Run.total ? Math.max(0, Math.min(100, Math.round((1 - Run.left / Run.total) * 1000) / 10)) : 0;
+function runLight() { const w = $('#runWrap'), r = $('#run'); if (w) w.style.setProperty('--pp', runPct()); if (r) r.style.setProperty('--rp', (runPct() / 100).toFixed(3)); }
 function runTick() {
   Run.left = Math.max(0, Math.round((Run.endAt - Date.now()) / 1000));
-  const el = $('#runTime'); if (el) el.textContent = mmss(Run.left);
+  const el = $('#runTime'); if (el) el.textContent = mmss(Run.left); runLight();
   if (Run.left <= 0) { clearInterval(Run.tick); Run.running = false; Run.ended = true; Run.mini = false; if (!Run.brk) { addWork(Run.total / 60); Work.skipId = Run.id; } runBeep(); runRender(); }
 }
 function runStartTimer() { Run.endAt = Date.now() + Run.left * 1000; Run.running = true; if (Run.brk) Run.brkStarted = true; clearInterval(Run.tick); Run.tick = setInterval(runTick, 250); runRender(); }
@@ -1507,16 +1510,20 @@ document.addEventListener('change', e => {
 
 // ---- Spatial design layer (spatial.css): classic | spatial, 5 themes, 3 effect levels. Stored in assist settings, mirrored to localStorage so the first paint has no flash.
 const DZ_THEMES = [['lavender', 'Lavender', '#6a4be0'], ['ocean', 'Ocean', '#0a82a8'], ['nature', 'Nature', '#3c7d4d'], ['sunset', 'Sunset', '#d9582b'], ['midnight', 'Midnight', '#2a2f57']], DZ_FX = [['minimal', 'Minimal'], ['spatial', 'Spatial'], ['immersive', 'Immersive']];
-const dz = () => { const a = D().assist; return { d: a.design === 'spatial' ? 'spatial' : 'classic', t: a.dzTheme || 'midnight', f: a.dzFx || 'spatial' }; };
+const dz = () => { const a = D().assist; return { d: a.design === 'spatial' ? 'spatial' : 'classic', t: a.dzTheme || 'midnight', f: a.dzFx || 'spatial', m: a.dzMode || 'auto' }; };
+const dzDark = z => z.t === 'midnight' || z.m === 'dark' || (z.m !== 'light' && matchMedia('(prefers-color-scheme:dark)').matches);
+try { matchMedia('(prefers-color-scheme:dark)').addEventListener('change', () => { if (dz().m === 'auto') applyDesign(); }); } catch (e) {}
 function applyDesign() {
   const z = dz(), h = document.documentElement;
-  if (z.d === 'spatial') { h.dataset.design = 'spatial'; h.dataset.theme = z.t; h.dataset.fx = z.f; } else { delete h.dataset.design; delete h.dataset.theme; delete h.dataset.fx; }
+  const dark = z.d === 'spatial' && dzDark(z);
+  if (z.d === 'spatial') { h.dataset.design = 'spatial'; h.dataset.theme = z.t; h.dataset.fx = z.f; if (dark) h.dataset.dark = '1'; else delete h.dataset.dark; } else { delete h.dataset.design; delete h.dataset.theme; delete h.dataset.fx; delete h.dataset.dark; }
   try { localStorage.setItem('doit-dz', JSON.stringify(z)); } catch (e) {}
-  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = z.d === 'spatial' ? (DZ_THEMES.find(x => x[0] === z.t) || DZ_THEMES[0])[2] : '#1f6f5c';
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = z.d === 'spatial' ? (dark ? '#0c0f1f' : (DZ_THEMES.find(x => x[0] === z.t) || DZ_THEMES[0])[2]) : '#1f6f5c';
 }
 const dzCard = () => { const z = dz(); return `<div class="card"><div class="t"><b>🎨 עיצוב</b></div><div class="sub">עיצוב Spatial: עומק, זכוכית ותנועה עדינה. אפשר לחזור לקלאסי בכל רגע</div>
   <div class="dzpick"><button class="${z.d === 'classic' ? 'on' : ''}" data-act="dzSet" data-k="d" data-v="classic">קלאסי</button><button class="${z.d === 'spatial' ? 'on' : ''}" data-act="dzSet" data-k="d" data-v="spatial">Spatial</button></div>
   ${z.d === 'spatial' ? `<div class="dzpick">${DZ_THEMES.map(([v, l, c]) => `<button class="${z.t === v ? 'on' : ''}" data-act="dzSet" data-k="t" data-v="${v}"><span class="sw" style="background:${c}"></span>${l}</button>`).join('')}</div>
+  ${z.t === 'midnight' ? '' : `<div class="dzpick">${[['auto', 'אוטומטי'], ['light', '☀️ בהיר'], ['dark', '🌙 כהה']].map(([v, l]) => `<button class="${z.m === v ? 'on' : ''}" data-act="dzSet" data-k="m" data-v="${v}">${l}</button>`).join('')}</div>`}
   <div class="dzpick">${DZ_FX.map(([v, l]) => `<button class="${z.f === v ? 'on' : ''}" data-act="dzSet" data-k="f" data-v="${v}">${l}</button>`).join('')}</div>` : ''}</div>`; };
 // pointer tilt on project cards (only with a mouse, only in Spatial/Immersive, never with reduced motion)
 (() => {
@@ -2442,7 +2449,7 @@ const A = {
   pmRevDone: () => { const k = state.pmReview === 'month' ? 'm' + TODAY().slice(0, 7) : weekStart(TODAY()), R = pmRevs(); R[k] = Object.assign({}, R[k], { doneAt: TODAY() }); Store.save(); state.pmReview = null; render(); window.scrollTo(0, 0); celebrate(); toast('<span>✅ הסקירה נשמרה. כל הכבוד שעצרת לחשוב</span><button data-act="toastClose" aria-label="סגור">✕</button>', 4000); },
   pmRelease: e => { const p = D().projects.find(x => x.id === e.id); if (p) { p.focusTaskId = ''; Store.save(); render(); } },
   pmSetStatus: e => { const p = D().projects.find(x => x.id === e.id); if (p) { p.status = e.s; Store.save(); render(); } },
-  dzSet: e => { const a = D().assist, m = { d: 'design', t: 'dzTheme', f: 'dzFx' }[e.k]; if (!m) return; a[m] = e.v; Store.save(); render(); },
+  dzSet: e => { const a = D().assist, m = { d: 'design', t: 'dzTheme', f: 'dzFx', m: 'dzMode' }[e.k]; if (!m) return; a[m] = e.v; Store.save(); render(); },
   pmView: e => { D().assist.pmView = e.v; state.pmIsle = null; Store.save(); render(); },
   pmIsle: e => {
     const w = document.getElementById('world'), b = w && w.querySelector('.isle[data-id="' + e.id + '"]'), go = () => { state.pmIsle = e.id; state.pmZoom = 'in'; render(); window.scrollTo(0, 0); };

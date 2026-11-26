@@ -174,3 +174,35 @@ html[data-design="spatial"] .isle .isleimg,html[data-design="spatial"] .isle .pm
 html[data-design="spatial"] .isle b{position:relative;z-index:1;margin-top:-6px;text-shadow:0 0 8px var(--bg),0 0 3px var(--bg)}
 html[data-design="spatial"] .isle b{margin-top:8px;font-size:13.5px;text-shadow:none}
 html[data-design="spatial"] .isle .pmimgw{margin-bottom:-6px}
+
+/* ---------- Stage 6: focus mode — the cleanest screen in the app ---------- */
+.runwrap .rr{display:none}
+html[data-design="spatial"] #run{background:radial-gradient(640px 420px at 50% 36%,color-mix(in srgb,var(--brand) calc(6% + var(--rp,0)*18%),transparent),transparent 72%),var(--bg);background-attachment:scroll}
+html[data-design="spatial"] #run.mini{background:color-mix(in srgb,var(--card) 82%,transparent);backdrop-filter:blur(var(--blur));border-radius:20px;box-shadow:var(--sh2)}
+html[data-design="spatial"] .runbox{max-width:400px;padding-top:46px}
+html[data-design="spatial"] .runbox h1{font-size:28px;text-align:center;margin:6px 0 18px;letter-spacing:-.01em}
+html[data-design="spatial"] .runbox>.sub:first-of-type{text-align:center}
+html[data-design="spatial"] .runrem{display:none}
+html[data-design="spatial"] .runwrap{position:relative;width:min(280px,72vw);aspect-ratio:1;margin:14px auto 18px;display:grid;place-items:center}
+html[data-design="spatial"] .runwrap .rr{display:block;position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+html[data-design="spatial"] .rr circle{fill:none;stroke-width:5;stroke-linecap:round}
+html[data-design="spatial"] .rrbg{stroke:color-mix(in srgb,var(--line) 80%,transparent)}
+html[data-design="spatial"] .rrfg{stroke:var(--brand);stroke-dasharray:100;stroke-dashoffset:calc(100 - var(--pp,0));filter:drop-shadow(0 0 6px color-mix(in srgb,var(--brand) 55%,transparent));transition:stroke-dashoffset .4s linear,stroke .4s}
+html[data-design="spatial"] .runwrap .runtime{font-size:54px;margin:0;letter-spacing:-.02em;position:relative}
+html[data-design="spatial"] .runwrap.end .rrfg{stroke:var(--accent)}
+html[data-design="spatial"] #run .runwrap.end{animation:sx-ring .9s ease-out 2}
+html[data-design="spatial"] #run .runwrap.end .runtime{animation:sx-check .6s var(--ease)}
+html[data-design="spatial"] .nowcard{background:color-mix(in srgb,var(--card) calc(var(--glass)*100%),transparent);padding:22px 20px;text-align:center}
+html[data-design="spatial"] .nowcard .big{font-size:26px;letter-spacing:-.01em;margin:8px 0 6px}
+html[data-design="spatial"] .nowcard .meta{justify-content:center}
+html[data-design="spatial"] .startnow{padding:16px;font-size:18px;border-radius:var(--r-lg);box-shadow:0 10px 28px color-mix(in srgb,var(--brand) 38%,transparent),inset 0 1px 0 rgba(255,255,255,.3)}
+
+/* ---------- Stage 7: dark variant of every theme (Midnight is always dark). Chosen in "עוד": automatic / light / dark ---------- */
+html[data-design="spatial"][data-dark]{color-scheme:dark;--danger:#ff8f86;--warn-bg:#3a2f14;--warn-ink:#f0c978;--bad-bg:#4a2724;--info-bg:#1f2b45;--info-ink:#a9c2f2;--brand-ink:#0c0f1f;
+  --sh1:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.3);--sh2:0 2px 4px rgba(0,0,0,.35),0 12px 30px rgba(0,0,0,.45);--sh3:0 4px 8px rgba(0,0,0,.4),0 22px 48px rgba(0,0,0,.55)}
+html[data-design="spatial"][data-dark][data-theme="lavender"]{--bg:#12102a;--card:#1c1940;--ink:#ece9ff;--muted:#a49fd0;--line:#2c2860;--soft:#26225a;--brand:#8f7bff;--accent:#c79bff;--orb1:#2f2a78;--orb2:#4a2468}
+html[data-design="spatial"][data-dark][data-theme="ocean"]{--bg:#08171d;--card:#10262f;--ink:#e2f4fa;--muted:#8fb4c2;--line:#1d3a46;--soft:#17323d;--brand:#3cc4e0;--accent:#6fdcf0;--orb1:#0f4558;--orb2:#1b3a6e}
+html[data-design="spatial"][data-dark][data-theme="nature"]{--bg:#0c1710;--card:#14231a;--ink:#e4f2e6;--muted:#92b09a;--line:#23382a;--soft:#1c3123;--brand:#7ccb8e;--accent:#c4e27a;--orb1:#1c4a2a;--orb2:#3c4a1a}
+html[data-design="spatial"][data-dark][data-theme="sunset"]{--bg:#1c0f0b;--card:#2a1812;--ink:#ffeee4;--muted:#c9a090;--line:#43271d;--soft:#3a2018;--brand:#ff9060;--accent:#ffc078;--orb1:#6a2d14;--orb2:#6a1f3a}
+html[data-design="spatial"][data-dark] .pmimgw>img{filter:brightness(.84) saturate(1.08) drop-shadow(0 10px 12px rgba(0,0,0,.45))}
+html[data-design="spatial"][data-dark] .sheet{background:rgba(0,0,0,.55)}
