@@ -1237,7 +1237,10 @@ const pmKind = areaId => PM_KIND[areaId] || 'star';
 const pmStageOf = pr => pr >= 100 ? 5 : pr >= 75 ? 4 : pr >= 50 ? 3 : pr >= 25 ? 2 : 1;
 const pmHigh = p => { const pr = pmPct(p) || 0; if (pr > (p.pmMax || 0)) p.pmMax = pr; return p.pmMax || 0; }; // a quiet week never shrinks the object
 const pmObjInner = (kind, stage) => '<ellipse cx="32" cy="56" rx="24" ry="5" fill="currentColor" opacity=".16"/>' + PM_OBJ[kind].filter(x => x[0] <= stage).map(x => x[1]).join('');
-const pmObj = (p, size) => `<svg class="pmobj" style="width:${size}px;height:${size}px" viewBox="0 0 64 64" aria-hidden="true">${pmObjInner(pmKind(p.area), pmStageOf(pmHigh(p)))}</svg>`;
+const pmLevel = pr => pr >= 70 ? 3 : pr >= 30 ? 2 : 1;
+const pmImg = (kind, level, size, cls) => `<img class="pmobj pmimg ${cls || ''}" src="assets/obj/${kind}${level}.png" width="${size}" height="${size}" alt="" loading="lazy" decoding="async" draggable="false">`;
+const pmObj = (p, size) => pmImg(pmKind(p.area), pmLevel(pmHigh(p)), size);
+const pmObjSvg = (p, size) => `<svg class="pmobj" style="width:${size}px;height:${size}px" viewBox="0 0 64 64" aria-hidden="true">${pmObjInner(pmKind(p.area), pmStageOf(pmHigh(p)))}</svg>`;
 const pmNextMile = p => { const t = pmOrdered(p).find(x => x.milestone); return t ? t.title : ''; };
 
 // ---- Stage 4: the life map. Islands per life area; click = camera zoom into the area's projects. A plain list view stays available.
@@ -1251,20 +1254,18 @@ const pmIsles = () => {
   });
 };
 function pmWorld() {
-  const I = pmIsles(), cols = 3, rowH = 158, rows = Math.ceil(I.length / cols), H = rows * rowH + 30;
-  const pos = I.map((a, k) => { const r = Math.floor(k / cols), c = k % cols, inRow = Math.min(cols, I.length - r * cols), x = (c + .5) * (100 / inRow); return { x: r % 2 ? 100 - x : x, y: r * rowH + 12 + (c % 2 ? 22 : 0) }; });
-  const path = pos.map((p, k) => `${k ? 'L' : 'M'}${(p.x * 3).toFixed(0)} ${p.y + 62}`).join(' ');
+  const I = pmIsles(), cols = 3, iw = Math.round(.3 * Math.min(innerWidth - 32, 616)), rowH = iw + 74, rows = Math.ceil(I.length / cols), H = rows * rowH + 30 + Math.round(iw * .22);
+  const pos = I.map((a, k) => { const r = Math.floor(k / cols), c = k % cols, inRow = Math.min(cols, I.length - r * cols), x = (c + .5) * (100 / inRow); return { x: r % 2 ? 100 - x : x, y: r * rowH + 8 + (c % 2 ? Math.round(iw * .22) : 0) }; });
+  const path = pos.map((p, k) => `${k ? 'L' : 'M'}${(p.x * 3).toFixed(0)} ${p.y + Math.round(iw * .45)}`).join(' ');
   return `<div class="world" id="world" style="height:${H}px"><svg class="wpaths" viewBox="0 0 300 ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" fill="none" stroke="var(--brand)" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity=".35" vector-effect="non-scaling-stroke"/></svg>
     ${I.map((a, k) => `<button class="isle" style="left:${pos[k].x}%;top:${pos[k].y}px;--pc:${a.color};--d:${(k * .37).toFixed(2)}s" data-act="pmIsle" data-id="${a.id}" aria-label="${esc(a.name)}: ${a.ps.length} פרויקטים">
-      <svg viewBox="0 0 120 112" aria-hidden="true"><defs><linearGradient id="ig${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a.color}" stop-opacity=".35"/><stop offset="1" stop-color="${a.color}" stop-opacity=".95"/></linearGradient></defs>
-        <path d="M12 68Q60 100 108 68z" fill="url(#ig${k})"/><ellipse cx="60" cy="68" rx="50" ry="14" fill="${a.color}" opacity=".28"/><ellipse cx="60" cy="67" rx="46" ry="11" fill="var(--card)" opacity=".85"/>
-        <svg x="24" y="4" width="72" height="72" viewBox="0 0 64 64" style="color:${a.color}">${pmObjInner(a.kind, a.ps.length ? pmStageOf(a.avg) : 1)}</svg></svg>
+      ${pmImg(a.kind, a.ps.length ? pmLevel(a.avg) : 1, 200, 'isleimg')}
       <b>${a.icon} ${esc(a.name)}</b><small>${a.ps.length ? a.ps.length + ' פרויקטים · ' + a.avg + '%' : 'אין פרויקטים'}</small></button>`).join('')}</div>`;
 }
 function pmIsleView(id) {
   const a = pmIsles().find(x => x.id === id); if (!a) { state.pmIsle = null; return pmMap(); }
   return `<div class="top"><button class="iconbtn" data-act="pmWorldBack" aria-label="חזרה למפת החיים">${chev('r')}<span style="margin-inline-start:6px">🌍 מפת החיים</span></button><div class="sw"><button class="iconbtn" data-act="pmNew" aria-label="פרויקט חדש">＋</button></div></div>
-    <div class="pmhero isleview" style="--pc:${a.color}"><svg class="pmobj" style="width:96px;height:96px;color:${a.color}" viewBox="0 0 64 64" aria-hidden="true">${pmObjInner(a.kind, a.ps.length ? pmStageOf(a.avg) : 1)}</svg><div class="grow"><div class="sub">תחום חיים</div><div class="pmoutcome">${a.icon} ${esc(a.name)}</div><div class="pmleft">${a.ps.length ? a.ps.length + ' פרויקטים · התקדמות ממוצעת ' + a.avg + '%' : 'עוד אין כאן פרויקטים'}</div></div></div>
+    <div class="pmhero isleview" style="--pc:${a.color}">${pmImg(a.kind, a.ps.length ? pmLevel(a.avg) : 1, 96)}<div class="grow"><div class="sub">תחום חיים</div><div class="pmoutcome">${a.icon} ${esc(a.name)}</div><div class="pmleft">${a.ps.length ? a.ps.length + ' פרויקטים · התקדמות ממוצעת ' + a.avg + '%' : 'עוד אין כאן פרויקטים'}</div></div></div>
     ${a.ps.length ? `<div id="pmcards">${a.ps.map(pmCard).join('')}</div>` : '<div class="empty">אפשר להוסיף כאן פרויקט ראשון עם ＋</div>'}`;
 }
 

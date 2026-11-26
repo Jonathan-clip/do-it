@@ -156,3 +156,6 @@ html[data-design="spatial"] .isleview{display:flex;align-items:center;gap:12px}
 html[data-design="spatial"] .isleview .pmobj{flex:none}
 html[data-design="spatial"] .pmviewseg{margin-bottom:8px}
 @media (prefers-reduced-motion:reduce){html[data-design="spatial"] .isle{animation:none!important}}
+html[data-design="spatial"] .pmimg{display:block;object-fit:contain;filter:drop-shadow(0 10px 12px color-mix(in srgb,var(--pc,var(--brand)) 22%,transparent));user-select:none;-webkit-user-drag:none}
+html[data-design="spatial"] .isle .isleimg{width:100%;height:auto;aspect-ratio:1}
+html[data-design="spatial"] .isle b{margin-top:-14px}
