@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.11-focus'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.12-sky'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -1257,13 +1257,13 @@ const pmIsles = () => {
   });
 };
 function pmWorld() {
-  const I = pmIsles(), cols = 3, iw = Math.round(.3 * Math.min(innerWidth - 32, 616)), rowH = iw + 92, rows = Math.ceil(I.length / cols), H = rows * rowH + 30 + Math.round(iw * .22);
+  const I = pmIsles(), cols = 3, iw = Math.round(.3 * Math.min(innerWidth - 32, 616)), rowH = iw + 112, rows = Math.ceil(I.length / cols), H = rows * rowH + 30 + Math.round(iw * .22);
   const pos = I.map((a, k) => { const r = Math.floor(k / cols), c = k % cols, inRow = Math.min(cols, I.length - r * cols), x = (c + .5) * (100 / inRow); return { x: r % 2 ? 100 - x : x, y: r * rowH + 8 + (c % 2 ? Math.round(iw * .22) : 0) }; });
   const path = pos.map((p, k) => `${k ? 'L' : 'M'}${(p.x * 3).toFixed(0)} ${p.y + Math.round(iw * .45)}`).join(' ');
   return `<div class="world" id="world" style="height:${H}px"><svg class="wpaths" viewBox="0 0 300 ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" fill="none" stroke="var(--brand)" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity=".35" vector-effect="non-scaling-stroke"/></svg>
     ${I.map((a, k) => `<button class="isle" style="left:${pos[k].x}%;top:${pos[k].y}px;--pc:${a.color};--d:${(k * .37).toFixed(2)}s" data-act="pmIsle" data-id="${a.id}" aria-label="${esc(a.name)}: ${a.ps.length} פרויקטים">
       ${pmImg(a.kind, a.ps.length ? pmLevel(a.avg) : 1, 200, 'isleimg')}
-      <b>${esc(a.name)}</b><small>${a.ps.length ? a.ps.length + ' פרויקטים · ' + a.avg + '%' : 'אין פרויקטים'}</small></button>`).join('')}</div>`;
+      <b>${esc(a.name)}</b><small>${a.ps.length ? a.ps.length + ' פרויקטים · ' + a.avg + '%' : 'אין פרויקטים'}</small>${a.ps.length ? `<span class="isleps">${a.ps.slice(0, 2).map(p => esc(p.title)).join(' · ')}${a.ps.length > 2 ? ' +' + (a.ps.length - 2) : ''}</span>` : ''}</button>`).join('')}</div>`;
 }
 function pmIsleView(id) {
   const a = pmIsles().find(x => x.id === id); if (!a) { state.pmIsle = null; return pmMap(); }
@@ -1293,6 +1293,7 @@ function pmMap() {
   const sel = (key, cur, opts, all) => `<select data-pmf="${key}" aria-label="${all}"><option value="">${all}</option>${opts.map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
   return `<div class="top"><h1>🗺️ מפת הפרויקטים שלי</h1><div class="sw"><button class="iconbtn" data-act="pmHome" aria-label="מסך הבית" title="${home ? 'זה מסך הבית. לחץ לביטול' : 'הפוך למסך הבית'}">${home ? '🏠' : '🏡'}</button><button class="iconbtn" data-act="pmNew" aria-label="פרויקט חדש">＋</button></div></div>
     <div class="sub" style="margin:-4px 0 12px">לאן אני הולך, ולמה זה חשוב לי</div>
+    ${pmAssignBanner()}
     ${document.documentElement.dataset.design === 'spatial' ? `<div class="seg pmviewseg"><button class="${pmWorldOn() ? 'on' : ''}" data-act="pmView" data-v="world">🌍 עולם</button><button class="${pmWorldOn() ? '' : 'on'}" data-act="pmView" data-v="list">📋 רשימה</button></div>` : ''}
     <div class="seg">${[['live', 'פעילים'], ...PM_STATUS.map(x => [x[0], x[1] + ' ' + x[2]]), ['all', 'הכל']].map(([k, l]) => `<button class="${S === k ? 'on' : ''}" data-act="pmStatusF" data-k="${k}">${l}</button>`).join('')}</div>
     ${pmWorldOn() ? '' : `<div class="pmfilters">${sel('pmArea', state.pmArea || '', pmAreas().map(a => [a.id, a.icon + ' ' + a.name]), 'כל התחומים')}${sel('pmRange', state.pmRange || '', PM_RANGES, 'כל טווח זמן')}<button class="iconbtn" data-act="pmAreasSheet" aria-label="עריכת תחומי חיים" title="תחומי חיים">⚙️</button></div>
@@ -1520,7 +1521,8 @@ function applyDesign() {
   try { localStorage.setItem('doit-dz', JSON.stringify(z)); } catch (e) {}
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = z.d === 'spatial' ? (dark ? '#0c0f1f' : (DZ_THEMES.find(x => x[0] === z.t) || DZ_THEMES[0])[2]) : '#1f6f5c';
 }
-const dzCard = () => { const z = dz(); return `<div class="card"><div class="t"><b>🎨 עיצוב</b></div><div class="sub">עיצוב Spatial: עומק, זכוכית ותנועה עדינה. אפשר לחזור לקלאסי בכל רגע</div>
+const dzCard = () => { const z = dz(); return `<div class="card"><div class="t"><b>🎨 עיצוב</b></div><div class="sub">עיצוב Spatial: שמיים, זכוכית ותנועה עדינה. אפשר לחזור לקלאסי בכל רגע</div>
+  ${z.d === 'spatial' ? `<input id="dzName" placeholder="איך לקרוא לך בברכה?" value="${esc((D().assist.userName || ''))}" maxlength="20" style="margin-top:8px">` : ''}
   <div class="dzpick"><button class="${z.d === 'classic' ? 'on' : ''}" data-act="dzSet" data-k="d" data-v="classic">קלאסי</button><button class="${z.d === 'spatial' ? 'on' : ''}" data-act="dzSet" data-k="d" data-v="spatial">Spatial</button></div>
   ${z.d === 'spatial' ? `<div class="dzpick">${DZ_THEMES.map(([v, l, c]) => `<button class="${z.t === v ? 'on' : ''}" data-act="dzSet" data-k="t" data-v="${v}"><span class="sw" style="background:${c}"></span>${l}</button>`).join('')}</div>
   ${z.t === 'midnight' ? '' : `<div class="dzpick">${[['auto', 'אוטומטי'], ['light', '☀️ בהיר'], ['dark', '🌙 כהה']].map(([v, l]) => `<button class="${z.m === v ? 'on' : ''}" data-act="dzSet" data-k="m" data-v="${v}">${l}</button>`).join('')}</div>`}
@@ -1541,6 +1543,56 @@ const dzCard = () => { const z = dz(); return `<div class="card"><div class="t">
   document.addEventListener('pointerleave', clear, true);
 })();
 
+// ---- Home (Spatial) and project context: greeting, a small life map and the active projects built from the user's real projects.
+const PM_KW = {
+  a1: ['עסק', 'לקוח', 'קריירה', 'עבודה', 'מכירות', 'שיווק', 'חברה', 'משרה', 'קורות חיים', 'ייעוץ', 'הצעת מחיר'],
+  a2: ['מוצר', 'סטארטאפ', 'אפליקציה', 'אתר', 'פיתוח', 'השקה', 'רעיון', 'mvp', 'יזמות', 'בניית'],
+  a3: ['קורס', 'ללמוד', 'למידה', 'לימוד', 'ספר', 'תואר', 'הכשרה', 'סדנה', 'מחקר'],
+  a4: ['השקעה', 'כסף', 'חיסכון', 'תקציב', 'מס', 'משכנתא', 'הכנסה', 'פנסיה', 'מניות'],
+  a5: ['ספורט', 'אימון', 'ריצה', 'דיאטה', 'תזונה', 'בריאות', 'שינה', 'כושר', 'רופא', 'יוגה'],
+  a6: ['משפחה', 'זוג', 'חברים', 'ילדים', 'הורים', 'חתונה', 'יחסים', 'חברתי'],
+  a7: ['מדיטציה', 'הרגל', 'התפתחות', 'יומן', 'טיפול', 'מיינדפולנס', 'עצמי'],
+  a8: ['טיול', 'חופשה', 'נסיעה', 'קונצרט', 'תחביב', 'חוויה', 'פנאי', 'מסע'],
+  a9: ['חלום', 'שאיפה', 'עתיד', 'יום אחד', 'חזון']
+};
+function pmSuggestArea(p) { // a suggestion only; the user confirms it
+  const text = ((p.title || '') + ' ' + (p.outcome || '') + ' ' + (p.why || '')).toLowerCase();
+  let best = '', score = 0;
+  pmAreas().forEach(a => {
+    const kws = (PM_KW[a.id] || []).concat(a.name.split(/[\s,\/]+/).filter(w => w.length > 2));
+    const s = kws.reduce((n, k) => n + (text.includes(k.toLowerCase()) ? 1 : 0), 0);
+    if (s > score) { score = s; best = a.id; }
+  });
+  return best;
+}
+const pmUnassigned = () => D().projects.filter(p => !pmArea(p) && pmStatus(p) !== 'done');
+const pmAssignBanner = () => { const n = pmUnassigned().length; return n ? `<div class="card pmassign"><div class="grow"><b>${n} פרויקטים עדיין בלי תחום חיים</b><div class="sub">שייך אותם כדי שיופיעו על האיים הנכונים. אני מציע, ואתה מאשר</div></div><button class="btn" data-act="pmAssign">שיוך מהיר</button></div>` : ''; };
+function pmAssignSheet() {
+  const L = pmUnassigned();
+  sheet(`<h1>שיוך פרויקטים לתחומי חיים</h1><div class="sub" style="margin-bottom:8px">ההצעות לפי המילים בשם ובתיאור של הפרויקט. שום דבר לא ישתנה עד שתלחץ "החל"</div>
+    ${L.map(p => { const sg = pmSuggestArea(p); return `<div class="card"><div class="row"><span style="font-size:22px">${esc(pmIcon(p))}</span><b class="grow">${esc(p.title)}</b></div><select data-pmas="${p.id}" style="margin-top:8px"><option value="">— בלי תחום —</option>${pmAreas().map(a => `<option value="${a.id}" ${a.id === sg ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>${sg ? '' : '<div class="sub" style="margin-top:4px">לא מצאתי התאמה, אפשר לבחור ידנית</div>'}</div>`; }).join('')}
+    <div class="actions"><button class="btn ghost" data-act="close">ביטול</button><button class="btn" data-act="pmAssignApply">החל</button></div>`);
+}
+const greet = () => { const h = new Date().getHours(), n = (D().assist.userName || '').trim(); return (h < 5 ? 'לילה טוב' : h < 12 ? 'בוקר טוב' : h < 17 ? 'צהריים טובים' : h < 21 ? 'ערב טוב' : 'לילה טוב') + (n ? ', ' + esc(n) : ''); };
+const hxOn = () => document.documentElement.dataset.design === 'spatial';
+function homeMap() {
+  const I = pmIsles().filter(a => a.ps.length).sort((a, b) => b.ps.length - a.ps.length).slice(0, 6);
+  const tile = a => `<button class="hxisle" style="--pc:${a.color}" data-act="homeIsle" data-id="${a.id}" aria-label="${esc(a.name)}">${pmImg(a.kind, pmLevel(a.avg), 120, 'isleimg')}<b>${esc(a.name)}</b><span class="hxpill"><i style="width:${a.avg}%"></i></span><small>${a.avg}% · ${a.ps.length} פרויקטים</small></button>`;
+  return `<section class="card hxmap"><div class="row"><b class="grow">מפת החיים שלי</b><button class="lnk" data-act="goTab" data-t="map">למפה המלאה ${chev('l')}</button></div>${pmAssignBanner()}${I.length ? `<div class="hxisles">${I.map(tile).join('')}</div>` : (D().projects.length ? '' : '<div class="empty">עוד אין פרויקטים. כשיהיו, כל תחום יופיע כאן כאי משלו</div>')}</section>`;
+}
+function homeProjects() {
+  const L = D().projects.filter(p => ['focus', 'active'].includes(pmStatus(p))).slice(0, 8);
+  if (!L.length) return `<section class="card"><b>הפרויקטים הפעילים שלי</b><div class="sub" style="margin:4px 0 8px">עוד אין פרויקטים פעילים</div><button class="btn" data-act="pmNew">＋ פרויקט חדש</button></section>`;
+  return `<section class="hxprojs"><h2>הפרויקטים הפעילים שלי</h2><div class="hxrow">${L.map(p => { const pr = pmPct(p), f = pmFocusTask(p), a = pmArea(p); return `<div class="card hxproj" style="--pc:${pmColor(p)}" data-act="homeProj" data-id="${p.id}">${pmObj(p, 72)}<div class="sub">${a ? esc(a.name) : 'ללא תחום'}</div><b>${esc(p.title)}</b><div class="bar"><div style="width:${pr || 0}%"></div></div><div class="sub">${pr === null ? 'התקדמות טרם הוגדרה' : pr + '%'}${f ? ' · 🎯 ' + esc(f.title) : ''}</div></div>`; }).join('')}</div></section>`;
+}
+function hxWrap(html, d) {
+  if (!hxOn() || d !== TODAY()) return html;
+  html = html.replace('<h1>היום</h1>', '<h1>' + greet() + '</h1>');
+  const i = html.indexOf('<div class="card" style="--pct'); if (i < 0) return html;
+  return html.slice(0, i) + '<div class="hxgrid"><div class="hxside">' + html.slice(i) + '</div><div class="hxmain">' + homeMap() + homeProjects() + '</div></div>';
+}
+document.addEventListener('change', e => { if (e.target && e.target.id === 'dzName') { D().assist.userName = e.target.value.trim(); Store.save(); } });
+
 const views = {
   today() {
     if (state.mode === 'do' && state.date === TODAY()) return doView();
@@ -1552,7 +1604,7 @@ const views = {
     const L0 = isToday ? (D().dayLog[dayKey()] || {}) : {}, est = isToday && remaining ? estimateEnd(remaining) : '';
     const visTop = isToday && !D().visual[d] && new Date().getHours() < 11, rs = isToday ? rewardState(d) : {}, rewardTop = isToday && rs.rule && rs.achieved && !rs.claimed;
     const hAct = hs.filter(h => !habitDone(h, d)).length;
-    return `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
+    const html = `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
       <div class="sw"><button class="iconbtn" data-act="printDayAll" aria-label="הדפסת פעילות היום" title="הדפסת פעילות היום">🖨</button><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
       <div class="card" style="--pct:${pct}%"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday ? '<button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' : ''}${isToday && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
        ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
@@ -1574,6 +1626,7 @@ const views = {
        <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>
       </details>
       <button class="fab" data-act="addTask" aria-label="פעולה חדשה">+</button>`;
+    return hxWrap(html, d);
   },
   upcoming() {
     // Todoist-style board in three modes: days (rolling), week, month. Everything is laid out right-to-left.
@@ -1851,6 +1904,7 @@ function render() {
   });
   const board = $('#uboard'), boardScroll = board ? board.scrollLeft : null; // keep the board's horizontal position across re-renders
   document.body.classList.toggle('wide', state.tab === 'upcoming');
+  document.body.classList.toggle('hxwide', hxOn() && state.tab === 'today' && state.mode !== 'do' && state.date === TODAY());
   $('#view').innerHTML = views[state.tab]();
   if (MORE_TABS.includes(state.tab) && state.tab !== 'assistant' && !(state.tab === 'lists' && state.openList) && !(state.tab === 'projects' && (state.openProject || state.openJob))) // back to the "עוד" menu
     $('#view').insertAdjacentHTML('afterbegin', `<button class="iconbtn backmore" data-act="goTab" data-t="more" aria-label="חזרה לעוד">${chev('r')}<span style="margin-inline-start:6px">עוד</span></button>`);
@@ -2459,6 +2513,10 @@ const A = {
     w.style.transformOrigin = (br.left + br.width / 2 - r.left) + 'px ' + (br.top + br.height / 2 - r.top) + 'px'; w.classList.add('zooming'); setTimeout(go, 340);
   },
   pmWorldBack: () => { state.pmIsle = null; state.pmZoom = 'out'; render(); window.scrollTo(0, 0); },
+  pmAssign: () => pmAssignSheet(),
+  pmAssignApply: () => { let n = 0; document.querySelectorAll('#sheet [data-pmas]').forEach(sel => { const p = D().projects.find(x => x.id === sel.dataset.pmas); if (p && sel.value) { p.area = sel.value; n++; } }); Store.save(); closeSheet(); render(); toast('<span>' + (n ? '✅ שויכו ' + n + ' פרויקטים לתחומי חיים' : 'לא שויך אף פרויקט') + '</span><button data-act="toastClose" aria-label="סגור">✕</button>', 3500); },
+  homeIsle: e => { state.tab = 'map'; state.pmIsle = e.id; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
+  homeProj: e => { state.tab = 'map'; state.pmOpen = e.id; state.pmReview = null; render(); window.scrollTo(0, 0); },
   pmNoop: () => {},
   pmOpen: e => { state.pmOpen = e.id; render(); window.scrollTo(0, 0); },
   pmBack: () => { state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },

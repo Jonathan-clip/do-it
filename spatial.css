@@ -206,3 +206,61 @@ html[data-design="spatial"][data-dark][data-theme="nature"]{--bg:#0c1710;--card:
 html[data-design="spatial"][data-dark][data-theme="sunset"]{--bg:#1c0f0b;--card:#2a1812;--ink:#ffeee4;--muted:#c9a090;--line:#43271d;--soft:#3a2018;--brand:#ff9060;--accent:#ffc078;--orb1:#6a2d14;--orb2:#6a1f3a}
 html[data-design="spatial"][data-dark] .pmimgw>img{filter:brightness(.84) saturate(1.08) drop-shadow(0 10px 12px rgba(0,0,0,.45))}
 html[data-design="spatial"][data-dark] .sheet{background:rgba(0,0,0,.55)}
+
+/* ---------- Sky: a painted sky behind everything, in each theme's own colours ---------- */
+html[data-design="spatial"]{--skyp:url(assets/sky/lavender-p.jpg);--skyl:url(assets/sky/lavender-l.jpg);--sky:var(--skyp);--veil:rgba(255,255,255,.22)}
+@media (min-width:820px){html[data-design="spatial"]{--sky:var(--skyl)}}
+html[data-design="spatial"][data-theme="ocean"]{--skyp:url(assets/sky/ocean-p.jpg);--skyl:url(assets/sky/ocean-l.jpg)}
+html[data-design="spatial"][data-theme="nature"]{--skyp:url(assets/sky/nature-p.jpg);--skyl:url(assets/sky/nature-l.jpg)}
+html[data-design="spatial"][data-theme="sunset"]{--skyp:url(assets/sky/sunset-p.jpg);--skyl:url(assets/sky/sunset-l.jpg)}
+html[data-design="spatial"][data-theme="midnight"]{--skyp:url(assets/sky/midnight-p.jpg);--skyl:url(assets/sky/midnight-l.jpg);--veil:rgba(8,10,28,.2)}
+html[data-design="spatial"][data-dark]:not([data-theme="midnight"]){--veil:color-mix(in srgb,var(--bg) 80%,transparent)}
+html[data-design="spatial"][data-fx="minimal"]{--sky:none;--veil:transparent}
+html[data-design="spatial"] body{background:transparent}
+html[data-design="spatial"] body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(var(--veil),var(--veil)),var(--sky) center top/cover no-repeat;transition:opacity .5s}
+html[data-design="spatial"][data-fx="immersive"] body{animation:none}
+/* lighter, airier glass so the sky shows through */
+html[data-design="spatial"]{--glass:.62;--blur:20px}
+html[data-design="spatial"][data-fx="immersive"]{--glass:.5;--blur:26px}
+html[data-design="spatial"] .card{border-color:color-mix(in srgb,#fff 55%,var(--line));border-radius:24px;box-shadow:var(--sh1),inset 0 1px 0 rgba(255,255,255,.5)}
+html[data-design="spatial"][data-dark] .card{border-color:color-mix(in srgb,#fff 10%,var(--line));box-shadow:var(--sh1),inset 0 1px 0 rgba(255,255,255,.07)}
+
+/* one family of line icons in the bottom navigation */
+html[data-design="spatial"] #nav button i{font-size:0;width:24px;height:24px;display:block;filter:none;opacity:.7;background:currentColor;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat;transition:transform .3s var(--ease),opacity .2s}
+html[data-design="spatial"] #nav button.on i{opacity:1}
+html[data-design="spatial"] #nav [data-tab="today"] i{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6'/%3E%3C/svg%3E")}
+html[data-design="spatial"] #nav [data-tab="upcoming"] i{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='3'/%3E%3Cpath d='M4 10h16M8 3v4M16 3v4'/%3E%3C/svg%3E")}
+html[data-design="spatial"] #nav [data-tab="map"] i{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cellipse cx='12' cy='12' rx='4' ry='9'/%3E%3Cpath d='M3 12h18'/%3E%3C/svg%3E")}
+html[data-design="spatial"] #nav [data-tab="cheer"] i{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z'/%3E%3C/svg%3E")}
+html[data-design="spatial"] #nav [data-tab="more"] i{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'%3E%3Crect x='4' y='4' width='6.5' height='6.5' rx='2'/%3E%3Crect x='13.5' y='4' width='6.5' height='6.5' rx='2'/%3E%3Crect x='4' y='13.5' width='6.5' height='6.5' rx='2'/%3E%3Crect x='13.5' y='13.5' width='6.5' height='6.5' rx='2'/%3E%3C/svg%3E")}
+
+/* ---------- Home: greeting, then plan on one side and the life map + projects on the other ---------- */
+html[data-design="spatial"] .hxgrid{display:block}
+html[data-design="spatial"] .hxmain{margin-top:6px}
+html[data-design="spatial"] .hxmap{padding:16px}
+html[data-design="spatial"] .hxisles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 4px;margin-top:6px}
+html[data-design="spatial"] .hxisle{border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;text-align:center;color:var(--ink);cursor:pointer;transition:transform .3s var(--ease)}
+html[data-design="spatial"] .hxisle:hover{transform:translateY(-4px) scale(1.04)}
+html[data-design="spatial"] .hxisle .pmimgw{width:100%!important;height:auto!important;aspect-ratio:1;max-width:130px}
+html[data-design="spatial"] .hxisle b{font-size:12.5px;line-height:1.25;margin-top:-8px}
+html[data-design="spatial"] .hxisle small{font-size:11px;color:var(--muted);margin-top:2px}
+html[data-design="spatial"] .hxpill{display:block;width:70%;height:5px;border-radius:5px;background:color-mix(in srgb,var(--line) 70%,transparent);overflow:hidden;margin-top:5px}
+html[data-design="spatial"] .hxpill i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,var(--brand),var(--accent))}
+html[data-design="spatial"] .hxprojs h2{margin-top:18px}
+html[data-design="spatial"] .hxrow{display:flex;gap:10px;overflow-x:auto;margin-inline:-16px;padding:2px 16px 12px;scroll-snap-type:x proximity}
+html[data-design="spatial"] .hxproj{flex:0 0 min(62vw,210px);scroll-snap-align:start;cursor:pointer;margin:0;display:flex;flex-direction:column;gap:3px}
+html[data-design="spatial"] .hxproj b{font-size:15px}
+html[data-design="spatial"] .hxproj .pmimgw{margin-bottom:-4px}
+html[data-design="spatial"] .hxproj .bar{margin:5px 0 2px}
+@media (min-width:900px){
+  html[data-design="spatial"] body.hxwide #app{max-width:1180px}
+  html[data-design="spatial"] .hxgrid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:22px;align-items:start}
+  html[data-design="spatial"] .hxmain{margin-top:0}
+  html[data-design="spatial"] .hxisles{grid-template-columns:repeat(3,1fr);gap:14px 8px}
+  html[data-design="spatial"] .hxrow{flex-wrap:wrap;overflow:visible;margin-inline:0;padding-inline:0}
+  html[data-design="spatial"] .hxproj{flex:1 1 200px;max-width:260px}
+}
+/* map screen: project names under each island, and the "assign to a life area" prompt */
+html[data-design="spatial"] .isle .isleps{display:block;max-width:100%;font-size:11px;color:var(--ink);opacity:.8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-design="spatial"] .pmassign,.pmassign{display:flex;align-items:center;gap:10px}
+.pmassign .btn{flex:none;padding:10px 14px}
