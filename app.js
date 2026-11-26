@@ -1260,12 +1260,12 @@ function pmWorld() {
   return `<div class="world" id="world" style="height:${H}px"><svg class="wpaths" viewBox="0 0 300 ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" fill="none" stroke="var(--brand)" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity=".35" vector-effect="non-scaling-stroke"/></svg>
     ${I.map((a, k) => `<button class="isle" style="left:${pos[k].x}%;top:${pos[k].y}px;--pc:${a.color};--d:${(k * .37).toFixed(2)}s" data-act="pmIsle" data-id="${a.id}" aria-label="${esc(a.name)}: ${a.ps.length} פרויקטים">
       ${pmImg(a.kind, a.ps.length ? pmLevel(a.avg) : 1, 200, 'isleimg')}
-      <b>${a.icon} ${esc(a.name)}</b><small>${a.ps.length ? a.ps.length + ' פרויקטים · ' + a.avg + '%' : 'אין פרויקטים'}</small></button>`).join('')}</div>`;
+      <b>${esc(a.name)}</b><small>${a.ps.length ? a.ps.length + ' פרויקטים · ' + a.avg + '%' : 'אין פרויקטים'}</small></button>`).join('')}</div>`;
 }
 function pmIsleView(id) {
   const a = pmIsles().find(x => x.id === id); if (!a) { state.pmIsle = null; return pmMap(); }
   return `<div class="top"><button class="iconbtn" data-act="pmWorldBack" aria-label="חזרה למפת החיים">${chev('r')}<span style="margin-inline-start:6px">🌍 מפת החיים</span></button><div class="sw"><button class="iconbtn" data-act="pmNew" aria-label="פרויקט חדש">＋</button></div></div>
-    <div class="pmhero isleview" style="--pc:${a.color}">${pmImg(a.kind, a.ps.length ? pmLevel(a.avg) : 1, 96)}<div class="grow"><div class="sub">תחום חיים</div><div class="pmoutcome">${a.icon} ${esc(a.name)}</div><div class="pmleft">${a.ps.length ? a.ps.length + ' פרויקטים · התקדמות ממוצעת ' + a.avg + '%' : 'עוד אין כאן פרויקטים'}</div></div></div>
+    <div class="pmhero isleview" style="--pc:${a.color}">${pmImg(a.kind, a.ps.length ? pmLevel(a.avg) : 1, 96)}<div class="grow"><div class="sub">תחום חיים</div><div class="pmoutcome">${esc(a.name)}</div><div class="pmleft">${a.ps.length ? a.ps.length + ' פרויקטים · התקדמות ממוצעת ' + a.avg + '%' : 'עוד אין כאן פרויקטים'}</div></div></div>
     ${a.ps.length ? `<div id="pmcards">${a.ps.map(pmCard).join('')}</div>` : '<div class="empty">אפשר להוסיף כאן פרויקט ראשון עם ＋</div>'}`;
 }
 
