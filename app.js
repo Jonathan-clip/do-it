@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.7'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.8-spatial'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -1454,6 +1454,35 @@ document.addEventListener('change', e => {
   if (cp) { D().assist.pmCap = Math.max(1, +cp.value || 20); Store.save(); pmLoadSheet(); }
 });
 
+// ---- Spatial design layer (spatial.css): classic | spatial, 5 themes, 3 effect levels. Stored in assist settings, mirrored to localStorage so the first paint has no flash.
+const DZ_THEMES = [['lavender', 'Lavender', '#6a4be0'], ['ocean', 'Ocean', '#0a82a8'], ['nature', 'Nature', '#3c7d4d'], ['sunset', 'Sunset', '#d9582b'], ['midnight', 'Midnight', '#2a2f57']], DZ_FX = [['minimal', 'Minimal'], ['spatial', 'Spatial'], ['immersive', 'Immersive']];
+const dz = () => { const a = D().assist; return { d: a.design === 'spatial' ? 'spatial' : 'classic', t: a.dzTheme || 'lavender', f: a.dzFx || 'spatial' }; };
+function applyDesign() {
+  const z = dz(), h = document.documentElement;
+  if (z.d === 'spatial') { h.dataset.design = 'spatial'; h.dataset.theme = z.t; h.dataset.fx = z.f; } else { delete h.dataset.design; delete h.dataset.theme; delete h.dataset.fx; }
+  try { localStorage.setItem('doit-dz', JSON.stringify(z)); } catch (e) {}
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = z.d === 'spatial' ? (DZ_THEMES.find(x => x[0] === z.t) || DZ_THEMES[0])[2] : '#1f6f5c';
+}
+const dzCard = () => { const z = dz(); return `<div class="card"><div class="t"><b>🎨 עיצוב</b></div><div class="sub">עיצוב Spatial: עומק, זכוכית ותנועה עדינה. אפשר לחזור לקלאסי בכל רגע</div>
+  <div class="dzpick"><button class="${z.d === 'classic' ? 'on' : ''}" data-act="dzSet" data-k="d" data-v="classic">קלאסי</button><button class="${z.d === 'spatial' ? 'on' : ''}" data-act="dzSet" data-k="d" data-v="spatial">Spatial</button></div>
+  ${z.d === 'spatial' ? `<div class="dzpick">${DZ_THEMES.map(([v, l, c]) => `<button class="${z.t === v ? 'on' : ''}" data-act="dzSet" data-k="t" data-v="${v}"><span class="sw" style="background:${c}"></span>${l}</button>`).join('')}</div>
+  <div class="dzpick">${DZ_FX.map(([v, l]) => `<button class="${z.f === v ? 'on' : ''}" data-act="dzSet" data-k="f" data-v="${v}">${l}</button>`).join('')}</div>` : ''}</div>`; };
+// pointer tilt on project cards (only with a mouse, only in Spatial/Immersive, never with reduced motion)
+(() => {
+  let cur = null; const reduce = matchMedia('(prefers-reduced-motion:reduce)');
+  const clear = () => { if (cur) { cur.style.removeProperty('--rx'); cur.style.removeProperty('--ry'); cur.style.removeProperty('--mx'); cur = null; } };
+  document.addEventListener('pointermove', e => {
+    const h = document.documentElement.dataset;
+    if (e.pointerType !== 'mouse' || h.design !== 'spatial' || h.fx === 'minimal' || reduce.matches) return clear();
+    const c = e.target.closest && e.target.closest('.pmcard, .pmfocusbig');
+    if (c !== cur) clear();
+    if (!c) return; cur = c;
+    const r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5, k = h.fx === 'immersive' ? 7 : 4;
+    c.style.setProperty('--ry', (-x * k).toFixed(2) + 'deg'); c.style.setProperty('--rx', (y * k).toFixed(2) + 'deg'); c.style.setProperty('--mx', ((x + .5) * 100).toFixed(0) + '%');
+  }, { passive: true });
+  document.addEventListener('pointerleave', clear, true);
+})();
+
 const views = {
   today() {
     if (state.mode === 'do' && state.date === TODAY()) return doView();
@@ -1467,7 +1496,7 @@ const views = {
     const hAct = hs.filter(h => !habitDone(h, d)).length;
     return `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
       <div class="sw"><button class="iconbtn" data-act="printDayAll" aria-label="הדפסת פעילות היום" title="הדפסת פעילות היום">🖨</button><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
-      <div class="card"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday ? '<button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' : ''}${isToday && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
+      <div class="card" style="--pct:${pct}%"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday ? '<button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' : ''}${isToday && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
        ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
       ${isToday ? modeSwitch() : ''}
       ${isToday ? syncHint() : ''}
@@ -1646,6 +1675,7 @@ const views = {
       ${item('lists', '📝', 'רשימות', `${D().lists.length} רשימות`)}
       <h2>הגדרות</h2>
       <div class="card"><div class="t"><b>🔔 רמת הודעות</b></div><select id="notifySel" style="margin-top:6px">${NOTIFY.map(([v, l]) => '<option value="' + v + '" ' + (notifyLevel() === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select><div class="sub" id="notifyDesc" style="margin-top:6px">${(NOTIFY.find(x => x[0] === notifyLevel()) || NOTIFY[1])[2]}</div></div>
+      ${dzCard()}
       <div class="card row"><div class="grow"><div class="t">גרסה ${APP_VERSION}</div><div class="sub">אם נראה שהאפליקציה לא מעודכנת, לחץ כדי לנקות את המטמון ולטעון מחדש</div></div><button class="iconbtn" data-act="refreshApp">🔄 רענון</button></div>
       <h2>חשבון</h2>
       <div class="card row" data-act="account"><span style="font-size:26px">☁️</span><div class="grow"><div class="t"><b>כניסה וסנכרון</b></div><div class="meta">${Cloud.user ? esc(Cloud.user.email) : 'לא מחובר'}</div></div>${chev('l')}</div>`;
@@ -1749,6 +1779,7 @@ const views = {
 };
 
 function render() {
+  applyDesign();
   sweepPast();
   // A background re-render (sync status, timers) must not wipe what the user is typing: remember the changed fields of the current screen
   const typed = {}; let focusKey = null, caret = null;
@@ -2359,6 +2390,7 @@ const A = {
   pmRevDone: () => { const k = state.pmReview === 'month' ? 'm' + TODAY().slice(0, 7) : weekStart(TODAY()), R = pmRevs(); R[k] = Object.assign({}, R[k], { doneAt: TODAY() }); Store.save(); state.pmReview = null; render(); window.scrollTo(0, 0); celebrate(); toast('<span>✅ הסקירה נשמרה. כל הכבוד שעצרת לחשוב</span><button data-act="toastClose" aria-label="סגור">✕</button>', 4000); },
   pmRelease: e => { const p = D().projects.find(x => x.id === e.id); if (p) { p.focusTaskId = ''; Store.save(); render(); } },
   pmSetStatus: e => { const p = D().projects.find(x => x.id === e.id); if (p) { p.status = e.s; Store.save(); render(); } },
+  dzSet: e => { const a = D().assist, m = { d: 'design', t: 'dzTheme', f: 'dzFx' }[e.k]; if (!m) return; a[m] = e.v; Store.save(); render(); },
   pmNoop: () => {},
   pmOpen: e => { state.pmOpen = e.id; render(); window.scrollTo(0, 0); },
   pmBack: () => { state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
