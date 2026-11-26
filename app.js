@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.8-spatial'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.9-world'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -1220,13 +1220,61 @@ const pmRing = (p, size) => {
   return `<div class="pmring" style="width:${size}px;height:${size}px"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--line)" stroke-width="7"/><circle class="pmarc" cx="32" cy="32" r="${r}" fill="none" stroke="${pmColor(p)}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - pr / 100)).toFixed(1)}" style="--c:${c.toFixed(1)}" transform="rotate(-90 32 32)"/></svg><b>${pr}%</b></div>`;
 };
 const pmChips = p => (p.values || []).map(v => `<span class="pmval">${esc(v)}</span>`).join('');
+// ---- Stage 5: project objects. One small SVG per life area; it gains parts as real progress passes 25/50/75/100% and never shrinks (pmMax = high-water mark).
+const PM_KIND = { a1: 'building', a2: 'lab', a3: 'books', a4: 'growth', a5: 'park', a6: 'meeting', a7: 'sprout', a8: 'mountain', a9: 'star' };
+const PM_OBJ = {
+  building: [[1, '<rect x="22" y="34" width="22" height="20" rx="2" fill="currentColor"/>'], [2, '<rect x="12" y="26" width="13" height="28" rx="2" fill="currentColor" opacity=".78"/>'], [3, '<rect x="40" y="22" width="13" height="32" rx="2" fill="currentColor" opacity=".9"/><g fill="#fff" opacity=".75"><rect x="26" y="39" width="4" height="4"/><rect x="34" y="39" width="4" height="4"/><rect x="15" y="31" width="3" height="3"/><rect x="43" y="28" width="3" height="3"/><rect x="48" y="28" width="3" height="3"/></g>'], [4, '<rect x="45" y="13" width="3" height="10" fill="currentColor"/><circle cx="46.5" cy="12" r="2.4" fill="var(--accent)"/>'], [5, '<rect x="26" y="22" width="1.6" height="12" fill="currentColor"/><path d="M27.6 22v8l8-4z" fill="var(--accent)"/>']],
+  lab: [[1, '<path d="M26 18h12v10l10 20a4 4 0 0 1-3.6 6H19.6A4 4 0 0 1 16 48l10-20z" fill="currentColor" opacity=".85"/>'], [2, '<path d="M20 44h24l3 6a2 2 0 0 1-1.8 3H18.8A2 2 0 0 1 17 50z" fill="#fff" opacity=".35"/><circle cx="28" cy="40" r="2" fill="#fff" opacity=".7"/><circle cx="36" cy="36" r="1.5" fill="#fff" opacity=".7"/>'], [3, '<circle cx="32" cy="9" r="5" fill="var(--accent)"/><rect x="30" y="13" width="4" height="4" rx="1" fill="currentColor"/>'], [4, '<g stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"><path d="M22 6l-3-2M42 6l3-2M20 12h-4M44 12h4"/></g>'], [5, '<path d="M52 20l1.6 4 4 1.6-4 1.6L52 31l-1.6-3.8-4-1.6 4-1.6z" fill="var(--accent)"/>']],
+  books: [[1, '<rect x="14" y="44" width="36" height="9" rx="1.5" fill="currentColor"/>'], [2, '<rect x="18" y="35" width="30" height="9" rx="1.5" fill="currentColor" opacity=".75"/>'], [3, '<rect x="16" y="26" width="32" height="9" rx="1.5" fill="currentColor" opacity=".9"/>'], [4, '<g fill="#fff" opacity=".6"><rect x="18" y="47" width="14" height="2"/><rect x="22" y="38" width="12" height="2"/><rect x="20" y="29" width="14" height="2"/></g>'], [5, '<path d="M32 8l16 7-16 7-16-7z" fill="var(--accent)"/><path d="M24 20v5c4 3 12 3 16 0v-5" fill="none" stroke="currentColor" stroke-width="2"/>']],
+  growth: [[1, '<rect x="12" y="42" width="10" height="12" rx="1.5" fill="currentColor" opacity=".6"/>'], [2, '<rect x="27" y="34" width="10" height="20" rx="1.5" fill="currentColor" opacity=".8"/>'], [3, '<rect x="42" y="24" width="10" height="30" rx="1.5" fill="currentColor"/>'], [4, '<path d="M12 34l16-10 10 6 16-16M48 14h7v7" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'], [5, '<circle cx="16" cy="12" r="6" fill="var(--accent)"/><text x="16" y="15.5" font-size="9" text-anchor="middle" fill="#fff" font-weight="700">₪</text>']],
+  park: [[1, '<rect x="30" y="40" width="4" height="14" fill="#8b6b4a"/><circle cx="32" cy="34" r="10" fill="currentColor" opacity=".75"/>'], [2, '<circle cx="32" cy="28" r="14" fill="currentColor" opacity=".9"/>'], [3, '<rect x="47" y="46" width="3" height="8" fill="#8b6b4a"/><circle cx="48.5" cy="42" r="7" fill="currentColor" opacity=".7"/>'], [4, '<path d="M8 54q12-6 22 0" fill="none" stroke="#fff" stroke-width="2" opacity=".55" stroke-linecap="round"/><rect x="11" y="46" width="12" height="2.5" rx="1" fill="#8b6b4a"/><rect x="12" y="48" width="1.6" height="5" fill="#8b6b4a"/><rect x="21" y="48" width="1.6" height="5" fill="#8b6b4a"/>'], [5, '<circle cx="53" cy="11" r="6" fill="var(--accent)"/>']],
+  meeting: [[1, '<ellipse cx="32" cy="46" rx="20" ry="7" fill="currentColor" opacity=".85"/>'], [2, '<circle cx="20" cy="30" r="5" fill="currentColor"/><path d="M12 42a8 8 0 0 1 16 0z" fill="currentColor" opacity=".8"/>'], [3, '<circle cx="44" cy="30" r="5" fill="currentColor"/><path d="M36 42a8 8 0 0 1 16 0z" fill="currentColor" opacity=".8"/>'], [4, '<circle cx="32" cy="22" r="5" fill="currentColor"/><path d="M24 34a8 8 0 0 1 16 0z" fill="currentColor" opacity=".8"/>'], [5, '<path d="M32 9c-3-5-10-2-7 3 2 3 7 6 7 6s5-3 7-6c3-5-4-8-7-3z" fill="var(--accent)"/>']],
+  sprout: [[1, '<path d="M32 54V38" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>'], [2, '<path d="M32 46c-8 0-12-5-12-10 8 0 12 4 12 10z" fill="currentColor" opacity=".75"/><path d="M32 42c8 0 12-5 12-10-8 0-12 4-12 10z" fill="currentColor" opacity=".9"/>'], [3, '<path d="M32 40V24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>'], [4, '<ellipse cx="32" cy="19" rx="4" ry="6" fill="var(--accent)"/>'], [5, '<g fill="var(--accent)"><circle cx="32" cy="12" r="4"/><circle cx="26" cy="18" r="4"/><circle cx="38" cy="18" r="4"/><circle cx="29" cy="24" r="4"/><circle cx="35" cy="24" r="4"/></g><circle cx="32" cy="18" r="3.4" fill="#fff"/>']],
+  mountain: [[1, '<path d="M8 54L28 20l20 34z" fill="currentColor" opacity=".85"/>'], [2, '<path d="M30 54l16-24 14 24z" fill="currentColor" opacity=".65"/>'], [3, '<path d="M22 54q8-8 2-14t6-12" fill="none" stroke="#fff" stroke-width="1.8" stroke-dasharray="3 3" stroke-linecap="round" opacity=".8"/>'], [4, '<circle cx="52" cy="14" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M52 9l2 5-2 5-2-5z" fill="var(--accent)"/>'], [5, '<rect x="27" y="7" width="1.6" height="13" fill="currentColor"/><path d="M28.6 7v8l8-4z" fill="var(--accent)"/>']],
+  star: [[1, '<circle cx="32" cy="34" r="6" fill="currentColor"/>'], [2, '<circle cx="32" cy="34" r="12" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".5"/>'], [3, '<path d="M32 12l5.5 12 13 1.5-9.7 8.8 2.7 12.9L32 40l-11.5 7.2 2.7-12.9-9.7-8.8 13-1.5z" fill="currentColor" opacity=".9"/>'], [4, '<ellipse cx="32" cy="30" rx="26" ry="8" fill="none" stroke="var(--accent)" stroke-width="1.6" transform="rotate(-20 32 30)"/>'], [5, '<circle cx="52" cy="12" r="3" fill="var(--accent)"/><circle cx="10" cy="20" r="2" fill="var(--accent)"/>']]
+};
+const pmKind = areaId => PM_KIND[areaId] || 'star';
+const pmStageOf = pr => pr >= 100 ? 5 : pr >= 75 ? 4 : pr >= 50 ? 3 : pr >= 25 ? 2 : 1;
+const pmHigh = p => { const pr = pmPct(p) || 0; if (pr > (p.pmMax || 0)) p.pmMax = pr; return p.pmMax || 0; }; // a quiet week never shrinks the object
+const pmObjInner = (kind, stage) => '<ellipse cx="32" cy="56" rx="24" ry="5" fill="currentColor" opacity=".16"/>' + PM_OBJ[kind].filter(x => x[0] <= stage).map(x => x[1]).join('');
+const pmObj = (p, size) => `<svg class="pmobj" style="width:${size}px;height:${size}px" viewBox="0 0 64 64" aria-hidden="true">${pmObjInner(pmKind(p.area), pmStageOf(pmHigh(p)))}</svg>`;
+const pmNextMile = p => { const t = pmOrdered(p).find(x => x.milestone); return t ? t.title : ''; };
+
+// ---- Stage 4: the life map. Islands per life area; click = camera zoom into the area's projects. A plain list view stays available.
+const pmWorldOn = () => document.documentElement.dataset.design === 'spatial' && (D().assist.pmView || 'world') === 'world';
+const pmIsles = () => {
+  const list = pmVisible(), all = pmAreas().map((a, i) => ({ id: a.id, icon: a.icon, name: a.name, i }));
+  if (D().projects.some(p => !pmArea(p))) all.push({ id: '_none', icon: '📁', name: 'ללא תחום', i: all.length });
+  return all.map(a => {
+    const ps = list.filter(p => (pmArea(p) ? p.area : '_none') === a.id), hs = ps.map(p => Math.max(pmPct(p) || 0, pmHigh(p))), avg = hs.length ? Math.round(hs.reduce((x, y) => x + y, 0) / hs.length) : 0;
+    return { ...a, ps, avg, color: PM_COLORS[a.i % PM_COLORS.length], kind: PM_KIND[a.id] || 'star' };
+  });
+};
+function pmWorld() {
+  const I = pmIsles(), cols = 3, rowH = 158, rows = Math.ceil(I.length / cols), H = rows * rowH + 30;
+  const pos = I.map((a, k) => { const r = Math.floor(k / cols), c = k % cols, inRow = Math.min(cols, I.length - r * cols), x = (c + .5) * (100 / inRow); return { x: r % 2 ? 100 - x : x, y: r * rowH + 12 + (c % 2 ? 22 : 0) }; });
+  const path = pos.map((p, k) => `${k ? 'L' : 'M'}${(p.x * 3).toFixed(0)} ${p.y + 62}`).join(' ');
+  return `<div class="world" id="world" style="height:${H}px"><svg class="wpaths" viewBox="0 0 300 ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" fill="none" stroke="var(--brand)" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity=".35" vector-effect="non-scaling-stroke"/></svg>
+    ${I.map((a, k) => `<button class="isle" style="left:${pos[k].x}%;top:${pos[k].y}px;--pc:${a.color};--d:${(k * .37).toFixed(2)}s" data-act="pmIsle" data-id="${a.id}" aria-label="${esc(a.name)}: ${a.ps.length} פרויקטים">
+      <svg viewBox="0 0 120 112" aria-hidden="true"><defs><linearGradient id="ig${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a.color}" stop-opacity=".35"/><stop offset="1" stop-color="${a.color}" stop-opacity=".95"/></linearGradient></defs>
+        <path d="M10 66Q60 118 110 66z" fill="url(#ig${k})"/><ellipse cx="60" cy="66" rx="50" ry="16" fill="${a.color}" opacity=".28"/><ellipse cx="60" cy="64" rx="46" ry="13" fill="var(--card)" opacity=".85"/>
+        <svg x="30" y="-4" width="60" height="64" viewBox="0 0 64 64" style="color:${a.color}">${pmObjInner(a.kind, a.ps.length ? pmStageOf(a.avg) : 1)}</svg></svg>
+      <b>${a.icon} ${esc(a.name)}</b><small>${a.ps.length ? a.ps.length + ' פרויקטים · ' + a.avg + '%' : 'אין פרויקטים'}</small></button>`).join('')}</div>`;
+}
+function pmIsleView(id) {
+  const a = pmIsles().find(x => x.id === id); if (!a) { state.pmIsle = null; return pmMap(); }
+  return `<div class="top"><button class="iconbtn" data-act="pmWorldBack" aria-label="חזרה למפת החיים">${chev('r')}<span style="margin-inline-start:6px">🌍 מפת החיים</span></button><div class="sw"><button class="iconbtn" data-act="pmNew" aria-label="פרויקט חדש">＋</button></div></div>
+    <div class="pmhero isleview" style="--pc:${a.color}"><svg class="pmobj" style="width:96px;height:96px;color:${a.color}" viewBox="0 0 64 64" aria-hidden="true">${pmObjInner(a.kind, a.ps.length ? pmStageOf(a.avg) : 1)}</svg><div class="grow"><div class="sub">תחום חיים</div><div class="pmoutcome">${a.icon} ${esc(a.name)}</div><div class="pmleft">${a.ps.length ? a.ps.length + ' פרויקטים · התקדמות ממוצעת ' + a.avg + '%' : 'עוד אין כאן פרויקטים'}</div></div></div>
+    ${a.ps.length ? `<div id="pmcards">${a.ps.map(pmCard).join('')}</div>` : '<div class="empty">אפשר להוסיף כאן פרויקט ראשון עם ＋</div>'}`;
+}
+
 function pmCard(p) {
   const f = pmFocusTask(p), st = PM_STATUS.find(x => x[0] === pmStatus(p)), a = pmArea(p), live = ['focus', 'active'].includes(pmStatus(p));
   return `<div class="pmcard" style="--pc:${pmColor(p)}" data-act="pmOpen" data-id="${p.id}">
     <div class="pmhead"><span class="pmgrip" data-act="pmNoop" title="גרור לשינוי סדר" aria-label="גרור לשינוי סדר">⋮⋮</span><span class="pmicon">${pmIcon(p)}</span><div class="grow"><b class="pmname">${esc(p.title)}</b><div class="sub">${a ? esc(a.icon + ' ' + a.name) + ' · ' : ''}${st[1]} ${st[2]}</div></div>${pmRing(p, 68)}</div>
     <div class="pmleft">⏳ ${pmLeft(p)}${p.due ? ' · ' + shortDate(p.due) : ''}</div>
-    ${p.why ? `<div class="pmwhy">“${esc(p.why)}”</div>` : `<div class="pmwhy none">אפשר להוסיף כאן את ה״למה״ שלך (✏️ בתוך הפרויקט)</div>`}
-    ${p.values && p.values.length ? `<div class="pmvals">${pmChips(p)}</div>` : ''}
+    <div class="pmmid"><div class="pmobjwrap">${pmObj(p, 84)}</div><div class="grow">${p.why ? `<div class="pmwhy">“${esc(p.why)}”</div>` : `<div class="pmwhy none">אפשר להוסיף כאן את ה״למה״ שלך (✏️ בתוך הפרויקט)</div>`}
+    ${p.values && p.values.length ? `<div class="pmvals">${pmChips(p)}</div>` : ''}${pmNextMile(p) ? `<div class="pmnext">⭐ אבן הדרך הבאה: <b>${esc(pmNextMile(p))}</b></div>` : ''}</div></div>
     ${f ? `<div class="pmfocus">🎯 <span>המיקוד השבוע</span><b>${esc(f.title)}</b></div>` : (live ? `<button class="lnk pmpick" data-act="pmFocusSet" data-id="${p.id}">＋ בחר מיקוד לשבוע</button>` : '')}
     <div class="pmopen">לפתיחת הפרויקט ${chev('l')}</div></div>`;
 }
@@ -1241,12 +1289,14 @@ function pmMap() {
   const sel = (key, cur, opts, all) => `<select data-pmf="${key}" aria-label="${all}"><option value="">${all}</option>${opts.map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
   return `<div class="top"><h1>🗺️ מפת הפרויקטים שלי</h1><div class="sw"><button class="iconbtn" data-act="pmHome" aria-label="מסך הבית" title="${home ? 'זה מסך הבית. לחץ לביטול' : 'הפוך למסך הבית'}">${home ? '🏠' : '🏡'}</button><button class="iconbtn" data-act="pmNew" aria-label="פרויקט חדש">＋</button></div></div>
     <div class="sub" style="margin:-4px 0 12px">לאן אני הולך, ולמה זה חשוב לי</div>
+    ${document.documentElement.dataset.design === 'spatial' ? `<div class="seg pmviewseg"><button class="${pmWorldOn() ? 'on' : ''}" data-act="pmView" data-v="world">🌍 עולם</button><button class="${pmWorldOn() ? '' : 'on'}" data-act="pmView" data-v="list">📋 רשימה</button></div>` : ''}
     <div class="seg">${[['live', 'פעילים'], ...PM_STATUS.map(x => [x[0], x[1] + ' ' + x[2]]), ['all', 'הכל']].map(([k, l]) => `<button class="${S === k ? 'on' : ''}" data-act="pmStatusF" data-k="${k}">${l}</button>`).join('')}</div>
-    <div class="pmfilters">${sel('pmArea', state.pmArea || '', pmAreas().map(a => [a.id, a.icon + ' ' + a.name]), 'כל התחומים')}${sel('pmRange', state.pmRange || '', PM_RANGES, 'כל טווח זמן')}<button class="iconbtn" data-act="pmAreasSheet" aria-label="עריכת תחומי חיים" title="תחומי חיים">⚙️</button></div>
+    ${pmWorldOn() ? '' : `<div class="pmfilters">${sel('pmArea', state.pmArea || '', pmAreas().map(a => [a.id, a.icon + ' ' + a.name]), 'כל התחומים')}${sel('pmRange', state.pmRange || '', PM_RANGES, 'כל טווח זמן')}<button class="iconbtn" data-act="pmAreasSheet" aria-label="עריכת תחומי חיים" title="תחומי חיים">⚙️</button></div>
     <div class="pmfilters">${sel('pmValue', state.pmValue || '', pmValues().map(v => [v, v]), 'כל הערכים')}${sel('pmPrio', state.pmPrio || '', PM_PRIO, 'כל העדיפויות')}</div>
+`}
     <div class="seg pmrevs"><button data-act="pmWeekRev">📋 סקירה שבועית</button><button data-act="pmMonthRev">🗓️ סקירה חודשית</button><button data-act="pmLoad">⏱️ עומס</button></div>
     ${live.length ? `<button class="btn ghost pmweek" data-act="pmWalk">🧭 כוונון שבוע: מה אני מקדם בכל פרויקט</button>` : ''}
-    ${list.length ? `<div id="pmcards">${list.map(pmCard).join('')}</div>` : `<div class="empty">${D().projects.length ? 'אין פרויקטים שמתאימים לסינון הזה' : 'עוד אין פרויקטים. אפשר להתחיל מאחד שחשוב לך'}</div>`}`;
+    ${pmWorldOn() ? pmWorld() : list.length ? `<div id="pmcards">${list.map(pmCard).join('')}</div>` : `<div class="empty">${D().projects.length ? 'אין פרויקטים שמתאימים לסינון הזה' : 'עוד אין פרויקטים. אפשר להתחיל מאחד שחשוב לך'}</div>`}`;
 }
 function pmDetail(p) {
   const f = pmFocusTask(p), st = pmStatus(p), s = projState(p), open = pmOrdered(p), done = s.ts.filter(t => t.done), a = pmArea(p), wasF = p.focusTaskId && !f && findTask(p.focusTaskId);
@@ -1259,7 +1309,7 @@ function pmDetail(p) {
   };
   const field = (l, v) => v ? `<div class="pmfield"><span>${l}</span><div>${v}</div></div>` : '';
   return `<div class="top"><div class="row"><button class="iconbtn" data-act="pmBack" aria-label="חזרה למפה">${chev('r')}</button><h1>${esc(p.title)}</h1></div><div class="sw"><button class="iconbtn" data-act="pmEdit" data-id="${p.id}" aria-label="עריכה">✏️</button></div></div>
-    <div class="pmhero" style="--pc:${pmColor(p)}"><span class="pmicon big">${pmIcon(p)}</span><div class="grow"><div class="sub">${a ? esc(a.icon + ' ' + a.name) : 'ללא תחום'}</div><div class="pmoutcome">${p.outcome ? esc(p.outcome) : '<span class="sub">עוד לא הוגדרה תוצאה רצויה</span>'}</div><div class="pmleft">⏳ ${pmLeft(p)}</div></div>${pmRing(p, 92)}</div>
+    <div class="pmhero" style="--pc:${pmColor(p)}"><span class="pmicon big">${pmIcon(p)}</span><span class="pmobjbig">${pmObj(p, 84)}</span><div class="grow"><div class="sub">${a ? esc(a.icon + ' ' + a.name) : 'ללא תחום'}</div><div class="pmoutcome">${p.outcome ? esc(p.outcome) : '<span class="sub">עוד לא הוגדרה תוצאה רצויה</span>'}</div><div class="pmleft">⏳ ${pmLeft(p)}</div></div>${pmRing(p, 92)}</div>
     <div class="card pminfo">${p.why ? `<div class="pmwhy big">“${esc(p.why)}”</div>` : ''}
       ${p.values && p.values.length ? `<div class="pmvals">${pmChips(p)}</div>` : ''}
       ${field('איך אני רוצה להרגיש', esc(p.feel || ''))}${field('התחלה', p.start ? longDate(p.start) : '')}${field('יעד', p.due ? longDate(p.due) : '')}
@@ -1474,10 +1524,10 @@ const dzCard = () => { const z = dz(); return `<div class="card"><div class="t">
   document.addEventListener('pointermove', e => {
     const h = document.documentElement.dataset;
     if (e.pointerType !== 'mouse' || h.design !== 'spatial' || h.fx === 'minimal' || reduce.matches) return clear();
-    const c = e.target.closest && e.target.closest('.pmcard, .pmfocusbig');
+    const c = e.target.closest && e.target.closest('.pmcard, .pmfocusbig, .world');
     if (c !== cur) clear();
     if (!c) return; cur = c;
-    const r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5, k = h.fx === 'immersive' ? 7 : 4;
+    const r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5, k = (h.fx === 'immersive' ? 7 : 4) * (c.classList.contains('world') ? 1.6 : 1);
     c.style.setProperty('--ry', (-x * k).toFixed(2) + 'deg'); c.style.setProperty('--rx', (y * k).toFixed(2) + 'deg'); c.style.setProperty('--mx', ((x + .5) * 100).toFixed(0) + '%');
   }, { passive: true });
   document.addEventListener('pointerleave', clear, true);
@@ -1636,6 +1686,7 @@ const views = {
   map() {
     const p = state.pmOpen && D().projects.find(x => x.id === state.pmOpen);
     if (state.pmReview) return pmReviewView();
+    if (state.pmIsle && !p && pmWorldOn()) return pmIsleView(state.pmIsle);
     if (p) return pmDetail(p);
     state.pmOpen = null; return pmMap();
   },
@@ -1798,7 +1849,7 @@ function render() {
   if (boardScroll === null && $('#uboard') && state.tab === 'upcoming' && state.upMode !== 'month') { const b = $('#uboard'), c = [...b.querySelectorAll('.ucol[data-drop]')].find(x => /^[0-9]{4}-/.test(x.dataset.drop)); if (c) b.scrollLeft += c.getBoundingClientRect().right - b.getBoundingClientRect().right + 16; }
   if (boardScroll !== null && $('#uboard')) $('#uboard').scrollLeft = boardScroll;
   // Entrance animation (FitMe-style soft rise, staggered) only when the screen changes, not on every re-render.
-  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.openList || '') + (state.openProject || '') + (state.openJob || '') + (state.pmOpen || '') + (state.pmReview || '');
+  const view = $('#view'), key = state.tab + (state.tab === 'upcoming' ? state.upMode : '') + (state.openList || '') + (state.openProject || '') + (state.openJob || '') + (state.pmOpen || '') + (state.pmIsle || '') + (state.pmReview || '');
   const enter = state.viewKey !== key; state.viewKey = key;
   if (!enter) { // same screen: put back what was typed, and the cursor
     document.querySelectorAll('#view input, #view select, #view textarea').forEach(el => {
@@ -1807,6 +1858,7 @@ function render() {
     });
   }
   view.classList.toggle('enter', enter);
+  { const w = document.getElementById('world'); if (w && state.pmZoom === 'out') w.classList.add('zoomout'); const iv = document.querySelector('.isleview'); if (iv && state.pmZoom === 'in') view.classList.add('zoomin'); else view.classList.remove('zoomin'); state.pmZoom = null; }
   if (enter) {
     [...view.children].forEach((el, i) => el.style.setProperty('--i', Math.min(i, 10)));
     view.querySelectorAll('.ucol').forEach((el, i) => el.style.setProperty('--c', Math.min(i, 8)));
@@ -2369,7 +2421,7 @@ const A = {
   jPhotoPick: () => $('#jphoto').click(),
   jPhotoDel: () => { jSet(state.jDate).photo = ''; Store.save(); render(); },
   jWinDel: e => { const J = jSet(state.jDate); J.wins = J.wins.filter(w => w.id !== e.id); Store.save(); render(); },
-  goTab: e => { state.tab = e.t; state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
+  goTab: e => { state.pmIsle = null; state.tab = e.t; state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
   addProject: () => projectForm(),
   openProject: e => { state.openProject = e.id; render(); window.scrollTo(0, 0); },
   backProjects: () => { state.openProject = null; state.openJob = null; render(); },
@@ -2391,6 +2443,15 @@ const A = {
   pmRelease: e => { const p = D().projects.find(x => x.id === e.id); if (p) { p.focusTaskId = ''; Store.save(); render(); } },
   pmSetStatus: e => { const p = D().projects.find(x => x.id === e.id); if (p) { p.status = e.s; Store.save(); render(); } },
   dzSet: e => { const a = D().assist, m = { d: 'design', t: 'dzTheme', f: 'dzFx' }[e.k]; if (!m) return; a[m] = e.v; Store.save(); render(); },
+  pmView: e => { D().assist.pmView = e.v; state.pmIsle = null; Store.save(); render(); },
+  pmIsle: e => {
+    const w = document.getElementById('world'), b = w && w.querySelector('.isle[data-id="' + e.id + '"]'), go = () => { state.pmIsle = e.id; state.pmZoom = 'in'; render(); window.scrollTo(0, 0); };
+    const h = document.documentElement.dataset;
+    if (!b || h.fx === 'minimal' || matchMedia('(prefers-reduced-motion:reduce)').matches) return go();
+    const r = w.getBoundingClientRect(), br = b.getBoundingClientRect();
+    w.style.transformOrigin = (br.left + br.width / 2 - r.left) + 'px ' + (br.top + br.height / 2 - r.top) + 'px'; w.classList.add('zooming'); setTimeout(go, 340);
+  },
+  pmWorldBack: () => { state.pmIsle = null; state.pmZoom = 'out'; render(); window.scrollTo(0, 0); },
   pmNoop: () => {},
   pmOpen: e => { state.pmOpen = e.id; render(); window.scrollTo(0, 0); },
   pmBack: () => { state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
@@ -2702,7 +2763,7 @@ document.addEventListener('click', ev => {
   const el = ev.target.closest('[data-act]');
   if (el) { const fn = A[el.dataset.act]; if (fn) { ev.preventDefault(); fn({ ...el.dataset }, el); } return; }
   const nav = ev.target.closest('#nav button');
-  if (nav) { state.tab = nav.dataset.tab; state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); }
+  if (nav) { state.pmIsle = null; state.tab = nav.dataset.tab; state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); }
 });
 document.addEventListener('change', ev => {
   if (ev.target.id === 'notifySel') { try { localStorage.setItem('doit-notify', ev.target.value); } catch (e) {} const d = $('#notifyDesc'); if (d) d.textContent = (NOTIFY.find(x => x[0] === ev.target.value) || NOTIFY[1])[2]; return; }

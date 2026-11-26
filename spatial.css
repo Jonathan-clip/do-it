@@ -122,3 +122,37 @@ html[data-design="spatial"] .pmfocusbig{animation:none}
 .dzpick button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 14px;font-size:14px}
 .dzpick button.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
 .dzpick .sw{width:12px;height:12px;border-radius:50%;display:inline-block;margin-inline-end:6px;vertical-align:-1px}
+
+/* ---------- Stage 5: project objects (hidden in the classic design) ---------- */
+.pmobjwrap,.pmobjbig{display:none}
+html[data-design="spatial"] .pmmid{display:flex;gap:12px;align-items:center}
+html[data-design="spatial"] .pmmid>.grow{min-width:0}
+html[data-design="spatial"] .pmobjwrap{display:block;flex:none}
+html[data-design="spatial"] .pmobjbig{display:block;flex:none;margin-inline-end:-6px}
+html[data-design="spatial"] .pmicon.big{display:none}
+html[data-design="spatial"] .pmobj{color:var(--pc,var(--brand));filter:drop-shadow(0 8px 10px color-mix(in srgb,var(--pc,var(--brand)) 25%,transparent));overflow:visible}
+html[data-design="spatial"] .pmobj *{transition:opacity .6s var(--ease)}
+html[data-design="spatial"] .pmnext{margin-top:8px;font-size:13px;color:var(--muted)}
+html[data-design="spatial"] .pmnext b{color:var(--ink);font-weight:600}
+
+/* ---------- Stage 4: the life map ---------- */
+html[data-design="spatial"] .world{position:relative;margin:6px 0 18px;transform-style:preserve-3d;transition:transform .35s var(--ease),opacity .35s var(--ease)}
+html[data-design="spatial"][data-fx="spatial"] .world,html[data-design="spatial"][data-fx="immersive"] .world{transform:perspective(1100px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg))}
+html[data-design="spatial"] .world.zooming{transform:scale(2.7)!important;opacity:0}
+html[data-design="spatial"] .world.zoomout{animation:sx-zoomout .5s var(--ease) both}
+html[data-design="spatial"] #view.zoomin>*{animation:sx-zoomin .5s var(--ease) both}
+@keyframes sx-zoomout{0%{opacity:0;transform:scale(1.8)}100%{opacity:1;transform:none}}
+@keyframes sx-zoomin{0%{opacity:0;transform:scale(.88)}100%{opacity:1;transform:none}}
+@keyframes sx-bob{0%,100%{translate:0 0}50%{translate:0 -7px}}
+html[data-design="spatial"] .wpaths{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+html[data-design="spatial"] .isle{position:absolute;width:30%;margin-left:-15%;border:0;background:none;padding:0;text-align:center;color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:0;transition:transform .3s var(--ease),filter .3s;filter:drop-shadow(0 14px 14px color-mix(in srgb,var(--pc) 22%,transparent))}
+html[data-design="spatial"] .isle svg{width:100%;height:auto;overflow:visible}
+html[data-design="spatial"] .isle b{font-size:13px;line-height:1.25;margin-top:-6px;font-weight:700}
+html[data-design="spatial"] .isle small{font-size:11.5px;color:var(--muted);margin-top:2px}
+html[data-design="spatial"][data-fx="spatial"] .isle,html[data-design="spatial"][data-fx="immersive"] .isle{animation:sx-bob 6s ease-in-out infinite;animation-delay:var(--d,0s)}
+html[data-design="spatial"] .isle:hover,html[data-design="spatial"] .isle:focus-visible{transform:translateY(-8px) scale(1.07);filter:drop-shadow(0 22px 20px color-mix(in srgb,var(--pc) 34%,transparent));outline:0;z-index:2}
+html[data-design="spatial"] .isle:active{transform:scale(.96)}
+html[data-design="spatial"] .isleview{display:flex;align-items:center;gap:12px}
+html[data-design="spatial"] .isleview .pmobj{flex:none}
+html[data-design="spatial"] .pmviewseg{margin-bottom:8px}
+@media (prefers-reduced-motion:reduce){html[data-design="spatial"] .isle{animation:none!important}}
