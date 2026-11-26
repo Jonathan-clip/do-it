@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.3'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.4'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -251,7 +251,16 @@ function energyBar(d) {
   const cur = focusOn(d).energy;
   return `<div class="ebar"><label class="sub" for="energySel" style="margin:0">האנרגיה שלי עכשיו:</label><select id="energySel" class="esel ${cur ? 'set' : ''}"><option value="">בחר מצב...</option>${ENERGY_MODES.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}</select>${cur ? '<button class="iconbtn" data-act="energyHelpOpen" aria-label="הצעות למצב הנוכחי">💡</button>' : ''}</div>`;
 }
-const yesterdayLeft = () => { const y = addDays(TODAY(), -1); return D().tasks.filter(t => t.date === y && !t.done); };
+// Actions left undone on a past day move to "no date" by themselves (t.from remembers the day, for the morning summary and "carry over")
+const wasOn = d => tasksOn(d).concat(D().tasks.filter(t => !t.date && !t.done && t.from === d));
+const yesterdayLeft = () => wasOn(addDays(TODAY(), -1)).filter(t => !t.done);
+function sweepPast() {
+  const T = TODAY(); if (state.sweptDay === T) return; state.sweptDay = T;
+  const L = D().tasks.filter(t => t.date && t.date < T && !t.done); if (!L.length) return;
+  state.sweepUndo = L.map(t => [t.id, t.date]);
+  L.forEach(t => { t.from = t.date; t.date = null; delete t.ord; }); Store.save();
+  setTimeout(() => toast('<span>' + L.length + ' פעולות שלא בוצעו הועברו ל"ללא תאריך"</span><button class="btn" data-act="undoSweep">בטל</button><button data-act="toastClose">✕</button>', 9000), 700);
+}
 function doneSection(d, ts, hs) {
   const rows = [], isToday = d === TODAY();
   ts.filter(t => t.done).forEach(t => rows.push(taskRow(t)));
@@ -597,10 +606,10 @@ function nudgeAny(ids) { if (!$('#sheet').hidden) return; const t = (ids ? ids.m
 let reviewSnooze = false;
 function reviewSheet() {
   fo(TODAY()).reviewAsked = true; Store.save(); // shown once per day
-  const T = TODAY(), y = addDays(T, -1), ts = tasksOn(y), doneL = ts.filter(t => t.done), left = ts.filter(t => !t.done), done = doneL.length, L = D().dayLog[y] || {}, F = D().focus[y] || {};
+  const T = TODAY(), y = addDays(T, -1), ts = wasOn(y), doneL = ts.filter(t => t.done), left = ts.filter(t => !t.done), done = doneL.length, L = D().dayLog[y] || {}, F = D().focus[y] || {};
   const pct = ts.length ? Math.round(done / ts.length * 100) : 0, planned = ts.reduce((a, t) => a + (t.mins || 0), 0), doneMin = doneL.reduce((a, t) => a + (t.mins || 0), 0);
   // earlier days, for comparison
-  const prev = [2, 3, 4, 5, 6, 7, 8].map(n => tasksOn(addDays(T, -n))).filter(x => x.length), avg = prev.length ? Math.round(prev.reduce((a, x) => a + x.filter(t => t.done).length / x.length * 100, 0) / prev.length) : null;
+  const prev = [2, 3, 4, 5, 6, 7, 8].map(n => wasOn(addDays(T, -n))).filter(x => x.length), avg = prev.length ? Math.round(prev.reduce((a, x) => a + x.filter(t => t.done).length / x.length * 100, 0) / prev.length) : null;
   const mit = F.mitId ? findTask(F.mitId) : null, rl = D().rhythmLog[y] || {}, rItems = D().rhythm, rDone = rItems.filter(r => rl[r.id]).length, wt = Math.round(F.workTotal || 0);
   const energyL = (ENERGY_MODES.find(m => m[0] === normEnergy(F.energy)) || [0, ''])[1], tips = [];
   if (avg !== null && ts.length) tips.push(pct >= avg + 10 ? 'ביצעת יותר מהממוצע של הימים האחרונים (' + avg + '%). מה עזר לך אתמול?' : pct <= avg - 10 ? 'ביצעת פחות מהממוצע של הימים האחרונים (' + avg + '%). שווה לבדוק מה הפריע.' : 'קצב הביצוע דומה לממוצע של הימים האחרונים (' + avg + '%).');
@@ -630,7 +639,7 @@ const morningEligible = () => {
   const T = TODAY(), y = addDays(T, -1), f = D().focus[T] || {}, fe = focusOn(T);
   return {
     visual: !visualSnooze && !D().visual[T] && !workedToday() && !f.visualAsked && new Date().getHours() < 14,
-    review: !reviewSnooze && !D().review[y] && !f.reviewAsked && (tasksOn(y).length > 0 || ((D().focus[y] || {}).workTotal || 0) > 0),
+    review: !reviewSnooze && !D().review[y] && !f.reviewAsked && (wasOn(y).length > 0 || ((D().focus[y] || {}).workTotal || 0) > 0),
     focus: !focusSnooze && !f.askedAt && !(fe.mit && fe.fun)
   };
 };
@@ -1471,6 +1480,7 @@ const views = {
 };
 
 function render() {
+  sweepPast();
   // A background re-render (sync status, timers) must not wipe what the user is typing: remember the changed fields of the current screen
   const typed = {}; let focusKey = null, caret = null;
   document.querySelectorAll('#view input, #view select, #view textarea').forEach(el => {
@@ -2193,6 +2203,7 @@ const A = {
     toast('<span>↩ הוחזרה לכל הפעולות</span><button class="btn ghost" data-act="undoPool" data-id="' + t.id + '" data-d="' + (prev || '') + '">בטל</button><button data-act="toastClose" aria-label="סגור">✕</button>', 6000);
   },
   undoPool: e => { const t = findTask(e.id); if (t) { t.date = e.d || null; t.parked = false; Store.save(); } $('#toast').hidden = true; render(); },
+  undoSweep: () => { (state.sweepUndo || []).forEach(([id, d]) => { const t = findTask(id); if (t && !t.date) { t.date = d; delete t.from; } }); state.sweepUndo = null; Store.save(); $('#toast').hidden = true; render(); },
   carryOver: () => { // move everything left undone from yesterday to today, on request only
     const T = TODAY(), list = yesterdayLeft(); if (!list.length) return;
     list.forEach(t => deferTo(t, T)); Store.save(); render();
