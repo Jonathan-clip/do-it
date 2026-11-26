@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.13-calm'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.14-plan'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -248,10 +248,20 @@ function goalCard({ g, s }) {
 /* ---------- Energy mode, "my three tasks", quick capture, start-now timer, stuck, what's next ---------- */
 const ENERGY_MODES = [['high', '⚡ אנרגיה גבוהה'], ['midlow', '🙂 בינונית או נמוכה'], ['tired', '😴 עייפות'], ['flood', '🌊 הצפה'], ['judge', '🪞 שיפוטיות'], ['focus', '🎯 חוסר ריכוז'], ['victim', '🥀 אני קורבן']];
 function energyBar(d) {
-  if (d !== TODAY()) return '';
+  if (d !== TODAY() || document.documentElement.dataset.design === 'spatial') return '';
   const cur = focusOn(d).energy;
   return `<div class="ebar"><label class="sub" for="energySel" style="margin:0">האנרגיה שלי עכשיו:</label><select id="energySel" class="esel ${cur ? 'set' : ''}"><option value="">בחר מצב...</option>${ENERGY_MODES.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}</select>${cur ? '<button class="iconbtn" data-act="energyHelpOpen" aria-label="הצעות למצב הנוכחי">💡</button>' : ''}</div>`;
 }
+function energyDock() { // Spatial design: a small circle in the corner; tap to choose how the energy is right now
+  const el = $('#edock'); if (!el) return;
+  const show = document.documentElement.dataset.design === 'spatial' && state.tab === 'today' && state.date === TODAY() && $('#run').hidden;
+  el.hidden = !show; if (!show) { el.innerHTML = ''; return; }
+  const cur = focusOn(TODAY()).energy, m = ENERGY_MODES.find(x => x[0] === cur);
+  el.innerHTML = '<button class="ecirc ' + (cur ? 'set' : '') + '" data-act="energyToggle" aria-label="' + (m ? 'האנרגיה שלי: ' + m[1].replace(/^\S+\s/, '') : 'האנרגיה שלי עכשיו') + '" aria-expanded="' + (state.eOpen ? 'true' : 'false') + '">' + (m ? m[1].split(' ')[0] : '⚡') + '</button>'
+    + (state.eOpen ? '<div class="epop" role="menu"><div class="sub">איך האנרגיה עכשיו?</div>' + ENERGY_MODES.map(([v, l]) => '<button class="eopt ' + (cur === v ? 'on' : '') + '" role="menuitem" data-act="energyPick" data-v="' + v + '">' + l + '</button>').join('')
+      + (cur ? '<button class="eopt" data-act="energyHelpOpen">💡 הצעות למצב הזה</button><button class="eopt clr" data-act="energyPick" data-v="">ניקוי</button>' : '') + '</div>' : '');
+}
+document.addEventListener('click', e => { if (state.eOpen && !(e.target.closest && e.target.closest('#edock'))) { state.eOpen = false; energyDock(); } });
 // Actions left undone on a past day move to "no date" by themselves (t.from remembers the day, for the morning summary and "carry over")
 const wasOn = d => tasksOn(d).concat(D().tasks.filter(t => !t.date && !t.done && t.from === d));
 const yesterdayLeft = () => wasOn(addDays(TODAY(), -1)).filter(t => !t.done);
@@ -555,6 +565,7 @@ function tick() {
   if (document.hidden || tickBusy) return; tickBusy = true;
   try {
     const T = TODAY(); ensureDayStart();
+    { const f0 = D().focus[T] || {}, fx = focusOn(T); if (new Date().getHours() >= 12 && f0.askedAt && !f0.askedNoon && !(fx.mit && fx.fun) && D().tasks.length && notifyLevel() !== 'quiet') { askFocus(); return; } }
     if (!$('#toast').hidden || !$('#sheet').hidden || !$('#run').hidden || notifyLevel() !== 'full') return; // meal / rest / hourly-break reminders only in the "full" level
     const now = toMin(nowHM()), log = D().rhythmLog[T] || {}, f = D().focus[T] || {};
     const r = rhythmSorted().find(x => !log[x.id] && toMin(x.time) <= now && now < toMin(x.time) + 180 && !tick.shown[T + x.id]);
@@ -1099,7 +1110,15 @@ const cheerPick = (L, shift) => { if (!L.length) return null; const n = Math.flo
 const reminder = () => { const c = cheerPick(cheerAll(), state.remShift); return c ? c.text : REMINDERS[0]; };
 const stuckLine = () => { const a = cheerAll(), h = a.filter(c => ['delay', 'tired', 'fear'].includes(c.cat)), L = h.length ? h : a, c = L.length ? L[((state.stuckShift || 0) % L.length + L.length) % L.length] : null; return c ? c.text : REMINDERS[0]; };
 /* ---------- Daily focus: the most important task and the "fun" of the day; asked at the start of the day when missing ---------- */
-const focusOn = d => { const f = D().focus[d] || {}, t = f.mitId ? D().tasks.find(x => x.id === f.mitId) : null; return { mit: t ? t.title : (f.mit || ''), mitId: t ? t.id : '', fun: f.fun || '', energy: normEnergy(f.energy) }; };
+const focusOn = d => { const f = D().focus[d] || {}, t = f.mitId ? D().tasks.find(x => x.id === f.mitId) : null, u = f.funId ? D().tasks.find(x => x.id === f.funId) : null; return { mit: t ? t.title : (f.mit || ''), mitId: t ? t.id : '', fun: u ? u.title : (f.fun || ''), funId: u ? u.id : '', energy: normEnergy(f.energy) }; };
+const hxMark = t => { if (!hxOn()) return ''; const f = focusOn(TODAY()); return (f.mitId === t.id ? '<span class="fmark mit" title="הכי חשוב לי שיקרה היום" aria-label="הכי חשוב היום">★</span>' : '') + (f.funId === t.id ? '<span class="fmark fun" title="משימת הפאן של היום" aria-label="משימת הפאן">☺</span>' : ''); };
+function hxFocusNote(d) { // text-only choices (not tied to a task) and the quiet way to set them
+  const f = focusOn(d), bits = [];
+  if (f.mit && !f.mitId) bits.push('<span class="fmark mit">★</span> ' + esc(f.mit));
+  if (f.fun && !f.funId) bits.push('<span class="fmark fun">☺</span> ' + esc(f.fun));
+  const set = f.mit && f.fun;
+  return '<div class="fnote">' + bits.map(b => '<div class="fline">' + b + '</div>').join('') + '<button class="lnk" data-act="focusEdit">' + (set ? '✎ שינוי מה שחשוב והפאן' : f.mit || f.fun ? '＋ השלם את מה שחשוב והפאן להיום' : '＋ קבע מה הכי חשוב ומה הפאן להיום') + '</button></div>';
+}
 function focusCard(d) {
   const f = focusOn(d);
   if (!f.mit && !f.fun) return `<div class="card focus" data-act="focusEdit"><div class="t"><b>⭐ מה החשוב היום, ומה הפאן?</b></div><div class="sub">לחץ כדי לקבוע</div></div>`;
@@ -1110,35 +1129,42 @@ function focusCard(d) {
 let focusSnooze = false;
 function focusSheet(d) { // the morning sheet: one dropdown per choice, so it stays short and calm
   const f = focusOn(d), raw = D().focus[d] || {}, prevImp = (D().review[addDays(d, -1)] || {}).improve;
-  const open = tasksOn(d).filter(t => !t.done).slice(0, 30), cur = f.mitId && open.some(t => t.id === f.mitId) ? f.mitId : (f.mit ? '__other' : '');
+  const open = tasksOn(d).filter(t => !t.done).slice(0, 30), cur = f.mitId && open.some(t => t.id === f.mitId) ? f.mitId : (f.mit ? '__other' : ''), curF = f.funId && open.some(t => t.id === f.funId) ? f.funId : (f.fun ? '__other' : '');
   sheet(`<h1>${d === TODAY() ? 'בוקר טוב 👋' : 'מיקוד היום'}</h1>${d === TODAY() ? morningBar('focus') : ''}
   <div class="focusnote">💬 ${esc(reminder())}${prevImp ? '<br>🔸 אתמול רצית לשפר: ' + esc(prevImp) : ''}</div>
   <form id="f" class="focusform">
-   <label>⭐ הפעולה החשובה היום</label>
+   <label>⭐ איזו משימה הכי חשוב לי שתקרה היום?</label>
    <select name="mitSel"><option value="">בחר פעולה...</option>${open.map(t => '<option value="' + t.id + '" ' + (cur === t.id ? 'selected' : '') + '>' + esc(t.title) + '</option>').join('')}<option value="__other" ${cur === '__other' ? 'selected' : ''}>✏️ אחרת, אכתוב בעצמי</option></select>
    <input name="mit" value="${esc(f.mitId ? '' : f.mit)}" autocomplete="off" placeholder="כתוב את הפעולה החשובה" ${cur === '__other' ? '' : 'hidden'}>
-   <label>🎉 הפאן של היום</label>
-   <input name="fun" value="${esc(f.fun)}" autocomplete="off" placeholder="משהו שמשמח אותך לקראתו">
+   <label>🎉 מה משימת הפאן שלי להיום?</label>
+   <select name="funSel"><option value="">בחר פעולה...</option>${open.map(t => '<option value="' + t.id + '" ' + (curF === t.id ? 'selected' : '') + '>' + esc(t.title) + '</option>').join('')}<option value="__other" ${curF === '__other' ? 'selected' : ''}>✏️ אחרת, אכתוב בעצמי</option></select>
+   <input name="fun" value="${esc(f.funId ? '' : f.fun)}" autocomplete="off" placeholder="משהו שמשמח אותך לקראתו" ${curF === '__other' ? '' : 'hidden'}>
    <div class="two">
     <div><label>🎁 תנאי לתגמול</label><select name="rewardRule">${REWARD_RULES.map(([v, l]) => '<option value="' + v + '" ' + ((raw.rewardRule || '') === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select></div>
-    <div><label>🔋 אנרגיה</label><select name="energy"><option value="">בחר מצב...</option>${ENERGY_MODES.map(([v, l]) => '<option value="' + v + '" ' + (f.energy === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select></div>
+    ${hxOn() ? '' : `<div><label>🔋 אנרגיה</label><select name="energy"><option value="">בחר מצב...</option>${ENERGY_MODES.map(([v, l]) => '<option value="' + v + '" ' + (f.energy === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select></div>`}
    </div>
    <div class="actions"><button type="button" class="btn ghost" data-act="focusLater">אין צורך</button><button class="btn">שמור</button></div>
   </form>`);
   const form = $('#f');
   form.mitSel.addEventListener('change', () => { const o = form.mitSel.value === '__other'; form.mit.hidden = !o; if (o) form.mit.focus(); });
+  form.funSel.addEventListener('change', () => { const o = form.funSel.value === '__other'; form.fun.hidden = !o; if (o) form.fun.focus(); });
   form.onsubmit = e => {
     e.preventDefault(); const fd = new FormData(form), sel = fd.get('mitSel') || '';
     const mitId = sel && sel !== '__other' ? sel : '', mit = sel === '__other' ? fd.get('mit').trim() : '';
-    Object.assign(fo(d), { mit, mitId, fun: fd.get('fun').trim(), energy: fd.get('energy') || '', rewardRule: fd.get('rewardRule') || '', energyAt: new Date().toISOString() });
+    const fs_ = fd.get('funSel') || '', funId = fs_ && fs_ !== '__other' ? fs_ : '', funTxt = fs_ === '__other' ? (fd.get('fun') || '').trim() : '';
+    const patch = { mit, mitId, fun: funTxt, funId, rewardRule: fd.get('rewardRule') || '' };
+    if (fd.has('energy')) { patch.energy = fd.get('energy') || ''; patch.energyAt = new Date().toISOString(); }
+    Object.assign(fo(d), patch);
     Morning.active = false; Store.save(); closeSheet(); render();
   };
 }
 function askFocus() { // start-of-day prompt: only for today, only if something is missing, never over another open sheet
   const T = TODAY(), f = focusOn(T), raw = D().focus[T] || {};
-  if (focusSnooze || raw.askedAt || (f.mit && f.fun) || !$('#sheet').hidden) return; // asked once per day, never again after it was shown or filled
-  fo(T).askedAt = new Date().toISOString(); Store.save();
-  focusSheet(T);
+  if ((f.mit && f.fun) || !$('#sheet').hidden || !$('#run').hidden) return;
+  const noon = new Date().getHours() >= 12 && raw.askedAt && !raw.askedNoon; // skipped in the morning: one more gentle ask at noon
+  if (!noon && (focusSnooze || raw.askedAt)) return; // otherwise once per day
+  if (noon) fo(T).askedNoon = new Date().toISOString(); else fo(T).askedAt = new Date().toISOString();
+  Store.save(); focusSheet(T);
 }
 /* ---------- Repeating tasks: finishing one creates the next occurrence ---------- */
 const REPEATS = [['', 'לא חוזרת'], ['d1', 'כל יום'], ['d2', 'כל יומיים'], ['d3', 'כל 3 ימים'], ['w1', 'כל שבוע'], ['w2', 'כל שבועיים'], ['m1', 'כל חודש']];
@@ -1155,7 +1181,7 @@ function taskRow(t, showDate) {
   return `<div class="grp" data-tid="${t.id}"><div class="card row p${effQuad(t) === 'q1' ? 2 : t.priority} ${t.done ? 'done' : ''}">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
-      <div class="t">${titleP(t)}</div>
+      <div class="t">${hxMark(t)}${titleP(t)}</div>
       <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
@@ -1614,7 +1640,7 @@ const views = {
       ${rhythmStrip(d, 'near')}
       ${rewardTop ? rewardCard(d) : ''}
       ${energyBar(d)}
-      ${focusCard(d)}
+      ${hxOn() && d === TODAY() ? hxFocusNote(d) : focusCard(d)}
       <h2>פעולות</h2>${isToday && yesterdayLeft().length ? '<button class="btn ghost more3" style="margin:0 0 8px" data-act="carryOver">⏩ העבר להיום את מה שלא בוצע אתמול (' + yesterdayLeft().length + ')</button>' : ''}${isToday && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
       ${doneSection(d, ts, hs)}
       <details class="todaymore" id="todayMore" ${state.moreOpen ? 'open' : ''}><summary>עוד להיום${hAct ? ` · ${hAct} הרגלים` : ''}</summary>
@@ -1931,6 +1957,7 @@ function render() {
     const { id, sid, date } = state.pop; state.pop = null;
     document.querySelectorAll(sid ? `[data-sid="${sid}"].on` : `[data-id="${id}"].on`).forEach(el => { if (!date || el.dataset.date === date) el.classList.add('pop'); });
   }
+  energyDock();
   const navTab = MORE_TABS.includes(state.tab) ? 'more' : state.tab;
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === navTab));
   const of = $('#outForm');
@@ -2665,6 +2692,8 @@ const A = {
   refreshApp: async () => { try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); for (const k of await caches.keys()) await caches.delete(k); } catch (e) {} location.href = location.pathname + '?' + (DEMO ? 'demo&' : '') + 'r=' + Date.now(); },
   clearOk: () => { const f = $('#f'); if (!f) return; f.dataset.ok = '1'; $('#clHint').innerHTML = '<div class="ok">✓ אישרת את הניסוח. אפשר לשמור.</div>'; },
   useSuggest: e => { const f = $('#f'); if (!f || !f.title) return; f.title.value = e.s; f.title.dispatchEvent(new Event('input')); f.title.focus(); },
+  energyToggle: () => { state.eOpen = !state.eOpen; energyDock(); },
+  energyPick: e => { state.eOpen = false; A.setEnergyTo(e.v); },
   setEnergyTo: v => { $('#toast').hidden = true; const f = fo(TODAY()); f.energy = v; f.energyAt = new Date().toISOString(); Store.save(); render(); if (v) energyHelp(v); },
   energyHelpOpen: () => { const v = focusOn(TODAY()).energy; if (v) energyHelp(v); },
   resetOrder: () => { tasksOn(state.date).forEach(t => { delete t.ord; }); Store.save(); render(); },
