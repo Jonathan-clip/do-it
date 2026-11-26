@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.1'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.2'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -2066,10 +2066,11 @@ const A = {
   renameProject: e => {
     const p = D().projects.find(x => x.id === e.id); if (!p) return;
     sheet(`<h1>✏️ שם הפרויקט</h1><form id="rnForm"><input id="rnText" value="${esc(p.title)}" maxlength="80" autocomplete="off" required>
-      <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
+      <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form><button type="button" class="btn danger" style="width:100%;margin-top:10px" data-act="delProjectSheet" data-id="${p.id}">🗑 מחק את הפרויקט</button>`);
     const inp = $('#rnText'); inp.focus(); inp.select();
     $('#rnForm').onsubmit = ev => { ev.preventDefault(); const n = inp.value.trim(); if (n) { p.title = n; Store.save(); } closeSheet(); render(); };
   },
+  delProjectSheet: e => { closeSheet(); A.delProject(e); },
   delProject: e => { if (confirm('למחוק את הפרויקט? הפעולות שלו יישארו, בלי פרויקט.')) { D().tasks.forEach(t => { if (t.projectId === e.id) t.projectId = ''; }); D().jobs.forEach(j => { if (j.projectId === e.id) j.projectId = ''; }); D().projects = D().projects.filter(p => p.id !== e.id); state.openProject = null; Store.save(); render(); } },
   projAddTask: e => taskForm(undefined, null, e.id),
   newProjectForm: () => projectForm(),
