@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.2'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.3'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -1819,6 +1819,7 @@ function menuSheet(id) {
   sheet(`<h1>${esc(t.title)}</h1>
    <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
    ${t.notes ? `<p class="sub" style="white-space:pre-wrap">${esc(t.notes)}</p>` : ''}
+   ${(t.subs || []).length ? `<div class="sub" style="margin:8px 0 4px">☰ תתי-פעולות (${subProg(t)})</div><div class="subs">${t.subs.map(x => `<div class="row ${x.done ? 'done' : ''}"><button class="check ${x.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${x.id}">${x.done ? '✓' : ''}</button><div class="t grow">${esc(x.title)}</div></div>`).join('')}</div>` : ''}
    ${t.done ? '' : '<div class="sub" style="margin:8px 0 4px">🧭 עדיפות</div>' + quadChips(t.id, t.quad || '', '') + '<div class="sub" style="margin:8px 0 2px">💗 כמה בא לי?</div>' + wantStars(t.id, t.want || 0, '')}
    <div class="grid2">
      ${t.done ? '' : `<button class="btn" data-act="runStart" data-id="${t.id}">◀ התחל עכשיו</button>`}
