@@ -1257,8 +1257,8 @@ function pmWorld() {
   return `<div class="world" id="world" style="height:${H}px"><svg class="wpaths" viewBox="0 0 300 ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" fill="none" stroke="var(--brand)" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity=".35" vector-effect="non-scaling-stroke"/></svg>
     ${I.map((a, k) => `<button class="isle" style="left:${pos[k].x}%;top:${pos[k].y}px;--pc:${a.color};--d:${(k * .37).toFixed(2)}s" data-act="pmIsle" data-id="${a.id}" aria-label="${esc(a.name)}: ${a.ps.length} פרויקטים">
       <svg viewBox="0 0 120 112" aria-hidden="true"><defs><linearGradient id="ig${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a.color}" stop-opacity=".35"/><stop offset="1" stop-color="${a.color}" stop-opacity=".95"/></linearGradient></defs>
-        <path d="M10 66Q60 118 110 66z" fill="url(#ig${k})"/><ellipse cx="60" cy="66" rx="50" ry="16" fill="${a.color}" opacity=".28"/><ellipse cx="60" cy="64" rx="46" ry="13" fill="var(--card)" opacity=".85"/>
-        <svg x="30" y="-4" width="60" height="64" viewBox="0 0 64 64" style="color:${a.color}">${pmObjInner(a.kind, a.ps.length ? pmStageOf(a.avg) : 1)}</svg></svg>
+        <path d="M12 68Q60 100 108 68z" fill="url(#ig${k})"/><ellipse cx="60" cy="68" rx="50" ry="14" fill="${a.color}" opacity=".28"/><ellipse cx="60" cy="67" rx="46" ry="11" fill="var(--card)" opacity=".85"/>
+        <svg x="24" y="4" width="72" height="72" viewBox="0 0 64 64" style="color:${a.color}">${pmObjInner(a.kind, a.ps.length ? pmStageOf(a.avg) : 1)}</svg></svg>
       <b>${a.icon} ${esc(a.name)}</b><small>${a.ps.length ? a.ps.length + ' פרויקטים · ' + a.avg + '%' : 'אין פרויקטים'}</small></button>`).join('')}</div>`;
 }
 function pmIsleView(id) {
