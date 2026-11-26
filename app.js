@@ -254,7 +254,7 @@ function energyBar(d) {
 }
 const EN_IMG = { high: 1, midlow: 1, tired: 1, flood: 1, focus: 1 }; // clay figures; the two sensitive states ("judging", "victim") stay as plain text on purpose
 const enIcon = (v, size) => EN_IMG[v] ? '<img class="enimg" src="assets/energy/' + v + '.png" width="' + size + '" height="' + size + '" alt="" decoding="async" draggable="false">' : '';
-const enLabel = l => l.replace(/^S+s/, '');
+const enLabel = l => l.split(' ').slice(1).join(' ');
 function energyDock() { // Spatial design: a small circle in the corner on every screen; tap to choose how the energy is right now
   const el = $('#edock'); if (!el) return;
   const run = $('#run'), show = document.documentElement.dataset.design === 'spatial' && (run.hidden || run.classList.contains('mini'));
