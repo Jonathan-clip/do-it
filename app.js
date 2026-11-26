@@ -1507,7 +1507,7 @@ document.addEventListener('change', e => {
 
 // ---- Spatial design layer (spatial.css): classic | spatial, 5 themes, 3 effect levels. Stored in assist settings, mirrored to localStorage so the first paint has no flash.
 const DZ_THEMES = [['lavender', 'Lavender', '#6a4be0'], ['ocean', 'Ocean', '#0a82a8'], ['nature', 'Nature', '#3c7d4d'], ['sunset', 'Sunset', '#d9582b'], ['midnight', 'Midnight', '#2a2f57']], DZ_FX = [['minimal', 'Minimal'], ['spatial', 'Spatial'], ['immersive', 'Immersive']];
-const dz = () => { const a = D().assist; return { d: a.design === 'spatial' ? 'spatial' : 'classic', t: a.dzTheme || 'lavender', f: a.dzFx || 'spatial' }; };
+const dz = () => { const a = D().assist; return { d: a.design === 'spatial' ? 'spatial' : 'classic', t: a.dzTheme || 'midnight', f: a.dzFx || 'spatial' }; };
 function applyDesign() {
   const z = dz(), h = document.documentElement;
   if (z.d === 'spatial') { h.dataset.design = 'spatial'; h.dataset.theme = z.t; h.dataset.fx = z.f; } else { delete h.dataset.design; delete h.dataset.theme; delete h.dataset.fx; }
