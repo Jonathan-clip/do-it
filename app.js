@@ -158,7 +158,7 @@ function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in lo
   r.readAsDataURL(file);
 }
 const MORE_TABS = ['week', 'journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
-const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: weekStart(TODAY()), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', allMode: 'list', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
+const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: TODAY(), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', allMode: 'list', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
 try { if (D().assist && D().assist.homeTab === 'map') state.tab = 'map'; } catch (e) {}
 state.mode = (() => { try { const m = localStorage.getItem('doit-mode'); if (m === 'plan' || m === 'do') return m; } catch (e) {} return window.matchMedia && matchMedia('(max-width: 700px)').matches ? 'do' : 'plan'; })();
 // Weekly vision data lives in D().weeks[<Sunday date>]; created lazily on first edit.
@@ -2368,18 +2368,18 @@ const A = {
   rescheduleOverdue: () => { const o = overdue(); if (o.length && confirm(`להעביר ${o.length} פעולות באיחור להיום?`)) { o.forEach(t => { t.date = TODAY(); }); Store.save(); render(); } },
   upMore: () => { state.upDays += 14; render(); },
   toggleSubs: e => { const t = findTask(e.id); t.collapsed = !t.collapsed; Store.save(); render(); },
-  upMode: e => { state.upMode = e.m; render(); },
+  upMode: e => { state.upMode = e.m; if (e.m === 'week') state.upWeek = TODAY(); render(); },
   upPick: e => { state.upSel = e.date; render(); },
   upNav: e => {
     const n = +e.n, m = state.upMode;
     if (m === 'three') state.up3 = addDays(state.up3, 3 * n);
-    else if (m === 'week') state.upWeek = addDays(state.upWeek, 7 * n);
+    else if (m === 'week') state.upWeek = addDays(state.upWeek, n); // rolling 7 days, one day per step
     else if (m === 'month') { state.upMonth = shiftMonth(state.upMonth, n); state.upSel = state.upMonth === TODAY().slice(0, 7) ? TODAY() : state.upMonth + '-01'; }
     render();
   },
   upToday: () => {
     const T = TODAY(), m = state.upMode;
-    if (m === 'three') state.up3 = T; else if (m === 'week') state.upWeek = weekStart(T); else if (m === 'month') { state.upMonth = T.slice(0, 7); state.upSel = T; } else state.upStart = T;
+    if (m === 'three') state.up3 = T; else if (m === 'week') state.upWeek = T; else if (m === 'month') { state.upMonth = T.slice(0, 7); state.upSel = T; } else state.upStart = T;
     render();
   },
   addGoal: () => goalForm(), editGoal: e => goalForm(e.id),
@@ -2763,7 +2763,7 @@ document.addEventListener('click', ev => {
   const el = ev.target.closest('[data-act]');
   if (el) { const fn = A[el.dataset.act]; if (fn) { ev.preventDefault(); fn({ ...el.dataset }, el); } return; }
   const nav = ev.target.closest('#nav button');
-  if (nav) { state.pmIsle = null; state.tab = nav.dataset.tab; state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); }
+  if (nav) { state.pmIsle = null; state.tab = nav.dataset.tab; if (state.tab === 'upcoming') state.upWeek = TODAY(); state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); }
 });
 document.addEventListener('change', ev => {
   if (ev.target.id === 'notifySel') { try { localStorage.setItem('doit-notify', ev.target.value); } catch (e) {} const d = $('#notifyDesc'); if (d) d.textContent = (NOTIFY.find(x => x[0] === ev.target.value) || NOTIFY[1])[2]; return; }
