@@ -17,16 +17,16 @@ html[data-design="spatial"],html[data-design="spatial"][data-theme="lavender"]{
   --orb1:#d9ccff;--orb2:#f6d6ff;--sheen:#8f74ff;--theme-color:#6a4be0;
 }
 html[data-design="spatial"][data-theme="ocean"]{
-  --bg:#eef8fb;--card:#ffffff;--ink:#0f2a35;--muted:#52788a;--line:#d3e8ef;--brand:#0a82a8;--brand-ink:#fff;--accent:#3cc4d9;--soft:#dff2f7;
-  --orb1:#bfe9f5;--orb2:#d4e4ff;--sheen:#2aa7cc;--theme-color:#0a82a8;
+  --bg:#eef8fb;--card:#ffffff;--ink:#0f2a35;--muted:#52788a;--line:#d3e8ef;--brand:#08759a;--brand-ink:#fff;--accent:#3cc4d9;--soft:#dff2f7;
+  --orb1:#bfe9f5;--orb2:#d4e4ff;--sheen:#2aa7cc;--theme-color:#08759a;
 }
 html[data-design="spatial"][data-theme="nature"]{
   --bg:#f1f6ee;--card:#ffffff;--ink:#1d2d1f;--muted:#5d7561;--line:#dce8d6;--brand:#3c7d4d;--brand-ink:#fff;--accent:#8cc46a;--soft:#e2f0dc;
   --orb1:#d3ecc2;--orb2:#f1ecc0;--sheen:#5aa86a;--theme-color:#3c7d4d;
 }
 html[data-design="spatial"][data-theme="sunset"]{
-  --bg:#fff4ec;--card:#ffffff;--ink:#35201a;--muted:#8a6458;--line:#f5dfd2;--brand:#d9582b;--brand-ink:#fff;--accent:#f2a65a;--soft:#ffe9db;
-  --orb1:#ffd4b8;--orb2:#ffc9d6;--sheen:#f0794a;--theme-color:#d9582b;
+  --bg:#fff4ec;--card:#ffffff;--ink:#35201a;--muted:#8a6458;--line:#f5dfd2;--brand:#c24a1f;--brand-ink:#fff;--accent:#f2a65a;--soft:#ffe9db;
+  --orb1:#ffd4b8;--orb2:#ffc9d6;--sheen:#f0794a;--theme-color:#c24a1f;
 }
 html[data-design="spatial"][data-theme="midnight"]{
   --bg:#0c0f1f;--card:#1a1e3a;--ink:#eceeff;--muted:#9aa0cf;--line:#2a2f57;--brand:#8f8cff;--brand-ink:#0c0f1f;--accent:#c79bff;--soft:#242a54;

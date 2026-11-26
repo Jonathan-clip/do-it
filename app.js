@@ -1509,7 +1509,7 @@ document.addEventListener('change', e => {
 });
 
 // ---- Spatial design layer (spatial.css): classic | spatial, 5 themes, 3 effect levels. Stored in assist settings, mirrored to localStorage so the first paint has no flash.
-const DZ_THEMES = [['lavender', 'Lavender', '#6a4be0'], ['ocean', 'Ocean', '#0a82a8'], ['nature', 'Nature', '#3c7d4d'], ['sunset', 'Sunset', '#d9582b'], ['midnight', 'Midnight', '#2a2f57']], DZ_FX = [['minimal', 'Minimal'], ['spatial', 'Spatial'], ['immersive', 'Immersive']];
+const DZ_THEMES = [['lavender', 'Lavender', '#6a4be0'], ['ocean', 'Ocean', '#08759a'], ['nature', 'Nature', '#3c7d4d'], ['sunset', 'Sunset', '#c24a1f'], ['midnight', 'Midnight', '#2a2f57']], DZ_FX = [['minimal', 'Minimal'], ['spatial', 'Spatial'], ['immersive', 'Immersive']];
 const dz = () => { const a = D().assist; return { d: a.design === 'spatial' ? 'spatial' : 'classic', t: a.dzTheme || 'midnight', f: a.dzFx || 'spatial', m: a.dzMode || 'auto' }; };
 const dzDark = z => z.t === 'midnight' || z.m === 'dark' || (z.m !== 'light' && matchMedia('(prefers-color-scheme:dark)').matches);
 try { matchMedia('(prefers-color-scheme:dark)').addEventListener('change', () => { if (dz().m === 'auto') applyDesign(); }); } catch (e) {}
