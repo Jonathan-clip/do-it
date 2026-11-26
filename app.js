@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-26.14-plan'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-26.15-energy'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -252,14 +252,17 @@ function energyBar(d) {
   const cur = focusOn(d).energy;
   return `<div class="ebar"><label class="sub" for="energySel" style="margin:0">האנרגיה שלי עכשיו:</label><select id="energySel" class="esel ${cur ? 'set' : ''}"><option value="">בחר מצב...</option>${ENERGY_MODES.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}</select>${cur ? '<button class="iconbtn" data-act="energyHelpOpen" aria-label="הצעות למצב הנוכחי">💡</button>' : ''}</div>`;
 }
-function energyDock() { // Spatial design: a small circle in the corner; tap to choose how the energy is right now
+const EN_IMG = { high: 1, midlow: 1, tired: 1, flood: 1, focus: 1 }; // clay figures; the two sensitive states ("judging", "victim") stay as plain text on purpose
+const enIcon = (v, size) => EN_IMG[v] ? '<img class="enimg" src="assets/energy/' + v + '.png" width="' + size + '" height="' + size + '" alt="" decoding="async" draggable="false">' : '';
+const enLabel = l => l.replace(/^S+s/, '');
+function energyDock() { // Spatial design: a small circle in the corner on every screen; tap to choose how the energy is right now
   const el = $('#edock'); if (!el) return;
-  const show = document.documentElement.dataset.design === 'spatial' && state.tab === 'today' && state.date === TODAY() && $('#run').hidden;
+  const run = $('#run'), show = document.documentElement.dataset.design === 'spatial' && (run.hidden || run.classList.contains('mini'));
   el.hidden = !show; if (!show) { el.innerHTML = ''; return; }
   const cur = focusOn(TODAY()).energy, m = ENERGY_MODES.find(x => x[0] === cur);
-  el.innerHTML = '<button class="ecirc ' + (cur ? 'set' : '') + '" data-act="energyToggle" aria-label="' + (m ? 'האנרגיה שלי: ' + m[1].replace(/^\S+\s/, '') : 'האנרגיה שלי עכשיו') + '" aria-expanded="' + (state.eOpen ? 'true' : 'false') + '">' + (m ? m[1].split(' ')[0] : '⚡') + '</button>'
-    + (state.eOpen ? '<div class="epop" role="menu"><div class="sub">איך האנרגיה עכשיו?</div>' + ENERGY_MODES.map(([v, l]) => '<button class="eopt ' + (cur === v ? 'on' : '') + '" role="menuitem" data-act="energyPick" data-v="' + v + '">' + l + '</button>').join('')
-      + (cur ? '<button class="eopt" data-act="energyHelpOpen">💡 הצעות למצב הזה</button><button class="eopt clr" data-act="energyPick" data-v="">ניקוי</button>' : '') + '</div>' : '');
+  el.innerHTML = '<button class="ecirc ' + (cur ? 'set' : '') + '" data-act="energyToggle" aria-label="' + (m ? 'האנרגיה שלי: ' + enLabel(m[1]) : 'האנרגיה שלי עכשיו') + '" aria-expanded="' + (state.eOpen ? 'true' : 'false') + '">' + (m ? (EN_IMG[cur] ? enIcon(cur, 38) : '<i class="edot"></i>') : '<i class="eplus"></i>') + '</button>'
+    + (state.eOpen ? '<div class="epop" role="menu"><div class="sub">איך האנרגיה עכשיו?</div>' + ENERGY_MODES.map(([v, l]) => '<button class="eopt ' + (cur === v ? 'on' : '') + '" role="menuitem" data-act="energyPick" data-v="' + v + '">' + (EN_IMG[v] ? enIcon(v, 40) : '<span class="enoimg"></span>') + '<span>' + enLabel(l) + '</span></button>').join('')
+      + (cur ? '<button class="eopt sm" data-act="energyHelpOpen"><span class="enoimg"></span><span>הצעות למצב הזה</span></button><button class="eopt sm clr" data-act="energyPick" data-v=""><span class="enoimg"></span><span>ניקוי</span></button>' : '') + '</div>' : '');
 }
 document.addEventListener('click', e => { if (state.eOpen && !(e.target.closest && e.target.closest('#edock'))) { state.eOpen = false; energyDock(); } });
 // Actions left undone on a past day move to "no date" by themselves (t.from remembers the day, for the morning summary and "carry over")

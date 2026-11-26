@@ -309,3 +309,17 @@ body.running #edock,body.miniRun #edock{display:none}
 .fnote{margin:4px 0 2px}
 .fnote .fline{font-size:14.5px;margin:2px 4px}
 .fnote .lnk{font-size:13.5px;color:var(--muted);padding:6px 4px}
+
+/* energy circle: on every screen, clay figures for the energy states */
+body.running #edock{display:none}
+body.miniRun #edock{bottom:calc(220px + env(safe-area-inset-bottom))}
+.ecirc{width:50px;height:50px;padding:0}
+.enimg{display:block;object-fit:contain;filter:drop-shadow(0 3px 4px rgba(0,0,0,.18));user-select:none;-webkit-user-drag:none}
+.edot{display:block;width:14px;height:14px;border-radius:50%;background:var(--brand)}
+.eplus{display:block;width:16px;height:16px;position:relative;opacity:.7}
+.eplus::before,.eplus::after{content:"";position:absolute;background:currentColor;border-radius:2px}
+.eplus::before{left:7px;top:1px;width:2px;height:14px}.eplus::after{top:7px;left:1px;height:2px;width:14px}
+.eopt{display:flex;align-items:center;gap:10px}
+.eopt .enoimg{display:inline-block;width:40px;flex:none}
+.eopt.sm{font-size:13.5px;padding:7px 10px}
+.eopt.sm .enoimg{width:40px}
