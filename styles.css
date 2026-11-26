@@ -406,3 +406,8 @@ body.miniRun #view{padding-bottom:170px}
 /* "בקרוב": the board is moved a day at a time (arrows, swipe, drag), so the browser must not claim sideways pans */
 .uboard{touch-action:pan-y}
 .seg .segtoday{border-color:var(--brand);color:var(--brand);font-weight:700}
+
+/* difficulty picker (replaces "how much do I want to") */
+.diffpick{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.diffpick button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 12px;font-size:14px;color:var(--ink)}
+.diffpick button.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:700}

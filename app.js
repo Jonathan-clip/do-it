@@ -174,7 +174,7 @@ const taskOrder = (d, a, b) => { // a manual drag order wins; otherwise today's 
   if (m === 'midlow' || m === 'tired' || m === 'flood' || m === 'focus') return e(a) - e(b) || p(b) - p(a); // gentler states: easy actions first
   return (b.energy || 0) - (a.energy || 0) || p(b) - p(a);
 };
-const tasksOn = d => D().tasks.filter(t => t.date === d).sort((a, b) => taskOrder(d, a, b) || (b.want || 0) - (a.want || 0));
+const tasksOn = d => D().tasks.filter(t => t.date === d).sort((a, b) => taskOrder(d, a, b) || (a.diff || 3) - (b.diff || 3));
 const stars = n => '★'.repeat(n || 0);
 const logoMark = (s = 32) => `<svg class="logo" width="${s}" height="${s}" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"/><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/><circle cx="390" cy="170" r="36" fill="#e8a33d"/></svg>`;
 /* Projects: a project groups several tasks (task.projectId). Deleting a project keeps its tasks. */
@@ -779,7 +779,7 @@ function projectForm() {
     e.preventDefault(); const f = new FormData(e.target), title = f.get('title').trim(); if (!title) return;
     const lines = f.get('jobs').split('\n').map(x => x.trim()).filter(Boolean), bad = lines.map(l => ({ l, why: clarity(l)[0] })).filter(x => x.why);
     if (bad.length) { alert('לא ניתן לשמור: פעולה אחת או יותר לא כתובות בצורה ברורה.\n"' + bad[0].l + '"\n' + bad[0].why); return; }
-    const p = { id: uid(), title, createdAt: TODAY(), quad: f.get('quad') || '', want: +f.get('want') || 0 }; D().projects.push(p);
+    const p = { id: uid(), title, createdAt: TODAY(), quad: f.get('quad') || '', diff: +f.get('diff') || 0 }; D().projects.push(p);
     lines.forEach(l => D().tasks.push({ id: uid(), title: l, date: null, done: false, priority: 0, energy: 3, mins: 15, brainless: false, print: false, visionId: '', projectId: p.id, notes: '', subs: [], jobId: '' }));
     Store.save(); closeSheet(); state.tab = 'projects'; state.openJob = null; state.openProject = p.id; render(); window.scrollTo(0, 0);
   };
@@ -795,18 +795,19 @@ const quadOf = k => QUADS.find(q => q[0] === k);
 const quadRank = { q1: 3, q2: 2, q3: 1, q4: 0 }, quadPri = { q1: 2, q2: 1, q3: 1, q4: 0 }; // order of work, and the old priority value kept in step
 const effQuad = t => t.quad || (t.jobId && (findJob(t.jobId) || {}).quad) || (t.projectId && (D().projects.find(p => p.id === t.projectId) || {}).quad) || '';
 const quadChip = t => { const k = effQuad(t), q = quadOf(k); return q ? '<span class="chip quad ' + k + (t.quad ? '' : ' inh') + '" title="' + (t.quad ? '' : 'עדיפות שעברה בירושה') + '">' + q[1] + '</span>' : ''; };
-const itemChips = x => quadChip({ quad: x.quad }) + (x.want ? '<span title="כמה בא לי">💗' + x.want + '</span>' : '');
+const itemChips = x => quadChip({ quad: x.quad }) + (x.diff ? '<span class="chip" title="רמת קושי">' + diffLabel(x.diff) + '</span>' : '');
 const itemOf = (kind, id) => kind === 'job' ? findJob(id) : kind === 'project' ? D().projects.find(p => p.id === id) : findTask(id);
-const wantStars = (id, cur, kind) => '<div class="hearts">' + [1, 2, 3, 4, 5].map(n => '<button type="button" class="' + (n <= cur ? 'on' : '') + '" data-act="setWant" data-id="' + id + '" data-k="' + (kind || '') + '" data-n="' + n + '" aria-label="' + n + '">♥</button>').join('') + '</div>';
-const prioBox = (kind, x) => '<div class="card"><div class="sub">🧭 עדיפות (דחוף / חשוב)</div>' + quadChips(x.id, x.quad || '', kind) + '<div class="sub" style="margin-top:10px">💗 כמה בא לי לעשות את זה?</div>' + wantStars(x.id, x.want || 0, kind) + '</div>';
-const prioFields = x => '<label>🧭 עדיפות (מטריצת אייזנהאואר)</label><div id="quadBox">' + quadChips('', x.quad || '', '') + '</div><input type="hidden" name="quad" value="' + (x.quad || '') + '"><label>💗 כמה בא לי לעשות את זה? (1 = בכלל לא, 5 = מאוד)</label><div id="wantBox">' + wantStars('', x.want || 0, '') + '</div><input type="hidden" name="want" value="' + (x.want || 0) + '">';
+const DIFF_L = ['קל מאוד', 'קל', 'בינוני', 'קשה', 'קשה מאוד'], diffLabel = k => k ? 'קושי: ' + DIFF_L[k - 1] : '';
+const wantStars = (id, cur, kind) => '<div class="diffpick">' + DIFF_L.map((l, i) => '<button type="button" class="' + (i + 1 === cur ? 'on' : '') + '" data-act="setWant" data-id="' + id + '" data-k="' + (kind || '') + '" data-n="' + (i + 1) + '" aria-pressed="' + (i + 1 === cur) + '">' + l + '</button>').join('') + '</div>';
+const prioBox = (kind, x) => '<div class="card"><div class="sub">🧭 עדיפות (דחוף / חשוב)</div>' + quadChips(x.id, x.quad || '', kind) + '<div class="sub" style="margin-top:10px">⛰ רמת קושי</div>' + wantStars(x.id, x.diff || 0, kind) + '</div>';
+const prioFields = x => '<label>🧭 עדיפות (מטריצת אייזנהאואר)</label><div id="quadBox">' + quadChips('', x.quad || '', '') + '</div><input type="hidden" name="quad" value="' + (x.quad || '') + '"><label>⛰ רמת קושי (1 = קל מאוד, 5 = קשה מאוד)</label><div id="diffBox">' + wantStars('', x.diff || 0, '') + '</div><input type="hidden" name="diff" value="' + (x.diff || 0) + '">';
 const quadChips = (id, cur, kind) => '<div class="opt quadopts">' + QUADS.map(q => '<button type="button" class="' + (cur === q[0] ? 'on' : '') + '" data-act="setQuad" data-id="' + id + '" data-k="' + (kind || '') + '" data-q="' + q[0] + '">' + q[1] + '</button>').join('') + '</div>' + (quadOf(cur) ? '<div class="sub" style="margin-top:6px">' + esc(quadOf(cur)[2]) + '</div>' : '');
 /* ---------- Plan mode / do mode, the next-action suggestion, coming back from a break ---------- */
 const modeSwitch = () => '<div class="opt modesw"><button class="' + (state.mode === 'plan' ? 'on' : '') + '" data-act="setMode" data-m="plan">📋 תכנון</button><button class="' + (state.mode === 'do' ? 'on' : '') + '" data-act="setMode" data-m="do">🎯 ביצוע</button></div>';
 const currentAction = () => { const t = state.doId ? findTask(state.doId) : null; return (t && !t.done && t.date === TODAY()) ? t : nextTask(''); };
 function nowCard(t) {
   return '<div class="card nowcard"><div class="sub">עכשיו</div><div class="t big">' + titleP(t) + '</div>' + (t.notes ? '<div class="sub" style="white-space:pre-wrap;margin-top:4px">' + esc(t.notes) + '</div>' : '')
-    + '<div class="meta" style="margin:8px 0">' + quadChip(t) + (t.want ? '<span>💗' + t.want + '</span>' : '') + projectChip(t) + '</div>'
+    + '<div class="meta" style="margin:8px 0">' + quadChip(t) + (t.diff ? '<span class="chip">' + diffLabel(t.diff) + '</span>' : '') + projectChip(t) + '</div>'
     + '<button class="btn startnow" data-act="runStart" data-id="' + t.id + '">◀ התחל עכשיו</button>'
     + '<div class="grid2"><button class="btn ghost" data-act="chooseOther">🔁 בחר פעולה אחרת</button><button class="btn ghost" data-act="runBreak">☕ אני צריך הפסקה</button></div>'
     + '<button class="lnk" data-act="toggleTask" data-id="' + t.id + '" style="margin-top:8px">✓ כבר עשיתי את זה</button></div>';
@@ -888,7 +889,7 @@ const Engine = {
     text = (text || '').trim(); s.turns++; if (text === '__skip__') text = '';
     if (s.mode === 'today') {
       const open = tasksOn(TODAY()).filter(t => !t.done), P = [], lines = mockItems(text);
-      if (/עמוס|מוצף|יותר מדי|אין לי כוח|עייף|לא מספיק/.test(text)) open.slice().sort((a, b) => (effQuad(a) === 'q4' ? 0 : 1) - (effQuad(b) === 'q4' ? 0 : 1) || (a.want || 0) - (b.want || 0)).slice(0, 2).forEach(t => P.push({ id: uid(), type: 'postpone', title: t.title, taskId: t.id, reason: 'אמרת שהיום עמוס, וזו אחת הפחות חשובות או פחות רצויות', on: true }));
+      if (/עמוס|מוצף|יותר מדי|אין לי כוח|עייף|לא מספיק/.test(text)) open.slice().sort((a, b) => (effQuad(a) === 'q4' ? 0 : 1) - (effQuad(b) === 'q4' ? 0 : 1) || (b.diff || 0) - (a.diff || 0)).slice(0, 2).forEach(t => P.push({ id: uid(), type: 'postpone', title: t.title, taskId: t.id, reason: 'אמרת שהיום עמוס, וזו אחת הפחות חשובות או פחות רצויות', on: true }));
       lines.filter(l => !/עמוס|מוצף|יותר מדי|אין לי כוח|עייף|לא מספיק/.test(l.text)).forEach(l => { if (!findSimilarAction(l.text)) P.push({ id: uid(), type: 'add', title: l.text, reason: 'ציינת את זה כמשהו שמעסיק אותך היום', on: l.group === 'urgent' }); });
       s.proposals = P; s.phase = 'proposals'; s.question = ''; s.summary = P.length ? 'הנה מה שהצעתי לעדכן, לפי מה שכתבת בלבד. סמן מה מתאים לך.' : 'לא מצאתי מה לעדכן ברשימה של היום לפי מה שכתבת. אפשר לכתוב עוד.'; return s;
     }
@@ -1186,7 +1187,7 @@ function taskRow(t, showDate) {
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${hxMark(t)}${titleP(t)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.want ? '<span title="כמה בא לי">💗' + t.want + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.diff ? '<span class="chip" title="רמת קושי">' + diffLabel(t.diff) + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -1221,10 +1222,10 @@ function upCard(t, showDate) {
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
-const filterOk = t => (!state.fQuad || (state.fQuad === 'none' ? !effQuad(t) : effQuad(t) === state.fQuad)) && (!state.fWant || (t.want || 0) >= state.fWant);
+const filterOk = t => (!state.fQuad || (state.fQuad === 'none' ? !effQuad(t) : effQuad(t) === state.fQuad)) && (!state.fWant || (t.diff || 3) <= state.fWant);
 const filterBar = () => '<details class="fdet" ' + (state.fQuad || state.fWant ? 'open' : '') + '><summary>🧭 סינון לפי עדיפות' + (state.fQuad || state.fWant ? ' · פעיל' : '') + '</summary>'
   + '<div class="opt fq"><span class="sub">🧭</span>' + [['', 'הכל']].concat(QUADS.map(q => [q[0], q[1]]), [['none', 'ללא סיווג']]).map(([k, l]) => '<button class="' + ((state.fQuad || '') === k ? 'on' : '') + '" data-act="filterQuad" data-q="' + k + '">' + l + '</button>').join('') + '</div>'
-  + '<div class="opt fq"><span class="sub">💗</span>' + [[0, 'הכל'], [3, '3 ומעלה'], [4, '4 ומעלה'], [5, '5']].map(([n, l]) => '<button class="' + ((state.fWant || 0) === n ? 'on' : '') + '" data-act="filterWant" data-n="' + n + '">' + l + '</button>').join('') + '</div>'
+  + '<div class="opt fq"><span class="sub">⛰</span>' + [[0, 'הכל'], [1, 'קל מאוד'], [2, 'עד קל'], [3, 'עד בינוני']].map(([n, l]) => '<button class="' + ((state.fWant || 0) === n ? 'on' : '') + '" data-act="filterWant" data-n="' + n + '">' + l + '</button>').join('') + '</div>'
   + (state.fQuad || state.fWant ? '<button class="lnk" data-act="filterReset">נקה סינון</button>' : '') + '</details>';
 /* ---------- Project map: a calm overview of the projects I promote (why, values, progress, weekly focus) ---------- */
 const PM_STATUS = [['focus', '🎯', 'במיקוד כרגע'], ['active', '🌱', 'פעיל'], ['paused', '⏸️', 'מושהה'], ['future', '🔭', 'עתידי'], ['done', '🏁', 'הושלם']];
@@ -1867,9 +1868,9 @@ const views = {
   },
   matrix() { state.tab = 'tasks'; state.allMode = 'matrix'; return views.matrixBody(); },
   matrixBody() {
-    const open = D().tasks.filter(t => !t.done), by = k => open.filter(t => effQuad(t) === k).sort((a, b) => (b.want || 0) - (a.want || 0) || (a.date || '9999').localeCompare(b.date || '9999')), none = open.filter(t => !effQuad(t));
+    const open = D().tasks.filter(t => !t.done), by = k => open.filter(t => effQuad(t) === k).sort((a, b) => (a.diff || 3) - (b.diff || 3) || (a.date || '9999').localeCompare(b.date || '9999')), none = open.filter(t => !effQuad(t));
     const items = k => D().projects.filter(p => p.quad === k).map(p => '<div class="sub">📁 ' + esc(p.title) + '</div>').join('') ;
-    const mcard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.quad ? '' : (effQuad(t) ? '<span title="עדיפות שעברה בירושה">↳ בירושה</span>' : '')) + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + ((t.want || 0) >= 4 ? '<span>💗' + t.want + '</span>' : '') + '</div></div>';
+    const mcard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.quad ? '' : (effQuad(t) ? '<span title="עדיפות שעברה בירושה">↳ בירושה</span>' : '')) + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + ((t.diff || 0) >= 4 ? '<span>💗' + t.want + '</span>' : '') + '</div></div>';
     const cell = q => '<section class="mxcell ' + q[0] + '" data-drop="q:' + q[0] + '"><div class="mxh"><b>' + q[1] + '</b><span class="sub">' + by(q[0]).length + '</span></div>' + items(q[0]) + (by(q[0]).map(mcard).join('') || '<div class="sub mxempty">גרור לכאן</div>') + '</section>';
     return `<div class="top"><h1>כל הפעולות</h1></div>${allSeg()}
      <p class="sub">גרור כל פעולה לריבוע שמתאים לה (בטלפון: לחיצה ארוכה ואז גרירה). לחיצה קצרה פותחת את התפריט שלה. פעולה שלא מסווגת יורשת את העדיפות של הפעולה או הפרויקט שלה.</p>
@@ -2049,7 +2050,7 @@ function taskForm(id, presetDate, presetProject, preset) {
     e.preventDefault();
     if (blocked()) { const why = clarity(form.title.value)[0]; $('#clHint').innerHTML = clarityHTML(form.title.value, true); form.title.focus(); alert('לא ניתן לשמור: הפעולה לא כתובה בצורה ברורה.\n' + why); return; }
     const f = new FormData(e.target), own = f.get('owner') || '', jobId = '', projectId = own.startsWith('p:') ? own.slice(2) : '', prevS = t.subs || [], subs = (f.get('subs') || '').split('\n').map(x => x.trim()).filter(Boolean).map(l => prevS.find(x => x.title === l) || { id: uid(), title: l, done: false });
-    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: f.get('quad') ? quadPri[f.get('quad')] : (t.priority || 0), quad: f.get('quad') || '', want: +f.get('want') || 0, visionId: t.visionId || '', jobId, projectId, subs, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
+    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: f.get('quad') ? quadPri[f.get('quad')] : (t.priority || 0), quad: f.get('quad') || '', diff: +f.get('diff') || 0, visionId: t.visionId || '', jobId, projectId, subs, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
     let saved = t;
     if (id) Object.assign(t, obj); else { saved = { id: uid(), done: false, subs: [], ...obj }; D().tasks.push(saved); }
     resolveLong([saved]);
@@ -2277,7 +2278,7 @@ function menuSheet(id) {
    <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
    ${t.notes ? `<p class="sub" style="white-space:pre-wrap">${esc(t.notes)}</p>` : ''}
    ${(t.subs || []).length ? `<div class="sub" style="margin:8px 0 4px">☰ תתי-פעולות (${subProg(t)})</div><div class="subs">${t.subs.map(x => `<div class="row ${x.done ? 'done' : ''}"><button class="check ${x.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${x.id}">${x.done ? '✓' : ''}</button><div class="t grow">${esc(x.title)}</div></div>`).join('')}</div>` : ''}
-   ${t.done ? '' : '<div class="sub" style="margin:8px 0 4px">🧭 עדיפות</div>' + quadChips(t.id, t.quad || '', '') + '<div class="sub" style="margin:8px 0 2px">💗 כמה בא לי?</div>' + wantStars(t.id, t.want || 0, '')}
+   ${t.done ? '' : '<div class="sub" style="margin:8px 0 4px">🧭 עדיפות</div>' + quadChips(t.id, t.quad || '', '') + '<div class="sub" style="margin:8px 0 2px">⛰ רמת קושי</div>' + wantStars(t.id, t.diff || 0, '')}
    <div class="grid2">
      ${t.done ? '' : `<button class="btn" data-act="runStart" data-id="${t.id}">◀ התחל עכשיו</button>`}
      <button class="btn ghost" data-act="menuDone" data-id="${t.id}">${t.done ? '↺ בטל ביצוע' : '✓ בוצע'}</button>
@@ -2677,8 +2678,8 @@ const A = {
     Store.save(); render(); if (!e.k && !$('#sheet').hidden) menuSheet(e.id);
   },
   setWant: e => {
-    if (!e.id) { const f = $('#f'), same = +f.want.value === +e.n; f.want.value = same ? 0 : e.n; $('#wantBox').innerHTML = wantStars('', +f.want.value, ''); return; }
-    const x = itemOf(e.k, e.id); if (!x) return; x.want = (x.want === +e.n) ? 0 : +e.n;
+    if (!e.id) { const f = $('#f'), same = +f.diff.value === +e.n; f.diff.value = same ? 0 : e.n; $('#diffBox').innerHTML = wantStars('', +f.diff.value, ''); return; }
+    const x = itemOf(e.k, e.id); if (!x) return; x.diff = (x.diff === +e.n) ? 0 : +e.n;
     Store.save(); render(); if (!e.k && !$('#sheet').hidden) menuSheet(e.id);
   },
   toPool: e => { // take the action off its day and put it back in "כל הפעולות" (no date, parked so the daily organizing does not ask about it)
