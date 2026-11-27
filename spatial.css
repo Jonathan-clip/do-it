@@ -342,3 +342,6 @@ body.miniRun #edock{bottom:calc(220px + env(safe-area-inset-bottom))}
 .epop{max-height:calc(100vh - 230px);max-height:calc(100dvh - 230px);overflow-y:auto;overscroll-behavior:contain}
 .etile .enimg{width:68px;height:68px}
 .etile{padding:6px 4px 8px;font-size:13.5px}
+
+/* quiet home: one column, a single small link to the map */
+.hxlink{display:block;margin:14px 2px 6px;color:var(--muted);font-size:14.5px;padding:8px 4px}

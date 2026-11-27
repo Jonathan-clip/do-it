@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-27.3-onebutton'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-27.4-quiet'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -1667,8 +1667,9 @@ function homeProjects() {
 function hxWrap(html, d) {
   if (!hxOn() || d !== TODAY()) return html;
   html = html.replace('<h1>היום</h1>', '<h1>' + greet() + '</h1>');
-  const i = html.indexOf('<div class="card" style="--pct'); if (i < 0) return html;
-  return html.slice(0, i) + '<div class="hxgrid"><div class="hxside">' + html.slice(i) + '</div><div class="hxmain">' + homeMap() + homeProjects() + '</div></div>';
+  const link = '<button class="lnk hxlink" data-act="goTab" data-t="map">🌍 מפת החיים והפרויקטים ' + chev('l') + '</button>';
+  const i = html.indexOf('<details class="todaymore"');
+  return i < 0 ? html : html.slice(0, i) + link + html.slice(i);
 }
 document.addEventListener('change', e => { if (e.target && e.target.id === 'dzName') { D().assist.userName = e.target.value.trim(); Store.save(); } });
 
@@ -1986,7 +1987,7 @@ function render() {
   const board = $('#uboard'), boardScroll = board ? board.scrollLeft : null; // keep the board's horizontal position across re-renders
   document.body.classList.toggle('wide', state.tab === 'upcoming');
   document.body.classList.toggle('skyfull', hxOn() && state.tab === 'map'); // the sky is only vivid on the map and project screens; work screens stay calm
-  document.body.classList.toggle('hxwide', hxOn() && state.tab === 'today' && state.mode !== 'do' && state.date === TODAY());
+  document.body.classList.toggle('hxwide', false); // the home stays a single calm column
   $('#view').innerHTML = views[state.tab]();
   if (MORE_TABS.includes(state.tab) && state.tab !== 'assistant' && !(state.tab === 'lists' && state.openList) && !(state.tab === 'projects' && (state.openProject || state.openJob))) // back to the "עוד" menu
     $('#view').insertAdjacentHTML('afterbegin', `<button class="iconbtn backmore" data-act="goTab" data-t="more" aria-label="חזרה לעוד">${chev('r')}<span style="margin-inline-start:6px">עוד</span></button>`);
