@@ -429,3 +429,11 @@ body.miniRun #view{padding-bottom:170px}
 .fabopt:active{transform:scale(.97)}
 body.miniRun .fabmenu{bottom:calc(214px + env(safe-area-inset-bottom))}
 body.running .fabmenu{display:none}
+
+/* the floating buttons: always pinned to the bottom, the "+" and the energy circle on the same line, the same distance above the navigation */
+:root{--dockb:76px}
+html[data-design="spatial"]{--dockb:98px}
+body.miniRun{--dockb:154px}
+.fab{position:fixed!important;bottom:calc(var(--dockb) + env(safe-area-inset-bottom))!important}
+#edock{position:fixed!important;bottom:calc(var(--dockb) + env(safe-area-inset-bottom))!important}
+.fabmenu{bottom:calc(var(--dockb) + 70px + env(safe-area-inset-bottom))!important}
