@@ -437,3 +437,8 @@ body.miniRun{--dockb:154px}
 .fab{position:fixed!important;bottom:calc(var(--dockb) + env(safe-area-inset-bottom))!important}
 #edock{position:fixed!important;bottom:calc(var(--dockb) + env(safe-area-inset-bottom))!important}
 .fabmenu{bottom:calc(var(--dockb) + 70px + env(safe-area-inset-bottom))!important}
+
+/* feature switches */
+.featsw{border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:999px;padding:7px 14px;font-size:14px;min-width:68px}
+.featsw.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);font-weight:700}
+#nav button[hidden]{display:none}

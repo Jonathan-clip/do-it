@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-27.4-quiet'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-27.5-focus-features'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -552,6 +552,7 @@ function estimateEnd(rem) { // when the day's remaining work should end, countin
 /* Rhythm of the day: meals and rest you define; separate from actions and not counted as progress */
 const rhythmSorted = () => D().rhythm.slice().sort((a, b) => a.time.localeCompare(b.time));
 function rhythmStrip(d, mode) {
+  if (!featOn('rhythm')) return '';
   if (d !== TODAY()) return '';
   const items = rhythmSorted(), log = D().rhythmLog[d] || {}, now = nowHM(), nowM = toMin(now), noRest = !items.some(r => r.kind === 'rest');
   const near = r => !log[r.id] && Math.abs(toMin(r.time) - nowM) <= 30;
@@ -790,6 +791,7 @@ function rewardState(d) {
   return { rule, achieved, text, picked: f.rewardPicked || '', claimed: !!f.rewardClaimed };
 }
 function rewardCard(d) {
+  if (!featOn('dayrewards')) return '';
   if (d !== TODAY()) return '';
   const s = rewardState(d);
   if (!s.rule) return '<div class="card focus" data-act="focusEdit"><div class="t"><b>🎁 תגמול יומי</b></div><div class="sub">לחץ כדי לקבוע תנאי לתגמול של היום</div></div>';
@@ -1673,6 +1675,31 @@ function hxWrap(html, d) {
 }
 document.addEventListener('change', e => { if (e.target && e.target.id === 'dzName') { D().assist.userName = e.target.value.trim(); Store.save(); } });
 
+/* ---------- Feature visibility: a calmer app. Hidden features keep their data and come back with one tap. ---------- */
+const FEATURES = [ // key, icon, title, what it is
+  ['habits', '🔁', 'הרגלים', 'מעקב הרגלים קבועים'],
+  ['goals', '🎯', 'יעדים ותגמולים', 'יעדים לאורך זמן עם תגמול'],
+  ['lists', '📝', 'רשימות', 'רשימות חופשיות'],
+  ['cheer', '💪', 'עידוד', 'משפטים מחזקים (בניווט התחתון)'],
+  ['journal', '📓', 'יומן', 'רישום יומי של ניצחונות ומחשבות'],
+  ['rhythm', '🕒', 'מקצב היום', 'הפסקות, ארוחות ותזכורות לאורך היום'],
+  ['week', '🧭', 'חזון שבועי', 'תוצאות השבוע, סיכום ותכנון'],
+  ['dayrewards', '🎁', 'תגמולים יומיים', 'פרס קטן על התקדמות היום'],
+  ['assistant', '🧠', 'עוזר התכנון שלי', 'שיחה שעוזרת לסדר את היום'],
+  ['vision', '🌟', 'חזון', 'תמונות ומשפטים על העתיד']
+];
+const FEAT_DEF = { habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
+const featOn = k => { const f = (D().assist || {}).features; return k in FEAT_DEF ? (f && k in f ? !!f[k] : !!FEAT_DEF[k]) : true; }; // tasks, projects, map, upcoming: always on
+const featCount = k => ({ habits: () => D().habits.length, goals: () => D().goals.length, lists: () => D().lists.length, journal: () => journalDays().length, rhythm: () => D().rhythm.length, dayrewards: () => D().dayRewards.length, assistant: () => D().topics.length, vision: () => D().visions.length }[k] || (() => 0))();
+function applyFeatures() {
+  const nav = document.querySelector('#nav [data-tab="cheer"]'); if (nav) nav.hidden = !featOn('cheer');
+  const i = MORE_TABS.indexOf('cheer'); if (!featOn('cheer') && i < 0) MORE_TABS.push('cheer'); else if (featOn('cheer') && i >= 0) MORE_TABS.splice(i, 1);
+}
+function featSheet() {
+  sheet('<h1>🎛 ניהול תכונות</h1><div class="sub" style="margin-bottom:8px">מה שכבוי מוסתר מהתפריטים ומהמסכים, ושום נתון לא נמחק. אפשר להדליק בכל רגע.</div>'
+    + FEATURES.map(([k, ic, t, d]) => { const on = featOn(k), n = featCount(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + (n ? ' · ' + n + ' פריטים' : '') + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
+    + '<div class="actions"><button class="btn" data-act="close">סגור</button></div>');
+}
 const views = {
   today() {
     if (state.mode === 'do' && state.date === TODAY()) return doView();
@@ -1852,9 +1879,10 @@ const views = {
   more() {
     const gs = D().goals.map(goalState), activeG = gs.filter(s => !s.achieved && !s.missed).length;
     const wait = D().goals.filter(g => g.reward && !g.claimed && goalState(g).achieved).length;
-    const item = (t, icon, title, sub) => `<div class="card row" data-act="goTab" data-t="${t}"><span style="font-size:26px">${icon}</span><div class="grow"><div class="t"><b>${title}</b></div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
+    const item0 = (t, icon, title, sub) => `<div class="card row" data-act="goTab" data-t="${t}"><span style="font-size:26px">${icon}</span><div class="grow"><div class="t"><b>${title}</b></div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
+    const item = (t, ...a) => featOn(t) ? item0(t, ...a) : '';
     return `<div class="top"><div class="brand">${logoMark(40)}<h1>Do It</h1></div></div>
-      <h2>יומי</h2>
+      ${['journal', 'rhythm', 'week', 'dayrewards'].some(featOn) ? '<h2>יומי</h2>' : ''}
       ${item('journal', '📓', 'יומן', `${journalDays().length} ימים עם רישום`)}
       ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
       ${item('week', '🧭', 'חזון שבועי', 'תוצאות השבוע, סיכום ותכנון')}
@@ -1862,13 +1890,15 @@ const views = {
       <h2>תכנון</h2>
       ${item('tasks', '✅', 'כל הפעולות והפרויקטים', `${D().tasks.filter(t => !t.done).length} פעולות פתוחות · ${D().projects.length} פרויקטים · ${D().tasks.filter(t => !t.done && !effQuad(t)).length} לא מסווגות`)}
       ${item('assistant', '🧠', 'עוזר התכנון שלי', `${D().topics.length} נושאים בזיכרון`)}
-      <h2>אישי</h2>
+      ${['habits', 'goals', 'vision', 'lists', 'cheer'].some(featOn) || !featOn('cheer') ? '<h2>אישי</h2>' : ''}
+      ${featOn('cheer') ? '' : item0('cheer', '💪', 'עידוד', 'משפטים שמחזקים')}
       ${item('habits', '🔁', 'הרגלים', `${D().habits.length} הרגלים`)}
       ${item('goals', '🎯', 'יעדים ותגמולים', `${activeG} פעילים${wait ? ` · 🎁 ${wait} ממתינים` : ''}`)}
       ${item('vision', '🌟', 'חזון', `${D().visions.length} פריטים`)}
       ${item('lists', '📝', 'רשימות', `${D().lists.length} רשימות`)}
       <h2>הגדרות</h2>
       <div class="card"><div class="t"><b>🔔 רמת הודעות</b></div><select id="notifySel" style="margin-top:6px">${NOTIFY.map(([v, l]) => '<option value="' + v + '" ' + (notifyLevel() === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select><div class="sub" id="notifyDesc" style="margin-top:6px">${(NOTIFY.find(x => x[0] === notifyLevel()) || NOTIFY[1])[2]}</div></div>
+      <div class="card row" data-act="featSheet"><span style="font-size:24px">🎛</span><div class="grow"><div class="t"><b>ניהול תכונות</b></div><div class="meta">מה מוצג ומה מוסתר באפליקציה</div></div>${chev('l')}</div>
       ${breathSettingsCard()}
       ${dzCard()}
       <div class="card row"><div class="grow"><div class="t">גרסה ${APP_VERSION}</div><div class="sub">אם נראה שהאפליקציה לא מעודכנת, לחץ כדי לנקות את המטמון ולטעון מחדש</div></div><button class="iconbtn" data-act="refreshApp">🔄 רענון</button></div>
@@ -1974,7 +2004,7 @@ const views = {
 };
 
 function render() {
-  applyDesign();
+  applyDesign(); applyFeatures();
   sweepPast();
   // A background re-render (sync status, timers) must not wipe what the user is typing: remember the changed fields of the current screen
   const typed = {}; let focusKey = null, caret = null;
@@ -2603,6 +2633,8 @@ const A = {
   pmAssignApply: () => { let n = 0; document.querySelectorAll('#sheet [data-pmas]').forEach(sel => { const p = D().projects.find(x => x.id === sel.dataset.pmas); if (p && sel.value) { p.area = sel.value; n++; } }); Store.save(); closeSheet(); render(); toast('<span>' + (n ? '✅ שויכו ' + n + ' פרויקטים לתחומי חיים' : 'לא שויך אף פרויקט') + '</span><button data-act="toastClose" aria-label="סגור">✕</button>', 3500); },
   homeIsle: e => { state.tab = 'map'; state.pmIsle = e.id; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
   homeProj: e => { state.tab = 'map'; state.pmOpen = e.id; state.pmReview = null; render(); window.scrollTo(0, 0); },
+  featSheet: () => featSheet(),
+  featToggle: e => { const a = D().assist; a.features = a.features || {}; a.features[e.k] = !featOn(e.k); Store.save(); applyFeatures(); featSheet(); render(); },
   pmNoop: () => {},
   pmOpen: e => { state.pmOpen = e.id; render(); window.scrollTo(0, 0); },
   pmBack: () => { state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
