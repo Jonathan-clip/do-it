@@ -420,3 +420,12 @@ body.miniRun #view{padding-bottom:170px}
 .brtext b{font-size:26px}
 .brtext span{font-size:15px;font-variant-numeric:tabular-nums;opacity:.9}
 @media (prefers-reduced-motion:reduce){.brcircle{transition:none}}
+
+/* one "+" button: the thought bubble is gone, the "+" opens the add action of the screen or "what's on my mind" */
+#capture{display:none!important}
+.fabmenu{position:fixed;inset-inline-start:20px;bottom:calc(150px + env(safe-area-inset-bottom));z-index:7;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.fabmenu[hidden]{display:none}
+.fabopt{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:13px 20px;font-size:16px;font-weight:600;box-shadow:0 8px 24px #0002;white-space:nowrap}
+.fabopt:active{transform:scale(.97)}
+body.miniRun .fabmenu{bottom:calc(214px + env(safe-area-inset-bottom))}
+body.running .fabmenu{display:none}

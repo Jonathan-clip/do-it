@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-27.2-breath'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-27.3-onebutton'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -431,7 +431,7 @@ function projectsBoard() { // "כל הפעולות" grouped by project: compact 
   return '<div class="top"><h1>כל הפעולות</h1><div class="sw"><button class="iconbtn" data-act="addProject">＋ פרויקט</button></div></div>' + allSeg()
     + '<div class="sub" style="margin:6px 0">לחיצה על שם פרויקט פותחת את הפעולות שלו. גרור פעולה (בטלפון: לחיצה ארוכה ואז גרירה) אל שורת פרויקט כדי לשייך אותה.</div>'
     + D().projects.map(sec).join('') + '<section class="prow none" data-drop="p:none"><div class="prh"><b class="grow" data-act="projToggle" data-id="none">ללא פרויקט</b><span class="sub">' + free.length + '</span></div>' + (isOpen('none') ? '<div class="pbody">' + (free.slice(0, 40).map(projCard).join('') || '<div class="sub mxempty">כל הפעולות משויכות לפרויקט</div>') + (free.length > 40 ? '<div class="sub">ועוד ' + (free.length - 40) + '. עבור לתצוגת רשימה כדי לראות הכל.</div>' : '') + '</div>' : '') + '</section>'
-    + '<button class="fab" data-act="addTask">+</button>';
+    + '<button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>';
 }
 /* ---------- Wellbeing: energy states with suggestions, rhythm (meals / rest / hourly break), day start & end, deferral nudge, morning review ---------- */
 const normEnergy = v => (v === 'low' || v === 'mid') ? 'midlow' : (v || '');
@@ -679,6 +679,10 @@ function askMorning() {
   if (el.focus) return askFocus();
   Morning.active = false;
 }
+/* ---------- One "+" button: the add action of the current screen, or capturing a thought ---------- */
+const FAB_L = { addTask: 'משימה חדשה', addHabit: 'הרגל חדש', addVision: 'פריט חזון חדש', addGoal: 'יעד חדש', addList: 'רשימה חדשה' };
+const fabClose = () => { const m = $('#fabmenu'); if (m) m.hidden = true; };
+document.addEventListener('click', e => { if (!e.target.closest) return; if (!e.target.closest('#fabmenu') && !e.target.closest('.fab')) fabClose(); });
 /* ---------- Morning breathing: slow breaths, one cycle at a time (default 5 minutes) ---------- */
 const BR = { in: 4, out: 6 }; // seconds: a longer exhale calms
 const Br = { left: 0, total: 0, endAt: 0, tick: null, running: false, ended: false };
@@ -867,7 +871,7 @@ function doView() { // do mode: only the current action, nothing else to distrac
     + (cur ? nowCard(cur) : ts.length === 0 ? '<div class="card"><div class="t">עוד אין פעולות להיום</div><div class="sub" style="margin-top:6px">הוסף את הפעולה הראשונה, או בחר מהמאגר במצב תכנון.</div><button class="btn startnow" data-act="addTask" style="margin-top:8px">＋ פעולה חדשה</button><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px;width:100%">📋 למצב תכנון</button></div>' : '<div class="card"><div class="t">🎉 אין עוד פעולות פתוחות להיום</div><div class="sub" style="margin-top:6px">במצב תכנון אפשר להוסיף פעולות מהמאגר, או לסיים את היום.</div><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px">📋 למצב תכנון</button></div>')
     + (queue.length ? '<h2>בתור</h2>' + queue.map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div><div class="meta">' + '</div></div>').join('') : '')
     + energyBar(d)
-    + '<button class="fab" data-act="addTask" aria-label="פעולה חדשה">+</button>';
+    + '<button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>';
 }
 function chooseOther() { // pick another action to do now (the user decides, the order is only a hint)
   $('#toast').hidden = true; const cur = currentAction(), list = tasksOn(TODAY()).filter(t => !t.done && (!cur || t.id !== cur.id)).slice(0, 6);
@@ -1701,7 +1705,7 @@ const views = {
        ${hs.some(h => !habitDone(h, d)) ? `<h2>הרגלים</h2>${hs.filter(h => !habitDone(h, d)).map(h => habitRow(h, d)).join('')}` : ''}
        <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>
       </details>
-      <button class="fab" data-act="addTask" aria-label="פעולה חדשה">+</button>`;
+      <button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>`;
     return hxWrap(html, d);
   },
   upcoming() {
@@ -1769,7 +1773,7 @@ const views = {
       ${filterBar()}
       <div class="sub" style="margin:6px 0">${list.length} פעולות. הלוח עם הגרירה נמצא בטאב "בקרוב".</div>
       ${list.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות שמתאימות לסינון</div>'}
-      <button class="fab" data-act="addTask">+</button>`;
+      <button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>`;
   },
   habits() {
     const d = TODAY(), last7 = Array.from({ length: 7 }, (_, i) => addDays(d, i - 6));
@@ -1780,7 +1784,7 @@ const views = {
         <div class="meta"><span>🔥 ${streak(h)} ימים</span><span>${h.days.length === 7 ? 'כל יום' : h.days.map(x => DAYS[x]).join(' ')}</span>${v ? `<span class="chip">${esc(v)}</span>` : ''}</div></div></div>
         <div class="dots" style="margin-top:8px;justify-content:flex-start">${last7.map(x => `<button class="dot7 ${habitDone(h, x) ? 'on' : ''}" style="${h.days.includes(parse(x).getDay()) ? '' : 'opacity:.35'}" data-act="toggleHabit" data-id="${h.id}" data-date="${x}">${parse(x).getDate()}</button>`).join('')}</div></div>`;
       }).join('') || '<div class="empty">עדיין אין הרגלים</div>'}
-      <button class="fab" data-act="addHabit">+</button>`;
+      <button class="fab" data-act="fabMenu" data-a="addHabit" aria-label="הוספה">+</button>`;
   },
   vision() {
     return `<div class="top"><h1>החזון שלי</h1></div>
@@ -1791,7 +1795,7 @@ const views = {
         ${v.desc ? `<div class="sub" style="white-space:pre-wrap;margin-top:4px">${esc(v.desc)}</div>` : ''}
         <div class="meta"><span>✅ ${dn}/${ts.length} פעולות</span><span>🔁 ${hs.length} הרגלים</span><span>🎯 ${D().goals.filter(x => x.visionId === v.id).length} יעדים</span>${v.area ? `<span class="chip">${esc(v.area)}</span>` : ''}</div></div>`;
       }).join('') || '<div class="empty">כתוב כאן את החזון שלך, תחומי חיים ויעדים גדולים</div>'}
-      <button class="fab" data-act="addVision">+</button>`;
+      <button class="fab" data-act="fabMenu" data-a="addVision" aria-label="הוספה">+</button>`;
   },
   week() {
     const ws = state.weekStart, we = addDays(ws, 6), T = TODAY(), cur = ws === weekStart(T);
@@ -1952,7 +1956,7 @@ const views = {
       ${waiting.map(x => `<div class="card row"><div class="grow"><div class="t">🎁 ${esc(x.g.reward)}</div><div class="meta">על: ${esc(x.g.title)}</div></div><button class="btn" data-act="goalClaim" data-id="${x.g.id}">מימשתי</button></div>`).join('')}
       ${claimed.map(x => `<div class="card done"><div class="t">🎁 ${esc(x.g.reward || x.g.title)}</div><div class="meta">מומש ${x.g.claimedAt ? shortDate(x.g.claimedAt) : ''} · ${esc(x.g.title)}</div></div>`).join('')}
       ${!waiting.length && !claimed.length ? '<div class="empty">תגמול מתווסף לכל יעד, והוא נפתח כשמשיגים אותו</div>' : ''}
-      <button class="fab" data-act="addGoal">+</button>`;
+      <button class="fab" data-act="fabMenu" data-a="addGoal" aria-label="הוספה">+</button>`;
   },
   lists() {
     if (state.openList) {
@@ -1964,7 +1968,7 @@ const views = {
     }
     return `<div class="top"><h1>רשימות</h1></div>
       ${D().lists.map(l => `<div class="card row" data-act="openList" data-id="${l.id}"><div class="grow"><div class="t"><b>${esc(l.title)}</b></div><div class="meta">${l.items.filter(i => i.done).length}/${l.items.length} פריטים</div></div><span class="sub">${chev('l')}</span></div>`).join('') || '<div class="empty">עדיין אין רשימות</div>'}
-      <button class="fab" data-act="addList">+</button>`;
+      <button class="fab" data-act="fabMenu" data-a="addList" aria-label="הוספה">+</button>`;
   }
 };
 
@@ -2008,6 +2012,8 @@ function render() {
     const { id, sid, date } = state.pop; state.pop = null;
     document.querySelectorAll(sid ? `[data-sid="${sid}"].on` : `[data-id="${id}"].on`).forEach(el => { if (!date || el.dataset.date === date) el.classList.add('pop'); });
   }
+  fabClose();
+  if (!$('#view .fab') && ['upcoming', 'map', 'cheer', 'more'].includes(state.tab) && !state.pmReview) $('#view').insertAdjacentHTML('beforeend', '<button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>');
   energyDock();
   const navTab = MORE_TABS.includes(state.tab) ? 'more' : state.tab;
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === navTab));
@@ -2797,6 +2803,9 @@ const A = {
     runOpen(id);
   },
   runBreak: () => { $('#toast').hidden = true; runOpen(null, true, 10); },
+  fabMenu: e => { const m = $('#fabmenu'); if (!m.hidden) return fabClose(); m.dataset.a = e.a || 'addTask'; m.innerHTML = '<button class="fabopt" data-act="fabGo">＋ ' + (FAB_L[m.dataset.a] || 'חדש') + '</button><button class="fabopt" data-act="fabThought">💭 מה עולה לי עכשיו</button>'; m.hidden = false; },
+  fabGo: () => { const a = ($('#fabmenu').dataset.a) || 'addTask'; fabClose(); if (A[a]) A[a]({}); },
+  fabThought: () => { fabClose(); A.capture(); },
   breathStart: () => breathOpen(),
   breathLater: () => { breathSnooze = true; closeSheet(); setTimeout(askMorning, 250); },
   breathClose: () => { breathStop(); render(); },
