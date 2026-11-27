@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-27.1-people'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-27.2-breath'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -657,6 +657,7 @@ const Morning = { plan: [], active: false };
 const morningEligible = () => {
   const T = TODAY(), y = addDays(T, -1), f = D().focus[T] || {}, fe = focusOn(T);
   return {
+    breath: !breathSnooze && breathOn() && !breathDone(T) && !f.breathAsked && !workedToday() && new Date().getHours() < 14,
     visual: !visualSnooze && !D().visual[T] && !workedToday() && !f.visualAsked && new Date().getHours() < 14,
     review: !reviewSnooze && !D().review[y] && !f.reviewAsked && (wasOn(y).length > 0 || ((D().focus[y] || {}).workTotal || 0) > 0),
     focus: !focusSnooze && !f.askedAt && !(fe.mit && fe.fun)
@@ -671,11 +672,54 @@ function askMorning() {
   if (!D().tasks.length) return; // a brand-new user has nothing to review or plan: no popups
   if (!$('#sheet').hidden || !$('#run').hidden) return;
   const el = morningEligible();
-  if (!Morning.active) { Morning.plan = ['visual', 'review', 'focus'].filter(k => el[k]); if (!Morning.plan.length) return; Morning.active = true; }
+  if (!Morning.active) { Morning.plan = ['breath', 'visual', 'review', 'focus'].filter(k => el[k]); if (!Morning.plan.length) return; Morning.active = true; }
+  if (el.breath) return breathOffer();
   if (el.visual) return visualOffer();
   if (el.review) return reviewSheet();
   if (el.focus) return askFocus();
   Morning.active = false;
+}
+/* ---------- Morning breathing: slow breaths, one cycle at a time (default 5 minutes) ---------- */
+const BR = { in: 4, out: 6 }; // seconds: a longer exhale calms
+const Br = { left: 0, total: 0, endAt: 0, tick: null, running: false, ended: false };
+let breathSnooze = false;
+const breathOn = () => D().assist.breathMorning !== false;
+const breathMins = () => +D().assist.breathMin || 5;
+const breathDone = d => !!((D().assist.breathLog || {})[d]);
+function breathCard(d) {
+  if (d !== TODAY() || !breathOn() || breathDone(d) || workedToday() || new Date().getHours() >= 14) return '';
+  return '<div class="card row"><span style="font-size:22px">🌬</span><div class="grow"><div class="t">נשימות הבוקר · ' + breathMins() + ' דקות</div><div class="meta"><span>עוד לא בוצע</span></div></div><button class="iconbtn" data-act="breathStart">◀ להתחיל</button></div>';
+}
+function breathSettingsCard() {
+  const on = breathOn(), m = breathMins();
+  return '<div class="card"><div class="t"><b>🌬 נשימות בוקר</b></div><div class="sub">פותחות את הבוקר, לפני דמיון מודרך והמיקוד היומי</div>'
+    + '<div class="dzpick"><button class="' + (on ? 'on' : '') + '" data-act="breathSet" data-k="on" data-v="1">פעיל</button><button class="' + (on ? '' : 'on') + '" data-act="breathSet" data-k="on" data-v="0">כבוי</button></div>'
+    + (on ? '<div class="dzpick">' + [3, 5, 10].map(n => '<button class="' + (m === n ? 'on' : '') + '" data-act="breathSet" data-k="min" data-v="' + n + '">' + n + ' דקות</button>').join('') + '</div>' : '') + '</div>';
+}
+function breathOffer() {
+  fo(TODAY()).breathAsked = true; Store.save(); // offered once a day; the card on the Today screen stays
+  sheet('<h1>🌬 נשימות של הבוקר</h1>' + morningBar('breath') + '<p class="sub">' + breathMins() + ' דקות של נשימה איטית לפני שמתחילים: שאיפה של ' + BR.in + ' שניות ונשיפה ארוכה של ' + BR.out + '. פשוט עוקבים אחרי העיגול.</p><div class="actions"><button class="btn ghost" data-act="breathLater">אחר כך</button><button class="btn" data-act="breathStart">◀ להתחיל</button></div>');
+}
+function breathOpen() {
+  clearInterval(Run.tick); closeSheet(); clearInterval(Br.tick);
+  Br.total = Br.left = breathMins() * 60; Br.running = false; Br.ended = false;
+  $('#run').hidden = false; document.body.classList.add('running'); breathRender();
+}
+function breathStop() { clearInterval(Br.tick); Br.running = false; $('#run').hidden = true; document.body.classList.remove('running'); }
+function breathRender() {
+  $('#run').innerHTML = '<div class="runbox brbox"><button class="iconbtn runx" data-act="breathClose" aria-label="סגור">✕</button>'
+    + '<div class="sub" style="text-align:center">🌬 נשימות הבוקר</div>'
+    + '<div class="brwrap" id="brWrap" style="--bs:1"><div class="brcircle"></div><div class="brtext"><b id="brPhase">' + (Br.ended ? 'סיימנו' : Br.running ? 'שאיפה' : 'מוכנים?') + '</b><span id="brTime">' + mmss(Br.left) + '</span></div></div>'
+    + '<div class="sub" style="text-align:center;min-height:22px">' + (Br.ended ? 'כל הכבוד. אפשר להמשיך ליום' : 'שאיפה דרך האף, נשיפה איטית דרך הפה') + '</div>'
+    + '<div class="grid2">' + (Br.ended ? '<button class="btn" data-act="breathDone">✓ להמשיך</button>' : '<button class="btn" data-act="breathToggle">' + (Br.running ? '⏸ השהה' : '◀ התחל') + '</button><button class="btn ghost" data-act="breathDone">✓ סיימתי</button>') + '</div></div>';
+}
+function breathTick() {
+  Br.left = Math.max(0, Math.ceil((Br.endAt - Date.now()) / 1000));
+  const elapsed = (Br.total * 1000 - (Br.endAt - Date.now())) / 1000, c = BR.in + BR.out, pos = ((elapsed % c) + c) % c, inh = pos < BR.in;
+  const sc = inh ? 1 + 0.38 * (pos / BR.in) : 1.38 - 0.38 * ((pos - BR.in) / BR.out);
+  const w = $('#brWrap'), p = $('#brPhase'), t = $('#brTime');
+  if (w) w.style.setProperty('--bs', sc.toFixed(3)); if (p) p.textContent = inh ? 'שאיפה' : 'נשיפה'; if (t) t.textContent = mmss(Br.left);
+  if (Br.left <= 0) { clearInterval(Br.tick); Br.running = false; Br.ended = true; try { navigator.vibrate && navigator.vibrate([60, 60, 60]); } catch (e) {} breathRender(); }
 }
 /* ---------- Morning guided visualization: shown paragraph by paragraph, optional auto-advance and read-aloud ---------- */
 const VISUALIZATION = [
@@ -1641,6 +1685,7 @@ const views = {
        ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
       ${isToday ? modeSwitch() : ''}
       ${isToday ? syncHint() : ''}
+      ${isToday ? breathCard(d) : ''}
       ${visTop ? visualCard(d) : ''}
       ${rhythmStrip(d, 'near')}
       ${rewardTop ? rewardCard(d) : ''}
@@ -1819,6 +1864,7 @@ const views = {
       ${item('lists', '📝', 'רשימות', `${D().lists.length} רשימות`)}
       <h2>הגדרות</h2>
       <div class="card"><div class="t"><b>🔔 רמת הודעות</b></div><select id="notifySel" style="margin-top:6px">${NOTIFY.map(([v, l]) => '<option value="' + v + '" ' + (notifyLevel() === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select><div class="sub" id="notifyDesc" style="margin-top:6px">${(NOTIFY.find(x => x[0] === notifyLevel()) || NOTIFY[1])[2]}</div></div>
+      ${breathSettingsCard()}
       ${dzCard()}
       <div class="card row"><div class="grow"><div class="t">גרסה ${APP_VERSION}</div><div class="sub">אם נראה שהאפליקציה לא מעודכנת, לחץ כדי לנקות את המטמון ולטעון מחדש</div></div><button class="iconbtn" data-act="refreshApp">🔄 רענון</button></div>
       <h2>חשבון</h2>
@@ -2450,7 +2496,7 @@ const A = {
   editTask: e => taskForm(e.id), addTask: () => taskForm(),
   habToTask: e => { const h = D().habits.find(x => x.id === e.id); taskForm(undefined, TODAY(), '', { title: h.task || h.title, energy: h.energy || 3, mins: h.mins || 15, visionId: h.visionId || '', repeat: 'd1' }); },
   focusEdit: () => focusSheet(state.date),
-  morningSkipAll: () => { const f = fo(TODAY()); f.visualAsked = true; f.reviewAsked = true; f.askedAt = new Date().toISOString(); Morning.active = false; Store.save(); closeSheet(); },
+  morningSkipAll: () => { const f = fo(TODAY()); f.breathAsked = true; f.visualAsked = true; f.reviewAsked = true; f.askedAt = new Date().toISOString(); Morning.active = false; Store.save(); closeSheet(); },
   focusLater: () => { focusSnooze = true; Morning.active = false; closeSheet(); },
   demoReset: () => { if (confirm('לאפס את הדמו לנתונים ההתחלתיים?')) { seedDemo(); render(); } },
   editHabit: e => habitForm(e.id), addHabit: () => habitForm(),
@@ -2751,6 +2797,12 @@ const A = {
     runOpen(id);
   },
   runBreak: () => { $('#toast').hidden = true; runOpen(null, true, 10); },
+  breathStart: () => breathOpen(),
+  breathLater: () => { breathSnooze = true; closeSheet(); setTimeout(askMorning, 250); },
+  breathClose: () => { breathStop(); render(); },
+  breathToggle: () => { if (Br.running) { clearInterval(Br.tick); Br.running = false; } else { Br.endAt = Date.now() + Br.left * 1000; Br.running = true; clearInterval(Br.tick); Br.tick = setInterval(breathTick, 100); } breathRender(); },
+  breathDone: () => { const a = D().assist; (a.breathLog = a.breathLog || {})[TODAY()] = new Date().toISOString(); Store.save(); breathStop(); render(); celebrate(); setTimeout(askMorning, 600); },
+  breathSet: e => { const a = D().assist; if (e.k === 'on') a.breathMorning = e.v === '1'; else a.breathMin = +e.v; Store.save(); render(); },
   visStart: () => visOpen(),
   visLater: () => { visualSnooze = true; closeSheet(); setTimeout(askMorning, 250); },
   visClose: () => { visStop(); render(); },
