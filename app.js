@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.13-plan-screen'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.14-wins'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -147,6 +147,7 @@ const visionName = id => (D().visions.find(v => v.id === id) || {}).title;
 /* ---------- Journal: thoughts (shared with the daily note), a photo of the day and wins ---------- */
 const jEntry = d => { const e = D().journal[d] || {}; return { photo: e.photo || '', wins: e.wins || [] }; };
 const jSet = d => (D().journal[d] = Object.assign({ photo: '', wins: [] }, D().journal[d]));
+const allWins = () => Object.keys(D().journal).map(d => [d, jEntry(d).wins]).filter(x => x[1].length).sort((a, b) => a[0] < b[0] ? 1 : -1);
 const journalDays = () => [...new Set([...Object.keys(D().notes).filter(k => (D().notes[k] || '').trim()), ...Object.keys(D().journal).filter(k => { const e = jEntry(k); return e.photo || e.wins.length; })])].sort().reverse();
 function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in local storage and cloud sync
   const r = new FileReader();
@@ -157,7 +158,7 @@ function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in lo
   }; im.src = r.result; };
   r.readAsDataURL(file);
 }
-const MORE_TABS = ['week', 'journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
+const MORE_TABS = ['week', 'wins', 'journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
 const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', upDay: TODAY(), up3: TODAY(), upWeek: TODAY(), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', allMode: 'list', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
 try { if (D().assist && D().assist.homeTab === 'map') state.tab = 'map'; } catch (e) {}
 state.mode = (() => { try { const m = localStorage.getItem('doit-mode'); if (m === 'plan' || m === 'do') return m; } catch (e) {} return window.matchMedia && matchMedia('(max-width: 700px)').matches ? 'do' : 'plan'; })();
@@ -458,7 +459,7 @@ function energyHelp(v) {
     flood: ['🌊 הצפה', ['עוצרים הכל לדקה. נשימה איטית: שאיפה 4, נשיפה 6.', 'פורקים הכל לדף, בלי לארגן (הכפתור 💭).', 'מציגים רק פעולה אחת. השאר מחכות.'],
       [b('runBreakMin', '🫁 דקה של נשימה', 'data-m="1" data-l="🫁 נושמים לאט"'), b('capture', '💭 לפרוק הכל לדף'), easy ? b('runStart', '◀ פעולה אחת: ' + esc(easy.title), `data-id="${easy.id}"`) : '']],
     judge: ['🪞 שיפוטיות', ['"' + REMINDERS[1] + '"', 'הקול הפנימי הזה לא מדד של האמת. משווים רק לעצמך של אתמול.', 'כתוב הצלחה אחת קטנה, ואז שתי דקות בלבד על פעולה קלה, בלי חובה לסיים.'],
-      [b('goTab', '🏆 לכתוב הצלחה קטנה', 'data-t="journal"'), easy ? b('run2', '⏱ שתי דקות על: ' + esc(easy.title), `data-id="${easy.id}"`) : '']]
+      [b('goTab', '🏆 לכתוב הצלחה קטנה', 'data-t="wins"'), easy ? b('run2', '⏱ שתי דקות על: ' + esc(easy.title), `data-id="${easy.id}"`) : '']]
   }[v];
   if (!M) return;
   sheet(`<h1>${M[0]}</h1>${M[1].map(x => `<p style="margin:6px 0">• ${x}</p>`).join('')}<div class="grid2" style="grid-template-columns:1fr">${M[2].join('')}</div><div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`);
@@ -1941,6 +1942,7 @@ const views = {
     const item0 = (t, icon, title, sub) => `<div class="card row" data-act="goTab" data-t="${t}"><span style="font-size:26px">${icon}</span><div class="grow"><div class="t"><b>${title}</b></div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
     const item = (t, ...a) => featOn(t) ? item0(t, ...a) : '';
     return `<div class="top"><div class="brand">${logoMark(40)}<h1>Do It</h1></div></div>
+      ${item0('wins', '🏆', 'ההצלחות שלי', allWins().reduce((n, x) => n + x[1].length, 0) + ' הצלחות')}
       ${['journal', 'rhythm', 'week', 'dayrewards'].some(featOn) ? '<h2>יומי</h2>' : ''}
       ${item('journal', '📓', 'יומן', `${journalDays().length} ימים עם רישום`)}
       ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
@@ -1964,6 +1966,12 @@ const views = {
       <div class="card row"><div class="grow"><div class="t">גרסה ${APP_VERSION}</div><div class="sub">אם נראה שהאפליקציה לא מעודכנת, לחץ כדי לנקות את המטמון ולטעון מחדש</div></div><button class="iconbtn" data-act="refreshApp">🔄 רענון</button></div>
       </div>` : ''}
       <div class="card row" data-act="account"><span style="font-size:26px">☁️</span><div class="grow"><div class="t"><b>כניסה וסנכרון</b></div><div class="meta">${Cloud.user ? esc(Cloud.user.email) : 'לא מחובר'}</div></div>${chev('l')}</div>`;
+  },
+  wins() {
+    const all = allWins(), total = all.reduce((n, x) => n + x[1].length, 0), T = TODAY();
+    return `<div class="tdy tdyp"><header class="tdy-head"><div><div class="tdy-date">${total ? total + ' הצלחות עד היום' : 'כל דבר קטן נחשב'}</div><h1>ההצלחות שלי</h1></div></header>
+      <form id="winForm" class="row" style="margin-bottom:18px;gap:8px"><input id="winText" placeholder="מה הצלחתי היום? גם דבר קטן" autocomplete="off" autofocus><button class="btn">הוסף</button></form>
+      ${all.map(([d, ws]) => `<div class="tdy-cap tdy-next">${d === T ? 'היום' : longDate(d)}</div><div class="tdy-list">${ws.map(w => `<div class="tdy-row"><span aria-hidden="true">🏆</span><div class="grow">${esc(w.text)}</div><button class="tdy-acct" style="width:34px;height:34px" data-act="winDel" data-d="${d}" data-id="${w.id}" aria-label="מחק">✕</button></div>`).join('')}</div>`).join('') || '<div class="empty">עוד אין הצלחות. כתוב את הראשונה, בלי להשוות לאף אחד.</div>'}</div>`;
   },
   journal() {
     const d = state.jDate, J = jEntry(d), note = D().notes[d] || '', T = TODAY();
@@ -2125,7 +2133,7 @@ function render() {
   const wf = $('#winForm');
   if (wf) wf.onsubmit = e => {
     e.preventDefault(); const txt = $('#winText').value.trim(); if (!txt) return;
-    jSet(state.jDate).wins.push({ id: uid(), text: txt });
+    jSet(state.tab === 'wins' ? TODAY() : state.jDate).wins.push({ id: uid(), text: txt });
     e.target.reset(); Store.save(); render(); celebrate(); $('#winText').focus();
   };
   const ph = $('#jphoto');
@@ -2659,8 +2667,9 @@ const A = {
   jOpen: e => { state.jDate = e.d; render(); window.scrollTo(0, 0); },
   jPhotoPick: () => $('#jphoto').click(),
   jPhotoDel: () => { jSet(state.jDate).photo = ''; Store.save(); render(); },
+  winDel: e => { const J = jSet(e.d); J.wins = J.wins.filter(w => w.id !== e.id); Store.save(); render(); },
   jWinDel: e => { const J = jSet(state.jDate); J.wins = J.wins.filter(w => w.id !== e.id); Store.save(); render(); },
-  goTab: e => { state.pmIsle = null; state.tab = e.t; state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
+  goTab: e => { closeSheet(); state.pmIsle = null; state.tab = e.t; state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
   addProject: () => projectForm(),
   openProject: e => { state.openProject = e.id; render(); window.scrollTo(0, 0); },
   backProjects: () => { state.openProject = null; state.openJob = null; render(); },
