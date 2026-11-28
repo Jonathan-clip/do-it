@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.5-calm-more'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.6-forms'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -420,7 +420,7 @@ function ownerOpts(sel) { // "belongs to": no project, or a project
   return opt('', 'ללא פרויקט') + D().projects.map(p => opt('p:' + p.id, '📁 ' + esc(p.title))).join('') + '<option value="__new__">＋ פרויקט חדש...</option>';
 }
 const projCard = t => '<div class="ucard mx" data-task="' + t.id + '" data-act="taskMenu" data-id="' + t.id + '"><div class="t">' + esc(t.title) + '</div><div class="meta">' + (t.date ? '<span>' + (t.date === TODAY() ? 'היום' : shortDate(t.date)) + '</span>' : '') + '</div></div>';
-const allSeg = () => '<div class="seg"><button class="' + (state.allMode === 'list' ? 'on' : '') + '" data-act="allMode" data-m="list">📋 רשימה</button><button class="' + (state.allMode === 'projects' ? 'on' : '') + '" data-act="allMode" data-m="projects">📁 לפי פרויקטים</button><button class="' + (state.allMode === 'matrix' ? 'on' : '') + '" data-act="allMode" data-m="matrix">🧭 לפי עדיפות</button><button class="' + (state.allMode === 'done' ? 'on' : '') + '" data-act="allMode" data-m="done">✅ בוצע</button></div>';
+const allSeg = () => '<div class="seg"><button class="' + (state.allMode === 'list' ? 'on' : '') + '" data-act="allMode" data-m="list">📋 רשימה</button><button class="' + (state.allMode === 'projects' ? 'on' : '') + '" data-act="allMode" data-m="projects">📁 לפי פרויקטים</button>' + (featOn('tasksMatrix') ? '<button class="' + (state.allMode === 'matrix' ? 'on' : '') + '" data-act="allMode" data-m="matrix">🧭 לפי עדיפות</button>' : '') + '<button class="' + (state.allMode === 'done' ? 'on' : '') + '" data-act="allMode" data-m="done">✅ בוצע</button></div>';
 function projectsBoard() { // "כל הפעולות" grouped by project: compact rows, drag an action onto a row to assign it
   const open = D().tasks.filter(t => !t.done), cap = 8, po = state.projOpen = state.projOpen || {};
   const isOpen = id => po[id] === undefined ? id === 'none' : po[id];
@@ -1688,6 +1688,10 @@ const FEATURES = [ // key, icon, title, what it is
   ['assistant', '🧠', 'עוזר התכנון שלי', 'שיחה שעוזרת לסדר את היום'],
   ['vision', '🌟', 'חזון', 'תמונות ומשפטים על העתיד']
 ];
+const TASKF = [ // the "all actions" screen
+  ['tasksMatrix', '🧭', 'תצוגת עדיפויות', 'התצוגה "לפי עדיפות" (מטריצת אייזנהאואר)'],
+  ['taskFilters', '🔎', 'סינון לפי עדיפות וקושי', 'שורות הסינון מעל הרשימה']
+];
 const MAPF = [['mapTools', '🧭', 'כלי סקירה', 'סקירה שבועית וחודשית, עומס וכוונון שבוע']]; // the map screen
 const UPF = [ // the "upcoming" screen
   ['upFilter', '🧭', 'סינון לפי עדיפות', 'שורת הסינון מעל הלוח'],
@@ -1703,7 +1707,7 @@ const DAYF = [ // the Today screen
   ['org', '🗂', 'ארגון יומי', 'כרטיס "ארגון" ברשימת היום'],
   ['dayextras', '🧰', 'כלים נוספים', 'הדפסה, "מה מעסיק אותי", תזכורת ו"הזנה מרוכזת"']
 ];
-const FEAT_DEF = { upFilter: 0, upPrint: 0, upHint: 0, mapTools: 0, viewMonth: 0, viewAll: 0, carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
+const FEAT_DEF = { tasksMatrix: 0, taskFilters: 0, upFilter: 0, upPrint: 0, upHint: 0, mapTools: 0, viewMonth: 0, viewAll: 0, carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
 const featOn = k => { const f = (D().assist || {}).features; return k in FEAT_DEF ? (f && k in f ? !!f[k] : !!FEAT_DEF[k]) : true; }; // tasks, projects, map, upcoming: always on
 const featCount = k => ({ habits: () => D().habits.length, goals: () => D().goals.length, lists: () => D().lists.length, journal: () => journalDays().length, rhythm: () => D().rhythm.length, dayrewards: () => D().dayRewards.length, assistant: () => D().topics.length, vision: () => D().visions.length }[k] || (() => 0))();
 function applyFeatures() {
@@ -1713,6 +1717,7 @@ function applyFeatures() {
 function featSheet() {
   sheet('<h1>🎛 ניהול תכונות</h1><div class="sub" style="margin-bottom:8px">מה שכבוי מוסתר מהתפריטים ומהמסכים, ושום נתון לא נמחק. אפשר להדליק בכל רגע.</div>'
     + FEATURES.map(([k, ic, t, d]) => { const on = featOn(k), n = featCount(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + (n ? ' · ' + n + ' פריטים' : '') + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
+    + '<h2>בכל הפעולות</h2>' + TASKF.map(([k, ic, t, d]) => { const on = featOn(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
     + '<h2>במפה</h2>' + MAPF.map(([k, ic, t, d]) => { const on = featOn(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
     + '<h2>ב"בקרוב"</h2>' + UPF.map(([k, ic, t, d]) => { const on = featOn(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
     + '<h2>במסך "היום"</h2>' + DAYF.map(([k, ic, t, d]) => { const on = featOn(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
@@ -1819,16 +1824,16 @@ const views = {
     if (f === 'brainless') list = list.filter(t => t.brainless && !t.done);
     list.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || b.priority - a.priority);
     const F = [['open', 'פתוחות'], ['brainless', '⚡ Brainless'], ['nodate', 'ללא תאריך'], ['all', 'הכל']];
-    return `<div class="top"><h1>כל הפעולות</h1><div class="sw"><button class="iconbtn" data-act="addBulk">📋 הזנה מרוכזת</button><button class="iconbtn" data-act="printSel">🖨 נבחרות</button></div></div>
+    return `<div class="top"><h1>כל הפעולות</h1><div class="sw">${featOn('dayextras') ? '<button class="iconbtn" data-act="addBulk">📋 הזנה מרוכזת</button><button class="iconbtn" data-act="printSel">🖨 נבחרות</button>' : ''}</div></div>
       ${allSeg()}<div class="seg">${F.map(([k, l]) => `<button class="${f === k ? 'on' : ''}" data-act="filter" data-f="${k}">${l}</button>`).join('')}</div>
-      ${filterBar()}
+      ${featOn('taskFilters') ? filterBar() : ''}
       <div class="sub" style="margin:6px 0">${list.length} פעולות. הלוח עם הגרירה נמצא בטאב "בקרוב".</div>
       ${list.map(t => taskRow(t, true)).join('') || '<div class="empty">אין פעולות שמתאימות לסינון</div>'}
       <button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>`;
   },
   habits() {
     const d = TODAY(), last7 = Array.from({ length: 7 }, (_, i) => addDays(d, i - 6));
-    return `<div class="top"><h1>הרגלים</h1><button class="iconbtn" data-act="addHabitBulk">📋 הזנה מרוכזת</button></div>
+    return `<div class="top"><h1>הרגלים</h1>${featOn('dayextras') ? '<button class="iconbtn" data-act="addHabitBulk">📋 הזנה מרוכזת</button>' : ''}</div>
       ${D().habits.map(h => {
         const v = h.visionId ? visionName(h.visionId) : '';
         return `<div class="card"><div class="row"><div class="grow" data-act="editHabit" data-id="${h.id}"><div class="t"><b>${esc(h.title)}</b></div>${h.task ? `<div class="sub">הפעולה: ${esc(h.task)}${h.mins ? ` · ${h.mins} ד׳` : ''}${h.energy ? ' ' + stars(h.energy) : ''}</div>` : ''}
@@ -2122,11 +2127,11 @@ function taskForm(id, presetDate, presetProject, preset) {
   <form id="f">
    <label>מה לעשות (פעולה אחת, ברורה ומוחשית)</label><input name="title" required value="${esc(t.title)}" autofocus autocomplete="off">
    <div id="clHint" class="clarity">${id ? '' : clarityHTML('', true)}</div>
-   <label>תיאור הפעולה (אופציונלי, באריכות)</label><textarea name="notes" rows="2" placeholder="פרטים: מה בדיוק, איפה, למי, מה צריך להיות מוכן">${esc(t.notes || '')}</textarea>
    <label>מתי?</label>
    <div class="opt" id="dateChips" style="margin-bottom:6px">${[['היום', TODAY()], ['מחר', addDays(TODAY(), 1)], ['ללא תאריך', '']].map(([l, v]) => `<button type="button" class="${(t.date || '') === v ? 'on' : ''}" onclick="const f=this.closest('form');f.elements.date.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div>
+   <details class="moreopts" ${id || t.repeat || t.notes || (t.subs || []).length ? 'open' : ''}><summary>אפשרויות נוספות</summary>
+   <label>תיאור הפעולה (אופציונלי, באריכות)</label><textarea name="notes" rows="2" placeholder="פרטים: מה בדיוק, איפה, למי, מה צריך להיות מוכן">${esc(t.notes || '')}</textarea>
    <label>תתי-פעולות (אופציונלי, שורה לכל תת-פעולה)</label><textarea name="subs" rows="2" placeholder="צעדים קטנים בתוך הפעולה">${esc((t.subs || []).map(x => x.title).join('\n'))}</textarea>
-   <details class="moreopts" ${id || t.repeat ? 'open' : ''}><summary>אפשרויות נוספות</summary>
    <label>תאריך אחר</label><input type="date" name="date" value="${t.date || ''}" oninput="document.querySelectorAll('#dateChips button').forEach(b=>b.classList.remove('on'))">
    <label>חוזרת? (בסיום נוצרת הפעולה הבאה)</label><select name="repeat">${REPEATS.map(([v, l]) => `<option value="${v}" ${(t.repeat || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
    <label>כמה אנרגיה זה דורש ממך? (1 = קל, 5 = הכי מאמץ)</label>
@@ -2137,7 +2142,7 @@ function taskForm(id, presetDate, presetProject, preset) {
    ${prioFields(t)}
    <label>פרויקט (אופציונלי)</label><select name="owner">${ownerOpts(t.projectId ? 'p:' + t.projectId : '')}</select>
    <label class="row" style="color:var(--ink)"><input type="checkbox" name="brainless" style="width:auto" ${t.brainless ? 'checked' : ''}> ⚡ Brainless (פעולה פשוטה שאפשר להעיף ברגע)</label>
-   <label class="row" style="color:var(--ink)"><input type="checkbox" name="print" style="width:auto" ${t.print ? 'checked' : ''}> סמן להדפסה</label>
+   ${featOn('dayextras') ? `<label class="row" style="color:var(--ink)"><input type="checkbox" name="print" style="width:auto" ${t.print ? 'checked' : ''}> סמן להדפסה</label>` : ''}
    </details>
    <div class="actions">${id ? '<button type="button" class="btn danger" data-act="delTask" data-id="' + id + '">מחק</button>' : ''}<button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div>
   </form>`);
