@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.1-day-features'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.2-day-features'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -1671,7 +1671,7 @@ function hxWrap(html, d) {
   html = html.replace('<h1>היום</h1>', '<h1>' + greet() + '</h1>');
   const link = '<button class="lnk hxlink" data-act="goTab" data-t="map">🌍 מפת החיים והפרויקטים ' + chev('l') + '</button>';
   const i = html.indexOf('<details class="todaymore"');
-  return i < 0 ? html : html.slice(0, i) + link + html.slice(i);
+  return i < 0 || !featOn('maplink') ? html : html.slice(0, i) + link + html.slice(i);
 }
 document.addEventListener('change', e => { if (e.target && e.target.id === 'dzName') { D().assist.userName = e.target.value.trim(); Store.save(); } });
 
@@ -1690,10 +1690,12 @@ const FEATURES = [ // key, icon, title, what it is
 ];
 const DAYF = [ // the Today screen
   ['hours', '⏱', 'שעות התחלה וסיום', 'הכפתורים "שעות" ו"התחלתי יום" ושורת הסיום המשוער'],
+  ['carry', '⏩', 'העבר מאתמול', 'כפתור "העבר להיום מה שלא בוצע אתמול"'],
+  ['maplink', '🌍', 'קישור למפה', 'הקישור "מפת החיים והפרויקטים" בתחתית "היום"'],
   ['org', '🗂', 'ארגון יומי', 'כרטיס "ארגון" ברשימת היום'],
   ['dayextras', '🧰', 'כלים נוספים', 'הדפסה, "מה מעסיק אותי", תזכורת ו"הזנה מרוכזת"']
 ];
-const FEAT_DEF = { hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
+const FEAT_DEF = { carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
 const featOn = k => { const f = (D().assist || {}).features; return k in FEAT_DEF ? (f && k in f ? !!f[k] : !!FEAT_DEF[k]) : true; }; // tasks, projects, map, upcoming: always on
 const featCount = k => ({ habits: () => D().habits.length, goals: () => D().goals.length, lists: () => D().lists.length, journal: () => journalDays().length, rhythm: () => D().rhythm.length, dayrewards: () => D().dayRewards.length, assistant: () => D().topics.length, vision: () => D().visions.length }[k] || (() => 0))();
 function applyFeatures() {
@@ -1729,7 +1731,7 @@ const views = {
       ${rewardTop ? rewardCard(d) : ''}
       ${energyBar(d)}
       ${hxOn() && d === TODAY() ? hxFocusNote(d) : focusCard(d)}
-      <h2>פעולות</h2>${isToday && yesterdayLeft().length ? '<button class="btn ghost more3" style="margin:0 0 8px" data-act="carryOver">⏩ העבר להיום את מה שלא בוצע אתמול (' + yesterdayLeft().length + ')</button>' : ''}${isToday && featOn('org') && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
+      <h2>פעולות</h2>${isToday && featOn('carry') && yesterdayLeft().length ? '<button class="btn ghost more3" style="margin:0 0 8px" data-act="carryOver">⏩ העבר להיום את מה שלא בוצע אתמול (' + yesterdayLeft().length + ')</button>' : ''}${isToday && featOn('org') && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
       ${doneSection(d, ts, hs)}
       <details class="todaymore" id="todayMore" ${state.moreOpen ? 'open' : ''}><summary>עוד להיום${hAct ? ` · ${hAct} הרגלים` : ''}</summary>
        ${featOn('dayextras') ? `<div class="opt" style="margin:6px 0"><button data-act="asstToday">💬 מה מעסיק אותי היום?</button></div>` : ''}
