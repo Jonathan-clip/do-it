@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.4-map'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.5-calm-more'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -1690,6 +1690,9 @@ const FEATURES = [ // key, icon, title, what it is
 ];
 const MAPF = [['mapTools', '🧭', 'כלי סקירה', 'סקירה שבועית וחודשית, עומס וכוונון שבוע']]; // the map screen
 const UPF = [ // the "upcoming" screen
+  ['upFilter', '🧭', 'סינון לפי עדיפות', 'שורת הסינון מעל הלוח'],
+  ['upPrint', '🖨', 'הדפסת שבוע', 'כפתור ההדפסה בראש המסך'],
+  ['upHint', '💡', 'הסבר על גרירה', 'שורת ההסבר בתחתית המסך'],
   ['viewMonth', '🗓', 'תצוגת חודש', 'לוח חודש מלא'],
   ['viewAll', '📜', 'תצוגת כל הימים', 'רשימה ארוכה של ימים קדימה']
 ];
@@ -1700,7 +1703,7 @@ const DAYF = [ // the Today screen
   ['org', '🗂', 'ארגון יומי', 'כרטיס "ארגון" ברשימת היום'],
   ['dayextras', '🧰', 'כלים נוספים', 'הדפסה, "מה מעסיק אותי", תזכורת ו"הזנה מרוכזת"']
 ];
-const FEAT_DEF = { mapTools: 0, viewMonth: 0, viewAll: 0, carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
+const FEAT_DEF = { upFilter: 0, upPrint: 0, upHint: 0, mapTools: 0, viewMonth: 0, viewAll: 0, carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
 const featOn = k => { const f = (D().assist || {}).features; return k in FEAT_DEF ? (f && k in f ? !!f[k] : !!FEAT_DEF[k]) : true; }; // tasks, projects, map, upcoming: always on
 const featCount = k => ({ habits: () => D().habits.length, goals: () => D().goals.length, lists: () => D().lists.length, journal: () => journalDays().length, rhythm: () => D().rhythm.length, dayrewards: () => D().dayRewards.length, assistant: () => D().topics.length, vision: () => D().visions.length }[k] || (() => 0))();
 function applyFeatures() {
@@ -1797,12 +1800,12 @@ const views = {
         <section class="ucol umore"><button class="uadd" data-act="upMore">＋ עוד שבועיים</button></section>
       </div>`;
     }
-    return `<div class="top"><h1>בקרוב</h1><div class="sw">${['week', 'three', 'day'].includes(mode) ? '' : monthSel}<button class="iconbtn" data-act="printWeek">🖨 שבוע</button></div></div>
+    return `<div class="top"><h1>בקרוב</h1><div class="sw">${['week', 'three', 'day'].includes(mode) ? '' : monthSel}${featOn('upPrint') ? '<button class="iconbtn" data-act="printWeek">🖨 שבוע</button>' : ''}</div></div>
       <div class="seg"><button class="segtoday" data-act="upToday">היום</button>${[['day', 'יום'], ['three', '3 ימים'], ['week', 'שבוע'], ...(featOn('viewMonth') ? [['month', 'חודש']] : []), ...(featOn('viewAll') ? [['days', 'כל הימים']] : [])].map(([k, l]) => `<button class="${mode === k ? 'on' : ''}" data-act="upMode" data-m="${k}">${l}</button>`).join('')}</div>
-      ${filterBar()}
+      ${featOn('upFilter') ? filterBar() : ''}
       ${mode === 'month' ? '' : '<div class="opt" style="margin:6px 0"><button data-act="upJump" data-c="none">📥 ללא תאריך (' + D().tasks.filter(t => !t.date && !t.done && filterOk(t)).length + ')</button></div>'}
       ${nav}${body}
-      <div class="sub" style="margin-top:6px">גרור פעולה (במגע: לחיצה ארוכה) כדי להעביר אותה ליום אחר, או למאגר "ללא תאריך".</div>`;
+      ${featOn('upHint') ? '<div class="sub" style="margin-top:6px">גרור פעולה (במגע: לחיצה ארוכה) כדי להעביר אותה ליום אחר, או למאגר "ללא תאריך".</div>' : ''}`;
   },
   tasks() {
     if (state.allMode === 'projects') return projectsBoard();
@@ -1916,13 +1919,14 @@ const views = {
       ${item('goals', '🎯', 'יעדים ותגמולים', `${activeG} פעילים${wait ? ` · 🎁 ${wait} ממתינים` : ''}`)}
       ${item('vision', '🌟', 'חזון', `${D().visions.length} פריטים`)}
       ${item('lists', '📝', 'רשימות', `${D().lists.length} רשימות`)}
-      <h2>הגדרות</h2>
+      <div class="card row" data-act="moreSettings"><span style="font-size:24px">⚙️</span><div class="grow"><div class="t"><b>הגדרות</b></div><div class="meta">הודעות, נשימות, עיצוב, תכונות וגרסה</div></div><span style="display:inline-block;transform:rotate(${state.moreSet ? -90 : 0}deg);transition:transform .2s">${chev('l')}</span></div>
+      ${state.moreSet ? `<div class="moreset">
       <div class="card"><div class="t"><b>🔔 רמת הודעות</b></div><select id="notifySel" style="margin-top:6px">${NOTIFY.map(([v, l]) => '<option value="' + v + '" ' + (notifyLevel() === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select><div class="sub" id="notifyDesc" style="margin-top:6px">${(NOTIFY.find(x => x[0] === notifyLevel()) || NOTIFY[1])[2]}</div></div>
       <div class="card row" data-act="featSheet"><span style="font-size:24px">🎛</span><div class="grow"><div class="t"><b>ניהול תכונות</b></div><div class="meta">מה מוצג ומה מוסתר באפליקציה</div></div>${chev('l')}</div>
       ${breathSettingsCard()}
       ${dzCard()}
       <div class="card row"><div class="grow"><div class="t">גרסה ${APP_VERSION}</div><div class="sub">אם נראה שהאפליקציה לא מעודכנת, לחץ כדי לנקות את המטמון ולטעון מחדש</div></div><button class="iconbtn" data-act="refreshApp">🔄 רענון</button></div>
-      <h2>חשבון</h2>
+      </div>` : ''}
       <div class="card row" data-act="account"><span style="font-size:26px">☁️</span><div class="grow"><div class="t"><b>כניסה וסנכרון</b></div><div class="meta">${Cloud.user ? esc(Cloud.user.email) : 'לא מחובר'}</div></div>${chev('l')}</div>`;
   },
   journal() {
@@ -2654,6 +2658,7 @@ const A = {
   homeIsle: e => { state.tab = 'map'; state.pmIsle = e.id; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
   homeProj: e => { state.tab = 'map'; state.pmOpen = e.id; state.pmReview = null; render(); window.scrollTo(0, 0); },
   featSheet: () => featSheet(),
+  moreSettings: () => { state.moreSet = !state.moreSet; render(); },
   featToggle: e => { const a = D().assist; a.features = a.features || {}; a.features[e.k] = !featOn(e.k); Store.save(); applyFeatures(); featSheet(); render(); },
   pmNoop: () => {},
   pmOpen: e => { state.pmOpen = e.id; render(); window.scrollTo(0, 0); },
