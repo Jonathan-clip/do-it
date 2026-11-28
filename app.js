@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.8-pick-project'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.9-no-note'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -1710,10 +1710,11 @@ const DAYF = [ // the Today screen
   ['hours', '⏱', 'שעות התחלה וסיום', 'הכפתורים "שעות" ו"התחלתי יום" ושורת הסיום המשוער'],
   ['carry', '⏩', 'העבר מאתמול', 'כפתור "העבר להיום מה שלא בוצע אתמול"'],
   ['maplink', '🌍', 'קישור למפה', 'הקישור "מפת החיים והפרויקטים" בתחתית "היום"'],
+  ['dayNote', '📝', 'פתק יומי', 'שדה כתיבה חופשי בתחתית "היום"'],
   ['org', '🗂', 'ארגון יומי', 'כרטיס "ארגון" ברשימת היום'],
   ['dayextras', '🧰', 'כלים נוספים', 'הדפסה, "מה מעסיק אותי", תזכורת ו"הזנה מרוכזת"']
 ];
-const FEAT_DEF = { morningVisual: 0, morningReview: 0, tasksMatrix: 0, taskFilters: 0, upFilter: 0, upPrint: 0, upHint: 0, mapTools: 0, viewMonth: 0, viewAll: 0, carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
+const FEAT_DEF = { dayNote: 0, morningVisual: 0, morningReview: 0, tasksMatrix: 0, taskFilters: 0, upFilter: 0, upPrint: 0, upHint: 0, mapTools: 0, viewMonth: 0, viewAll: 0, carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
 const featOn = k => { const f = (D().assist || {}).features; return k in FEAT_DEF ? (f && k in f ? !!f[k] : !!FEAT_DEF[k]) : true; }; // tasks, projects, map, upcoming: always on
 const featCount = k => ({ habits: () => D().habits.length, goals: () => D().goals.length, lists: () => D().lists.length, journal: () => journalDays().length, rhythm: () => D().rhythm.length, dayrewards: () => D().dayRewards.length, assistant: () => D().topics.length, vision: () => D().visions.length }[k] || (() => 0))();
 function applyFeatures() {
@@ -1761,7 +1762,7 @@ const views = {
        ${featOn('dayextras') ? `<div class="remind" data-act="nextReminder" title="לחץ להחלפה">💬 ${esc(reminder())}</div>` : ''}
        ${featOn('dayextras') ? `<div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל פעולות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>` : ''}
        ${hs.some(h => !habitDone(h, d)) ? `<h2>הרגלים</h2>${hs.filter(h => !habitDone(h, d)).map(h => habitRow(h, d)).join('')}` : ''}
-       <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>
+       ${featOn('dayNote') ? `<h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>` : ''}
       </details>
       <button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>`;
     return hxWrap(html, d);
