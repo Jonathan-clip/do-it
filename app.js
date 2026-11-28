@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.2-day-features'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.3-upcoming'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -158,7 +158,7 @@ function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in lo
   r.readAsDataURL(file);
 }
 const MORE_TABS = ['week', 'journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
-const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', up3: TODAY(), upWeek: TODAY(), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', allMode: 'list', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
+const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', upDay: TODAY(), up3: TODAY(), upWeek: TODAY(), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', allMode: 'list', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
 try { if (D().assist && D().assist.homeTab === 'map') state.tab = 'map'; } catch (e) {}
 state.mode = (() => { try { const m = localStorage.getItem('doit-mode'); if (m === 'plan' || m === 'do') return m; } catch (e) {} return window.matchMedia && matchMedia('(max-width: 700px)').matches ? 'do' : 'plan'; })();
 // Weekly vision data lives in D().weeks[<Sunday date>]; created lazily on first edit.
@@ -1688,6 +1688,10 @@ const FEATURES = [ // key, icon, title, what it is
   ['assistant', '🧠', 'עוזר התכנון שלי', 'שיחה שעוזרת לסדר את היום'],
   ['vision', '🌟', 'חזון', 'תמונות ומשפטים על העתיד']
 ];
+const UPF = [ // the "upcoming" screen
+  ['viewMonth', '🗓', 'תצוגת חודש', 'לוח חודש מלא'],
+  ['viewAll', '📜', 'תצוגת כל הימים', 'רשימה ארוכה של ימים קדימה']
+];
 const DAYF = [ // the Today screen
   ['hours', '⏱', 'שעות התחלה וסיום', 'הכפתורים "שעות" ו"התחלתי יום" ושורת הסיום המשוער'],
   ['carry', '⏩', 'העבר מאתמול', 'כפתור "העבר להיום מה שלא בוצע אתמול"'],
@@ -1695,7 +1699,7 @@ const DAYF = [ // the Today screen
   ['org', '🗂', 'ארגון יומי', 'כרטיס "ארגון" ברשימת היום'],
   ['dayextras', '🧰', 'כלים נוספים', 'הדפסה, "מה מעסיק אותי", תזכורת ו"הזנה מרוכזת"']
 ];
-const FEAT_DEF = { carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
+const FEAT_DEF = { viewMonth: 0, viewAll: 0, carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
 const featOn = k => { const f = (D().assist || {}).features; return k in FEAT_DEF ? (f && k in f ? !!f[k] : !!FEAT_DEF[k]) : true; }; // tasks, projects, map, upcoming: always on
 const featCount = k => ({ habits: () => D().habits.length, goals: () => D().goals.length, lists: () => D().lists.length, journal: () => journalDays().length, rhythm: () => D().rhythm.length, dayrewards: () => D().dayRewards.length, assistant: () => D().topics.length, vision: () => D().visions.length }[k] || (() => 0))();
 function applyFeatures() {
@@ -1705,6 +1709,7 @@ function applyFeatures() {
 function featSheet() {
   sheet('<h1>🎛 ניהול תכונות</h1><div class="sub" style="margin-bottom:8px">מה שכבוי מוסתר מהתפריטים ומהמסכים, ושום נתון לא נמחק. אפשר להדליק בכל רגע.</div>'
     + FEATURES.map(([k, ic, t, d]) => { const on = featOn(k), n = featCount(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + (n ? ' · ' + n + ' פריטים' : '') + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
+    + '<h2>ב"בקרוב"</h2>' + UPF.map(([k, ic, t, d]) => { const on = featOn(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
     + '<h2>במסך "היום"</h2>' + DAYF.map(([k, ic, t, d]) => { const on = featOn(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
     + '<div class="actions"><button class="btn" data-act="close">סגור</button></div>');
 }
@@ -1755,8 +1760,13 @@ const views = {
     if (!ymList.includes(curYM)) { ymList.push(curYM); ymList.sort(); }
     const monthSel = `<select id="upMonth" style="width:auto">${ymList.map(v => { const [y, m] = v.split('-').map(Number); return `<option value="${v}" ${v === curYM ? 'selected' : ''}>${MONTHS[m - 1]} ${y}</option>`; }).join('')}</select>`;
     const navRow = lbl => `<div class="row" style="margin:6px 0 10px"><button class="iconbtn" data-act="upNav" data-n="-1" aria-label="הקודם">${chev('r')}</button><b class="grow" style="text-align:center">${lbl}</b><button class="iconbtn" data-act="upNav" data-n="1" aria-label="הבא">${chev('l')}</button></div>`;
+    if ((mode === 'month' && !featOn('viewMonth')) || (mode === 'days' && !featOn('viewAll'))) { state.upMode = 'three'; return views.upcoming(); }
     let nav = '', body = '';
-    if (mode === 'week') {
+    if (mode === 'day') {
+      const dd = state.upDay;
+      nav = navRow(`${shortDate(dd)} · ${label(dd)}`);
+      body = `<div class="uboard day" id="uboard">${dayCol(dd)}</div>`;
+    } else if (mode === 'week') {
       const ws = state.upWeek;
       nav = navRow(`${shortDate(ws)} – ${shortDate(addDays(ws, 6))}`);
       body = `<div class="uboard week" id="uboard">${poolCol()}${Array.from({ length: 7 }, (_, i) => dayCol(addDays(ws, i))).join('')}</div>`;
@@ -1785,8 +1795,8 @@ const views = {
         <section class="ucol umore"><button class="uadd" data-act="upMore">＋ עוד שבועיים</button></section>
       </div>`;
     }
-    return `<div class="top"><h1>בקרוב</h1><div class="sw">${mode === 'week' || mode === 'three' ? '' : monthSel}<button class="iconbtn" data-act="printWeek">🖨 שבוע</button></div></div>
-      <div class="seg"><button class="segtoday" data-act="upToday">היום</button>${[['three', '3 ימים'], ['week', 'שבוע'], ['month', 'חודש'], ['days', 'כל הימים']].map(([k, l]) => `<button class="${mode === k ? 'on' : ''}" data-act="upMode" data-m="${k}">${l}</button>`).join('')}</div>
+    return `<div class="top"><h1>בקרוב</h1><div class="sw">${['week', 'three', 'day'].includes(mode) ? '' : monthSel}<button class="iconbtn" data-act="printWeek">🖨 שבוע</button></div></div>
+      <div class="seg"><button class="segtoday" data-act="upToday">היום</button>${[['day', 'יום'], ['three', '3 ימים'], ['week', 'שבוע'], ...(featOn('viewMonth') ? [['month', 'חודש']] : []), ...(featOn('viewAll') ? [['days', 'כל הימים']] : [])].map(([k, l]) => `<button class="${mode === k ? 'on' : ''}" data-act="upMode" data-m="${k}">${l}</button>`).join('')}</div>
       ${filterBar()}
       ${mode === 'month' ? '' : '<div class="opt" style="margin:6px 0"><button data-act="upJump" data-c="none">📥 ללא תאריך (' + D().tasks.filter(t => !t.date && !t.done && filterOk(t)).length + ')</button></div>'}
       ${nav}${body}
@@ -2555,7 +2565,7 @@ const A = {
   rescheduleOverdue: () => { const o = overdue(); if (o.length && confirm(`להעביר ${o.length} פעולות באיחור להיום?`)) { o.forEach(t => { t.date = TODAY(); }); Store.save(); render(); } },
   upMore: () => { state.upDays += 14; render(); },
   toggleSubs: e => { const t = findTask(e.id); t.collapsed = !t.collapsed; Store.save(); render(); },
-  upMode: e => { state.upMode = e.m; if (e.m === 'week') state.upWeek = TODAY(); render(); },
+  upMode: e => { state.upMode = e.m; if (e.m === 'week') state.upWeek = TODAY(); if (e.m === 'day') state.upDay = TODAY(); render(); },
   upPick: e => { state.upSel = e.date; render(); },
   upNav: e => {
     const n = +e.n, m = state.upMode;
@@ -2966,7 +2976,7 @@ document.addEventListener('click', ev => {
   const el = ev.target.closest('[data-act]');
   if (el) { const fn = A[el.dataset.act]; if (fn) { ev.preventDefault(); fn({ ...el.dataset }, el); } return; }
   const nav = ev.target.closest('#nav button');
-  if (nav) { state.pmIsle = null; state.tab = nav.dataset.tab; if (state.tab === 'upcoming') state.upWeek = TODAY(); state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); }
+  if (nav) { state.pmIsle = null; state.tab = nav.dataset.tab; if (state.tab === 'upcoming') { state.upWeek = TODAY(); state.upDay = TODAY(); } state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); }
 });
 document.addEventListener('change', ev => {
   if (ev.target.id === 'notifySel') { try { localStorage.setItem('doit-notify', ev.target.value); } catch (e) {} const d = $('#notifyDesc'); if (d) d.textContent = (NOTIFY.find(x => x[0] === ev.target.value) || NOTIFY[1])[2]; return; }
@@ -3184,7 +3194,7 @@ document.addEventListener('click', e => { if (Drag.suppressClick) { e.stopPropag
 document.addEventListener('contextmenu', e => { if (Drag.el && e.target.closest('.ucard')) e.preventDefault(); });
 
 /* ---------- "בקרוב" board: one day per step, with a soft slide (arrows, swipe, mouse drag, trackpad). ---------- */
-const UP_KEY = { three: 'up3', week: 'upWeek', days: 'upStart' };
+const UP_KEY = { day: 'upDay', three: 'up3', week: 'upWeek', days: 'upStart' };
 const upDaysCols = () => [...document.querySelectorAll('#uboard .ucol[data-drop^="20"]')]; // the dated columns only; the "no date" pool stays put
 const upSlot = () => { const c = upDaysCols(); return c.length > 1 ? c[1].getBoundingClientRect().left - c[0].getBoundingClientRect().left : 0; }; // signed distance between two neighbouring days
 const UP_EASE = 'cubic-bezier(.22,.8,.24,1)';
@@ -3199,7 +3209,7 @@ function upShift(n, dx = 0) {
 }
 (() => {
   let g = null, wacc = 0, wlock = 0;
-  const modes = ['three', 'week', 'days'], skip = 'a,button,input,select,textarea,.uadd,.check';
+  const modes = ['day', 'three', 'week', 'days'], skip = 'a,button,input,select,textarea,.uadd,.check';
   document.addEventListener('pointerdown', e => {
     const b = e.target.closest && e.target.closest('#uboard'); if (!b || state.tab !== 'upcoming' || !modes.includes(state.upMode)) return;
     if (e.pointerType === 'mouse' ? (e.button !== 0 || e.target.closest(skip + ',.ucard')) : e.target.closest(skip)) return; // a mouse press on a card starts the card drag instead

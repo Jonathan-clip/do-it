@@ -442,3 +442,7 @@ body.miniRun{--dockb:154px}
 .featsw{border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:999px;padding:7px 14px;font-size:14px;min-width:68px}
 .featsw.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);font-weight:700}
 #nav button[hidden]{display:none}
+
+/* single-day view */
+.uboard.day{overflow-x:visible}
+.uboard.day .ucol{flex:1 0 100%;scroll-snap-align:none}
