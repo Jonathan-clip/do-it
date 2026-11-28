@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.14-wins'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.16-calm-map'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -863,6 +863,25 @@ const quadChips = (id, cur, kind) => '<div class="opt quadopts">' + QUADS.map(q 
 /* ---------- Plan mode / do mode, the next-action suggestion, coming back from a break ---------- */
 const modeSwitch = () => '<div class="opt modesw"><button class="' + (state.mode === 'plan' ? 'on' : '') + '" data-act="setMode" data-m="plan">📋 תכנון</button><button class="' + (state.mode === 'do' ? 'on' : '') + '" data-act="setMode" data-m="do">🎯 ביצוע</button></div>';
 const currentAction = () => { const t = state.doId ? findTask(state.doId) : null; return (t && !t.done && t.date === TODAY()) ? t : nextTask(''); };
+const lineSvg = p => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
+const LI = {
+  '🏆': '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a2 2 0 0 0 2 4M16 6h3a2 2 0 0 1-2 4M12 13v4M9 20h6M10 17h4"/>',
+  '✅': '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
+  '🧠': '<path d="M5 6.5A2.5 2.5 0 0 1 7.5 4H12v16H8.5A3.5 3.5 0 0 1 5 16.5zM19 6.5A2.5 2.5 0 0 0 16.5 4H12v16h3.5a3.5 3.5 0 0 0 3.5-3.5z"/>',
+  '💪': '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.600-7 10-7 10z"/>',
+  '🔁': '<path d="M17 3l3 3-3 3M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3M20 13v2a3 3 0 0 1-3 3H4"/>',
+  '🎯': '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8"/>',
+  '🌟': '<path d="M12 3.500l2.600 5.400 5.900.8-4.300 4.100 1 5.800L12 16.800 6.800 19.600l1-5.800L3.500 9.700l5.900-.8z"/>',
+  '📝': '<path d="M6 4h9l4 4v12H6zM14 4v5h5M9 13h7M9 17h5"/>',
+  '⚙️': '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.500M12 18.500V21M3 12h2.500M18.500 12H21M5.600 5.600l1.800 1.800M16.600 16.600l1.800 1.800M18.400 5.600l-1.800 1.800M7.400 16.600l-1.800 1.800"/>',
+  '☁️': '<path d="M7 18a4 4 0 0 1-.500-7.900A5.500 5.500 0 0 1 17 8.500 4.500 4.500 0 0 1 17 18z"/>',
+  '📓': '<path d="M6 4h12v16H6zM6 8H4M6 12H4M6 16H4M10 8h5"/>',
+  '😌': '<circle cx="12" cy="12" r="8"/><path d="M9 14.500c1.700 1.600 4.300 1.600 6 0M9 10h.01M15 10h.01"/>',
+  '🗓': '<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  '🎁': '<path d="M4 9h16v4H4zM6 13v7h12v-7M12 9v11M12 9S10.500 5 8.500 5 6 7.500 8 9M12 9s1.500-4 3.500-4S18 7.500 16 9"/>',
+  '🎛': '<path d="M5 6h9M18 6h1M5 12h3M12 12h7M5 18h11M20 18h-1"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2" opacity="0"/>'
+};
+const lineIcon = e => LI[e] ? lineSvg(LI[e]) : '<span style="font-size:20px">' + e + '</span>';
 const IC = {
   play: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M17 4.5v15L5 12z"/></svg>',
   check: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -1264,7 +1283,7 @@ function taskRow(t, showDate) {
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${hxMark(t)}${titleP(t)}</div>
-      <div class="meta">${t.start ? `<span class="chip" style="background:var(--info-bg);color:var(--info-ink);font-weight:600" title="עוגן: שעת התחלה קבועה">⚓ ${t.start}</span>` : ''}${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.diff ? '<span class="chip" title="רמת קושי">' + diffLabel(t.diff) + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.start ? `<span class="chip" style="background:var(--info-bg);color:var(--info-ink);font-weight:600" title="עוגן: שעת התחלה קבועה">${IC.anchor}${t.start}</span>` : ''}${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.diff ? '<span class="chip" title="רמת קושי">' + diffLabel(t.diff) + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -1295,7 +1314,7 @@ function upCard(t, showDate) {
   return `<div class="ucard p${t.priority} ${t.done ? 'done' : ''}" data-task="${t.id}"><div class="urow">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${titleP(t)}</div>
-    <div class="meta">${t.start ? `<span class="chip" style="background:var(--info-bg);color:var(--info-ink);font-weight:600" title="עוגן: שעת התחלה קבועה">⚓ ${t.start}</span>` : ''}${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
+    <div class="meta">${t.start ? `<span class="chip" style="background:var(--info-bg);color:var(--info-ink);font-weight:600" title="עוגן: שעת התחלה קבועה">${IC.anchor}${t.start}</span>` : ''}${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
@@ -1399,13 +1418,13 @@ function pmVisible() {
 function pmMap() {
   const S = state.pmStatus || 'live', list = pmVisible(), home = D().assist.homeTab === 'map', live = D().projects.filter(p => ['focus', 'active'].includes(pmStatus(p)));
   const sel = (key, cur, opts, all) => `<select data-pmf="${key}" aria-label="${all}"><option value="">${all}</option>${opts.map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
-  return `<div class="top"><h1>🗺️ מפת הפרויקטים שלי</h1><div class="sw"><button class="iconbtn" data-act="pmHome" aria-label="מסך הבית" title="${home ? 'זה מסך הבית. לחץ לביטול' : 'הפוך למסך הבית'}">${home ? '🏠' : '🏡'}</button><button class="iconbtn" data-act="pmNew" aria-label="פרויקט חדש">＋</button></div></div>
-    <div class="sub" style="margin:-4px 0 12px">לאן אני הולך, ולמה זה חשוב לי</div>
+  const filtActive = !!(state.pmArea || state.pmRange || state.pmPrio || state.pmValue);
+  return `<div class="top"><div><div class="tdy-date">לאן אני הולך, ולמה זה חשוב לי</div><h1>הפרויקטים שלי</h1></div><div class="sw"><button class="iconbtn" data-act="pmHome" aria-label="מסך הבית" title="${home ? 'זה מסך הבית. לחץ לביטול' : 'הפוך למסך הבית'}">${home ? '🏠' : '🏡'}</button><button class="iconbtn" data-act="pmNew" aria-label="פרויקט חדש">＋</button></div></div>
     ${pmAssignBanner()}
     ${document.documentElement.dataset.design === 'spatial' ? `<div class="seg pmviewseg"><button class="${pmWorldOn() ? 'on' : ''}" data-act="pmView" data-v="world">🌍 עולם</button><button class="${pmWorldOn() ? '' : 'on'}" data-act="pmView" data-v="list">📋 רשימה</button></div>` : ''}
     <div class="seg">${[['live', 'פעילים'], ...PM_STATUS.map(x => [x[0], x[1] + ' ' + x[2]]), ['all', 'הכל']].map(([k, l]) => `<button class="${S === k ? 'on' : ''}" data-act="pmStatusF" data-k="${k}">${l}</button>`).join('')}</div>
-    ${pmWorldOn() ? '' : `<div class="pmfilters">${sel('pmArea', state.pmArea || '', pmAreas().map(a => [a.id, a.icon + ' ' + a.name]), 'כל התחומים')}${sel('pmRange', state.pmRange || '', PM_RANGES, 'כל טווח זמן')}<button class="iconbtn" data-act="pmAreasSheet" aria-label="עריכת תחומי חיים" title="תחומי חיים">⚙️</button></div>
-    <div class="pmfilters">${sel('pmValue', state.pmValue || '', pmValues().map(v => [v, v]), 'כל הערכים')}${sel('pmPrio', state.pmPrio || '', PM_PRIO, 'כל העדיפויות')}</div>
+    ${pmWorldOn() ? '' : `<div style="margin:-4px 0 8px"><button class="tdy-link" data-act="pmFiltToggle">${state.pmFilt || filtActive ? 'הסתר סינון' : 'סינון לפי תחום, זמן וערך'}</button></div>${state.pmFilt || filtActive ? `<div class="pmfilters">${sel('pmArea', state.pmArea || '', pmAreas().map(a => [a.id, a.icon + ' ' + a.name]), 'כל התחומים')}${sel('pmRange', state.pmRange || '', PM_RANGES, 'כל טווח זמן')}<button class="iconbtn" data-act="pmAreasSheet" aria-label="עריכת תחומי חיים" title="תחומי חיים">⚙️</button></div>
+    <div class="pmfilters">${sel('pmValue', state.pmValue || '', pmValues().map(v => [v, v]), 'כל הערכים')}${sel('pmPrio', state.pmPrio || '', PM_PRIO, 'כל העדיפויות')}</div>` : ''}
 `}
     ${featOn('mapTools') ? `<div class="seg pmrevs"><button data-act="pmWeekRev">📋 סקירה שבועית</button><button data-act="pmMonthRev">🗓️ סקירה חודשית</button><button data-act="pmLoad">⏱️ עומס</button></div>` : ''}
     ${featOn('mapTools') && live.length ? `<button class="btn ghost pmweek" data-act="pmWalk">🧭 כוונון שבוע: מה אני מקדם בכל פרויקט</button>` : ''}
@@ -1939,33 +1958,33 @@ const views = {
   more() {
     const gs = D().goals.map(goalState), activeG = gs.filter(s => !s.achieved && !s.missed).length;
     const wait = D().goals.filter(g => g.reward && !g.claimed && goalState(g).achieved).length;
-    const item0 = (t, icon, title, sub) => `<div class="card row" data-act="goTab" data-t="${t}"><span style="font-size:26px">${icon}</span><div class="grow"><div class="t"><b>${title}</b></div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
+    const item0 = (t, icon, title, sub) => `<div class="tdy-item" data-act="goTab" data-t="${t}"><span class="ico">${lineIcon(icon)}</span><div class="grow"><div class="t">${title}</div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
     const item = (t, ...a) => featOn(t) ? item0(t, ...a) : '';
-    return `<div class="top"><div class="brand">${logoMark(40)}<h1>Do It</h1></div></div>
+    return `<div class="tdy tdyp"><header class="tdy-head"><div><div class="tdy-date">Do It</div><h1>עוד</h1></div></header>
       ${item0('wins', '🏆', 'ההצלחות שלי', allWins().reduce((n, x) => n + x[1].length, 0) + ' הצלחות')}
-      ${['journal', 'rhythm', 'week', 'dayrewards'].some(featOn) ? '<h2>יומי</h2>' : ''}
+      ${['journal', 'rhythm', 'week', 'dayrewards'].some(featOn) ? '<div class="tdy-sect">יומי</div>' : ''}
       ${item('journal', '📓', 'יומן', `${journalDays().length} ימים עם רישום`)}
       ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
       ${item('week', '🧭', 'חזון שבועי', 'תוצאות השבוע, סיכום ותכנון')}
       ${item('dayrewards', '🎁', 'תגמולים יומיים', `${D().dayRewards.length} תגמולים ברשימה`)}
-      <h2>תכנון</h2>
+      <div class="tdy-sect">תכנון</div>
       ${item('tasks', '✅', 'כל הפעולות והפרויקטים', `${D().tasks.filter(t => !t.done).length} פעולות פתוחות · ${D().projects.length} פרויקטים · ${D().tasks.filter(t => !t.done && !effQuad(t)).length} לא מסווגות`)}
       ${item('assistant', '🧠', 'עוזר התכנון שלי', `${D().topics.length} נושאים בזיכרון`)}
-      ${['habits', 'goals', 'vision', 'lists', 'cheer'].some(featOn) || !featOn('cheer') ? '<h2>אישי</h2>' : ''}
+      ${['habits', 'goals', 'vision', 'lists', 'cheer'].some(featOn) || !featOn('cheer') ? '<div class="tdy-sect">אישי</div>' : ''}
       ${featOn('cheer') ? '' : item0('cheer', '💪', 'עידוד', 'משפטים שמחזקים')}
       ${item('habits', '🔁', 'הרגלים', `${D().habits.length} הרגלים`)}
       ${item('goals', '🎯', 'יעדים ותגמולים', `${activeG} פעילים${wait ? ` · 🎁 ${wait} ממתינים` : ''}`)}
       ${item('vision', '🌟', 'חזון', `${D().visions.length} פריטים`)}
       ${item('lists', '📝', 'רשימות', `${D().lists.length} רשימות`)}
-      <div class="card row" data-act="moreSettings"><span style="font-size:24px">⚙️</span><div class="grow"><div class="t"><b>הגדרות</b></div><div class="meta">הודעות, נשימות, עיצוב, תכונות וגרסה</div></div><span style="display:inline-block;transform:rotate(${state.moreSet ? -90 : 0}deg);transition:transform .2s">${chev('l')}</span></div>
+      <div class="tdy-item" data-act="moreSettings"><span class="ico">${lineIcon('⚙️')}</span><div class="grow"><div class="t">הגדרות</div><div class="meta">הודעות, נשימות, עיצוב, תכונות וגרסה</div></div><span style="display:inline-block;transform:rotate(${state.moreSet ? -90 : 0}deg);transition:transform .2s">${chev('l')}</span></div>
       ${state.moreSet ? `<div class="moreset">
       <div class="card"><div class="t"><b>🔔 רמת הודעות</b></div><select id="notifySel" style="margin-top:6px">${NOTIFY.map(([v, l]) => '<option value="' + v + '" ' + (notifyLevel() === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select><div class="sub" id="notifyDesc" style="margin-top:6px">${(NOTIFY.find(x => x[0] === notifyLevel()) || NOTIFY[1])[2]}</div></div>
-      <div class="card row" data-act="featSheet"><span style="font-size:24px">🎛</span><div class="grow"><div class="t"><b>ניהול תכונות</b></div><div class="meta">מה מוצג ומה מוסתר באפליקציה</div></div>${chev('l')}</div>
+      <div class="tdy-item" data-act="featSheet"><span class="ico">${lineIcon('🎛')}</span><div class="grow"><div class="t">ניהול תכונות</div><div class="meta">מה מוצג ומה מוסתר באפליקציה</div></div>${chev('l')}</div>
       ${breathSettingsCard()}
       ${dzCard()}
       <div class="card row"><div class="grow"><div class="t">גרסה ${APP_VERSION}</div><div class="sub">אם נראה שהאפליקציה לא מעודכנת, לחץ כדי לנקות את המטמון ולטעון מחדש</div></div><button class="iconbtn" data-act="refreshApp">🔄 רענון</button></div>
       </div>` : ''}
-      <div class="card row" data-act="account"><span style="font-size:26px">☁️</span><div class="grow"><div class="t"><b>כניסה וסנכרון</b></div><div class="meta">${Cloud.user ? esc(Cloud.user.email) : 'לא מחובר'}</div></div>${chev('l')}</div>`;
+      <div class="tdy-item" data-act="account"><span class="ico">${lineIcon('☁️')}</span><div class="grow"><div class="t">כניסה וסנכרון</div><div class="meta">${Cloud.user ? esc(Cloud.user.email) : 'לא מחובר'}</div></div>${chev('l')}</div></div>`;
   },
   wins() {
     const all = allWins(), total = all.reduce((n, x) => n + x[1].length, 0), T = TODAY();
@@ -2168,8 +2187,8 @@ function taskForm(id, presetDate, presetProject, preset) {
    <div id="clHint" class="clarity">${id ? '' : clarityHTML('', true)}</div>
    <label>מתי?</label>
    <div class="opt" id="dateChips" style="margin-bottom:6px">${[['היום', TODAY()], ['מחר', addDays(TODAY(), 1)], ['ללא תאריך', '']].map(([l, v]) => `<button type="button" class="${(t.date || '') === v ? 'on' : ''}" onclick="const f=this.closest('form');f.elements.date.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div>
-   <label>שעת התחלה קבועה (עוגן, אופציונלי)</label><input type="time" name="start" value="${t.start || ''}">
-   <label>התראה לפני העוגן</label><select name="lead">${[[0, 'ללא התראה'], [15, 'רבע שעה לפני'], [30, 'חצי שעה לפני'], [60, 'שעה לפני'], [120, 'שעתיים לפני']].map(([v, l]) => `<option value="${v}" ${(t.lead === undefined ? 15 : t.lead) === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+   <label>שעת התחלה קבועה (עוגן, אופציונלי)</label><input type="time" name="start" value="${t.start || ''}" oninput="document.getElementById('leadBox').hidden=!this.value">
+   <div id="leadBox" ${t.start ? '' : 'hidden'}><label>התראה לפני העוגן</label><select name="lead">${[[0, 'ללא התראה'], [15, 'רבע שעה לפני'], [30, 'חצי שעה לפני'], [60, 'שעה לפני'], [120, 'שעתיים לפני']].map(([v, l]) => `<option value="${v}" ${(t.lead === undefined ? 15 : t.lead) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
    <label>פרויקט (אופציונלי)</label><select name="owner">${ownerOpts(t.projectId ? 'p:' + t.projectId : '')}</select>
    <details class="moreopts" ${id || t.repeat || t.notes || (t.subs || []).length ? 'open' : ''}><summary>אפשרויות נוספות</summary>
    <label>תיאור הפעולה (אופציונלי, באריכות)</label><textarea name="notes" rows="2" placeholder="פרטים: מה בדיוק, איפה, למי, מה צריך להיות מוכן">${esc(t.notes || '')}</textarea>
@@ -2705,6 +2724,7 @@ const A = {
   homeIsle: e => { state.tab = 'map'; state.pmIsle = e.id; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
   homeProj: e => { state.tab = 'map'; state.pmOpen = e.id; state.pmReview = null; render(); window.scrollTo(0, 0); },
   featSheet: () => featSheet(),
+  pmFiltToggle: () => { state.pmFilt = !state.pmFilt; render(); },
   moreSettings: () => { state.moreSet = !state.moreSet; render(); },
   featToggle: e => { const a = D().assist; a.features = a.features || {}; a.features[e.k] = !featOn(e.k); Store.save(); applyFeatures(); featSheet(); render(); },
   pmNoop: () => {},

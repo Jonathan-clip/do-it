@@ -517,3 +517,45 @@ html[data-design="spatial"] .tdy-now,html[data-design="spatial"] .tdy-acct,html[
 .tdyp .more3{margin-top:10px}
 .tdyp .todaymore{margin-top:18px;border:0}
 .tdyp .todaymore>summary{color:var(--muted);font-size:14px;padding:8px 4px}
+
+/* ===== Calm layer: one visual language on every screen ===== */
+#nav button i{font-size:0;width:24px;height:24px;display:block;filter:none;opacity:.7;background:currentColor;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat;transition:transform .3s var(--ease),opacity .2s}
+#nav button.on i{opacity:1}
+#nav [data-tab="today"] i{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6'/%3E%3C/svg%3E")}
+#nav [data-tab="upcoming"] i{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='3'/%3E%3Cpath d='M4 10h16M8 3v4M16 3v4'/%3E%3C/svg%3E")}
+#nav [data-tab="map"] i{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cellipse cx='12' cy='12' rx='4' ry='9'/%3E%3Cpath d='M3 12h18'/%3E%3C/svg%3E")}
+#nav [data-tab="cheer"] i{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z'/%3E%3C/svg%3E")}
+#nav [data-tab="more"] i{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'%3E%3Crect x='4' y='4' width='6.5' height='6.5' rx='2'/%3E%3Crect x='13.5' y='4' width='6.5' height='6.5' rx='2'/%3E%3Crect x='4' y='13.5' width='6.5' height='6.5' rx='2'/%3E%3Crect x='13.5' y='13.5' width='6.5' height='6.5' rx='2'/%3E%3C/svg%3E")}
+#nav{border-top:1px solid var(--line)}
+#nav button{font-size:12px;gap:3px;padding:9px 0 7px}
+#nav button.on{font-weight:600}
+h2{font-size:13px;font-weight:600;margin:26px 4px 8px}
+#view .top h1{font-size:26px;font-weight:700;letter-spacing:-.01em}
+#view .top .brand .logo{display:none}
+.card{border-radius:16px;padding:14px 16px;box-shadow:none}
+input,select,textarea{background:var(--card);border-radius:12px;padding:12px 14px;min-height:46px;border-color:var(--line)}
+input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--brand) 40%,transparent);outline-offset:1px;border-color:var(--brand)}
+textarea{min-height:90px}
+label{font-size:14px;margin:16px 2px 6px}
+.btn{min-height:48px;border-radius:14px;font-size:16px}
+.iconbtn{border-radius:12px;min-height:40px}
+.panel{border-radius:24px 24px 0 0;padding:20px 18px calc(28px + env(safe-area-inset-bottom))}
+.panel h1{font-size:21px;font-weight:700;margin:2px 0 6px}
+.actions{margin-top:22px}
+.opt button{padding:8px 14px;border-radius:999px}
+.tdy-item{display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.tdy-item .ico{width:40px;height:40px;border-radius:12px;background:var(--soft);color:var(--brand);display:grid;place-items:center;flex:none}
+.tdy-item .ico svg{width:22px;height:22px}
+.tdy-item .t{font-size:17px;font-weight:600}
+.tdy-item .meta{margin-top:2px}
+.tdy-sect{margin:22px 4px 2px;font-size:13px;color:var(--muted);font-weight:600}
+.tdy-item .grow{flex:1;min-width:0}
+/* upcoming + other segmented rows */
+.seg{padding:4px;border-radius:14px;background:var(--line);gap:4px;overflow-x:auto}
+.seg button{border:0;background:transparent;color:var(--muted);padding:9px 14px;border-radius:11px;font:inherit;font-size:14px;flex:1;cursor:pointer}
+.seg button.on{background:var(--card);color:var(--ink);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.seg .segtoday{border:0;color:var(--brand);font-weight:700;flex:0 0 auto}
+.uhead b{font-size:16px}
+.uhead{border-bottom:0;padding:8px 4px 6px}
+.ucard{border-radius:14px;box-shadow:none}
+.opt button{background:var(--card)}
