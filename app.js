@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-27.5-focus-features'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.1-day-features'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -594,7 +594,7 @@ function dayKey() { // which log the "good night" button belongs to: today, or y
   return toMin(Y.end) < toMin(Y.start) && now <= toMin(Y.end) + 60 ? y : T;
 }
 function dayCard(d) {
-  if (d !== TODAY()) return '';
+  if (d !== TODAY() || !featOn('hours')) return '';
   const L = D().dayLog[dayKey()] || {};
   const btn = !L.start ? '<button class="iconbtn" data-act="dayStart">◀ התחל יום</button>' : !L.end ? '<button class="iconbtn" data-act="dayEnd">🌙 לילה טוב</button>' : '<button class="iconbtn" data-act="dayReopen" aria-label="פתח מחדש">↺</button>';
   return `<div class="card row daycard"><span style="font-size:22px">🕗</span><div class="grow" data-act="dayEdit"><div class="t">${L.start ? 'התחלת ב-' + L.start : 'היום עוד לא התחיל'}${L.end ? ' · סיימת ב-' + L.end : ''}</div>${L.start ? `<div class="meta"><span>${L.end ? 'משך היום' : 'עד עכשיו'}: ${fmtDur(dayDurMin(L))}</span></div>` : ''}</div><button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>${btn}</div>`;
@@ -867,9 +867,9 @@ function doView() { // do mode: only the current action, nothing else to distrac
   const rem = open.reduce((a, t) => a + (t.mins || 0), 0), est = rem ? estimateEnd(rem) : '', pct = ts.length ? Math.round(done / ts.length * 100) : 0;
   const queue = open.filter(t => !cur || t.id !== cur.id).slice(0, 2);
   const dayBtn = !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : (L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : '');
-  return '<div class="top"><div class="brand">' + logoMark(36) + '<div><h1>היום</h1><div class="sub">' + longDate(d) + '</div></div></div><div class="sw"><button class="iconbtn" data-act="printDayAll" aria-label="הדפסת פעילות היום" title="הדפסת פעילות היום">🖨</button><button class="iconbtn" data-act="account" title="סנכרון וחשבון">' + (Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤') + '</button></div></div>'
+  return '<div class="top"><div class="brand">' + logoMark(36) + '<div><h1>היום</h1><div class="sub">' + longDate(d) + '</div></div></div><div class="sw">' + (featOn('dayextras') ? '<button class="iconbtn" data-act="printDayAll" aria-label="הדפסת פעילות היום" title="הדפסת פעילות היום">🖨</button>' : '') + '<button class="iconbtn" data-act="account" title="סנכרון וחשבון">' + (Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤') + '</button></div></div>'
     + modeSwitch()
-    + '<div class="card"><div class="row"><b class="grow">' + done + '/' + ts.length + ' הושלמו' + (rem ? ' · נותרו ' + rem + ' ד׳' : '') + '</b><button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' + dayBtn + '</div><div class="bar"><div style="width:' + pct + '%"></div></div>' + (est ? '<div class="sub" style="margin-top:6px">סיום משוער ' + est + ' (כולל הפסקות)</div>' : '') + '</div>'
+    + '<div class="card"><div class="row"><b class="grow">' + done + '/' + ts.length + ' הושלמו' + (rem ? ' · נותרו ' + rem + ' ד׳' : '') + '</b>' + (featOn('hours') ? '<button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' + dayBtn : '') + '</div><div class="bar"><div style="width:' + pct + '%"></div></div>' + (est ? '<div class="sub" style="margin-top:6px">סיום משוער ' + est + ' (כולל הפסקות)</div>' : '') + '</div>'
     + (cur ? nowCard(cur) : ts.length === 0 ? '<div class="card"><div class="t">עוד אין פעולות להיום</div><div class="sub" style="margin-top:6px">הוסף את הפעולה הראשונה, או בחר מהמאגר במצב תכנון.</div><button class="btn startnow" data-act="addTask" style="margin-top:8px">＋ פעולה חדשה</button><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px;width:100%">📋 למצב תכנון</button></div>' : '<div class="card"><div class="t">🎉 אין עוד פעולות פתוחות להיום</div><div class="sub" style="margin-top:6px">במצב תכנון אפשר להוסיף פעולות מהמאגר, או לסיים את היום.</div><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px">📋 למצב תכנון</button></div>')
     + (queue.length ? '<h2>בתור</h2>' + queue.map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div><div class="meta">' + '</div></div>').join('') : '')
     + energyBar(d)
@@ -1688,7 +1688,12 @@ const FEATURES = [ // key, icon, title, what it is
   ['assistant', '🧠', 'עוזר התכנון שלי', 'שיחה שעוזרת לסדר את היום'],
   ['vision', '🌟', 'חזון', 'תמונות ומשפטים על העתיד']
 ];
-const FEAT_DEF = { habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
+const DAYF = [ // the Today screen
+  ['hours', '⏱', 'שעות התחלה וסיום', 'הכפתורים "שעות" ו"התחלתי יום" ושורת הסיום המשוער'],
+  ['org', '🗂', 'ארגון יומי', 'כרטיס "ארגון" ברשימת היום'],
+  ['dayextras', '🧰', 'כלים נוספים', 'הדפסה, "מה מעסיק אותי", תזכורת ו"הזנה מרוכזת"']
+];
+const FEAT_DEF = { hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
 const featOn = k => { const f = (D().assist || {}).features; return k in FEAT_DEF ? (f && k in f ? !!f[k] : !!FEAT_DEF[k]) : true; }; // tasks, projects, map, upcoming: always on
 const featCount = k => ({ habits: () => D().habits.length, goals: () => D().goals.length, lists: () => D().lists.length, journal: () => journalDays().length, rhythm: () => D().rhythm.length, dayrewards: () => D().dayRewards.length, assistant: () => D().topics.length, vision: () => D().visions.length }[k] || (() => 0))();
 function applyFeatures() {
@@ -1698,6 +1703,7 @@ function applyFeatures() {
 function featSheet() {
   sheet('<h1>🎛 ניהול תכונות</h1><div class="sub" style="margin-bottom:8px">מה שכבוי מוסתר מהתפריטים ומהמסכים, ושום נתון לא נמחק. אפשר להדליק בכל רגע.</div>'
     + FEATURES.map(([k, ic, t, d]) => { const on = featOn(k), n = featCount(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + (n ? ' · ' + n + ' פריטים' : '') + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
+    + '<h2>במסך "היום"</h2>' + DAYF.map(([k, ic, t, d]) => { const on = featOn(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
     + '<div class="actions"><button class="btn" data-act="close">סגור</button></div>');
 }
 const views = {
@@ -1705,16 +1711,16 @@ const views = {
     if (state.mode === 'do' && state.date === TODAY()) return doView();
     const d = state.date, ts = tasksOn(d), hs = habitsOn(d);
     const isToday = d === TODAY(); // the daily "ארגון" ritual counts as one item on today's list
-    const total = ts.length + hs.length + (isToday ? 1 : 0), done = ts.filter(t => t.done).length + hs.filter(h => habitDone(h, d)).length + (isToday && orgDone(d) ? 1 : 0);
+    const total = ts.length + hs.length + (isToday && featOn('org') ? 1 : 0), done = ts.filter(t => t.done).length + hs.filter(h => habitDone(h, d)).length + (isToday && featOn('org') && orgDone(d) ? 1 : 0);
     const pct = total ? Math.round(done / total * 100) : 0;
     const remaining = ts.filter(t => !t.done).reduce((a, t) => a + (t.mins || 0), 0) + hs.filter(h => !habitDone(h, d)).reduce((a, h) => a + (h.mins || 0), 0);
     const L0 = isToday ? (D().dayLog[dayKey()] || {}) : {}, est = isToday && remaining ? estimateEnd(remaining) : '';
     const visTop = isToday && !D().visual[d] && new Date().getHours() < 11, rs = isToday ? rewardState(d) : {}, rewardTop = isToday && rs.rule && rs.achieved && !rs.claimed;
     const hAct = hs.filter(h => !habitDone(h, d)).length;
     const html = `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
-      <div class="sw"><button class="iconbtn" data-act="printDayAll" aria-label="הדפסת פעילות היום" title="הדפסת פעילות היום">🖨</button><button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
-      <div class="card" style="--pct:${pct}%"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday ? '<button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' : ''}${isToday && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : ''}${isToday && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
-       ${L0.start || est ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
+      <div class="sw">${featOn('dayextras') ? '<button class="iconbtn" data-act="printDayAll" aria-label="הדפסת פעילות היום" title="הדפסת פעילות היום">🖨</button>' : ''}<button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
+      <div class="card" style="--pct:${pct}%"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday && featOn('hours') ? '<button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' : ''}${isToday && featOn('hours') && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && featOn('hours') && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : ''}${isToday && featOn('hours') && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
+       ${featOn('hours') && (L0.start || est) ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
       ${isToday ? modeSwitch() : ''}
       ${isToday ? syncHint() : ''}
       ${isToday ? breathCard(d) : ''}
@@ -1723,13 +1729,13 @@ const views = {
       ${rewardTop ? rewardCard(d) : ''}
       ${energyBar(d)}
       ${hxOn() && d === TODAY() ? hxFocusNote(d) : focusCard(d)}
-      <h2>פעולות</h2>${isToday && yesterdayLeft().length ? '<button class="btn ghost more3" style="margin:0 0 8px" data-act="carryOver">⏩ העבר להיום את מה שלא בוצע אתמול (' + yesterdayLeft().length + ')</button>' : ''}${isToday && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
+      <h2>פעולות</h2>${isToday && yesterdayLeft().length ? '<button class="btn ghost more3" style="margin:0 0 8px" data-act="carryOver">⏩ העבר להיום את מה שלא בוצע אתמול (' + yesterdayLeft().length + ')</button>' : ''}${isToday && featOn('org') && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
       ${doneSection(d, ts, hs)}
       <details class="todaymore" id="todayMore" ${state.moreOpen ? 'open' : ''}><summary>עוד להיום${hAct ? ` · ${hAct} הרגלים` : ''}</summary>
-       <div class="opt" style="margin:6px 0"><button data-act="asstToday">💬 מה מעסיק אותי היום?</button></div>
+       ${featOn('dayextras') ? `<div class="opt" style="margin:6px 0"><button data-act="asstToday">💬 מה מעסיק אותי היום?</button></div>` : ''}
        ${dayCard(d)}${visTop ? '' : visualCard(d)}${rewardTop ? '' : rewardCard(d)}${rhythmStrip(d, 'rest')}
-       <div class="remind" data-act="nextReminder" title="לחץ להחלפה">💬 ${esc(reminder())}</div>
-       <div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל פעולות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>
+       ${featOn('dayextras') ? `<div class="remind" data-act="nextReminder" title="לחץ להחלפה">💬 ${esc(reminder())}</div>` : ''}
+       ${featOn('dayextras') ? `<div class="opt" style="margin-bottom:6px"><button data-act="printDayAll">🖨 הדפס את כל פעולות היום</button><button data-act="printDay">🖨 רק פתוחות/מסומנות</button><button data-act="addBulk">📋 הזנה מרוכזת</button></div>` : ''}
        ${hs.some(h => !habitDone(h, d)) ? `<h2>הרגלים</h2>${hs.filter(h => !habitDone(h, d)).map(h => habitRow(h, d)).join('')}` : ''}
        <h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>
       </details>
