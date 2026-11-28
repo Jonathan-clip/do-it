@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.7-morning'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.8-pick-project'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -821,10 +821,12 @@ const setReward = title => { fo(TODAY()).rewardPicked = title; Store.save(); clo
 const newChips = active => '<div class="opt" style="margin-bottom:6px">' + [['action', 'פעולה', 'newActionForm'], ['project', '📁 פרויקט', 'newProjectForm']].map(([k, l, act]) => k === active ? '<button type="button" class="on">' + l + '</button>' : '<button type="button" data-act="' + act + '">' + l + '</button>').join('') + '</div>';
 function projectForm() {
   sheet(`<h1>פרויקט חדש</h1>${newChips('project')}
+  ${D().projects.some(p => pmStatus(p) !== 'done') ? '<div class="card" style="background:var(--soft)"><label style="margin-top:0">או להוסיף פעולה לפרויקט שכבר קיים</label><select id="pickProj"><option value="">בחר פרויקט קיים...</option>' + D().projects.filter(p => pmStatus(p) !== 'done').map(p => '<option value="' + p.id + '">📁 ' + esc(p.title) + '</option>').join('') + '</select></div>' : ''}
   <form id="f"><label>שם הפרויקט</label><input name="title" required autocomplete="off" placeholder="למשל: השקת האתר החדש" autofocus>
    <label>פעולות ראשונות בפרויקט (אופציונלי, שורה לכל פעולה)</label><textarea name="jobs" rows="4" placeholder="להקים את דף הבית&#10;לכתוב את הטקסטים&#10;להשיק קמפיין פתיחה"></textarea>
    ${prioFields({})}
    <div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>`);
+  const pp = $('#pickProj'); if (pp) pp.onchange = () => { if (pp.value) taskForm(null, undefined, pp.value); };
   $('#f').onsubmit = e => {
     e.preventDefault(); const f = new FormData(e.target), title = f.get('title').trim(); if (!title) return;
     const lines = f.get('jobs').split('\n').map(x => x.trim()).filter(Boolean), bad = lines.map(l => ({ l, why: clarity(l)[0] })).filter(x => x.why);
@@ -849,8 +851,8 @@ const itemChips = x => quadChip({ quad: x.quad }) + (x.diff ? '<span class="chip
 const itemOf = (kind, id) => kind === 'job' ? findJob(id) : kind === 'project' ? D().projects.find(p => p.id === id) : findTask(id);
 const DIFF_L = ['קל מאוד', 'קל', 'בינוני', 'קשה', 'קשה מאוד'], diffLabel = k => k ? 'קושי: ' + DIFF_L[k - 1] : '';
 const wantStars = (id, cur, kind) => '<div class="diffpick">' + DIFF_L.map((l, i) => '<button type="button" class="' + (i + 1 === cur ? 'on' : '') + '" data-act="setWant" data-id="' + id + '" data-k="' + (kind || '') + '" data-n="' + (i + 1) + '" aria-pressed="' + (i + 1 === cur) + '">' + l + '</button>').join('') + '</div>';
-const prioBox = (kind, x) => '<div class="card"><div class="sub">🧭 עדיפות (דחוף / חשוב)</div>' + quadChips(x.id, x.quad || '', kind) + '<div class="sub" style="margin-top:10px">⛰ רמת קושי</div>' + wantStars(x.id, x.diff || 0, kind) + '</div>';
-const prioFields = x => '<label>🧭 עדיפות (מטריצת אייזנהאואר)</label><div id="quadBox">' + quadChips('', x.quad || '', '') + '</div><input type="hidden" name="quad" value="' + (x.quad || '') + '"><label>⛰ רמת קושי (1 = קל מאוד, 5 = קשה מאוד)</label><div id="diffBox">' + wantStars('', x.diff || 0, '') + '</div><input type="hidden" name="diff" value="' + (x.diff || 0) + '">';
+const prioBox = (kind, x) => '<div class="card">' + (featOn('tasksMatrix') ? '<div class="sub">🧭 עדיפות (דחוף / חשוב)</div>' + quadChips(x.id, x.quad || '', kind) : '') + '<div class="sub" style="margin-top:' + (featOn('tasksMatrix') ? 10 : 0) + 'px">⛰ רמת קושי</div>' + wantStars(x.id, x.diff || 0, kind) + '</div>';
+const prioFields = x => (featOn('tasksMatrix') ? '<label>🧭 עדיפות (מטריצת אייזנהאואר)</label><div id="quadBox">' + quadChips('', x.quad || '', '') + '</div>' : '') + '<input type="hidden" name="quad" value="' + (x.quad || '') + '"><label>⛰ רמת קושי (1 = קל מאוד, 5 = קשה מאוד)</label><div id="diffBox">' + wantStars('', x.diff || 0, '') + '</div><input type="hidden" name="diff" value="' + (x.diff || 0) + '">';
 const quadChips = (id, cur, kind) => '<div class="opt quadopts">' + QUADS.map(q => '<button type="button" class="' + (cur === q[0] ? 'on' : '') + '" data-act="setQuad" data-id="' + id + '" data-k="' + (kind || '') + '" data-q="' + q[0] + '">' + q[1] + '</button>').join('') + '</div>' + (quadOf(cur) ? '<div class="sub" style="margin-top:6px">' + esc(quadOf(cur)[2]) + '</div>' : '');
 /* ---------- Plan mode / do mode, the next-action suggestion, coming back from a break ---------- */
 const modeSwitch = () => '<div class="opt modesw"><button class="' + (state.mode === 'plan' ? 'on' : '') + '" data-act="setMode" data-m="plan">📋 תכנון</button><button class="' + (state.mode === 'do' ? 'on' : '') + '" data-act="setMode" data-m="do">🎯 ביצוע</button></div>';
@@ -2134,6 +2136,7 @@ function taskForm(id, presetDate, presetProject, preset) {
    <div id="clHint" class="clarity">${id ? '' : clarityHTML('', true)}</div>
    <label>מתי?</label>
    <div class="opt" id="dateChips" style="margin-bottom:6px">${[['היום', TODAY()], ['מחר', addDays(TODAY(), 1)], ['ללא תאריך', '']].map(([l, v]) => `<button type="button" class="${(t.date || '') === v ? 'on' : ''}" onclick="const f=this.closest('form');f.elements.date.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div>
+   <label>פרויקט (אופציונלי)</label><select name="owner">${ownerOpts(t.projectId ? 'p:' + t.projectId : '')}</select>
    <details class="moreopts" ${id || t.repeat || t.notes || (t.subs || []).length ? 'open' : ''}><summary>אפשרויות נוספות</summary>
    <label>תיאור הפעולה (אופציונלי, באריכות)</label><textarea name="notes" rows="2" placeholder="פרטים: מה בדיוק, איפה, למי, מה צריך להיות מוכן">${esc(t.notes || '')}</textarea>
    <label>תתי-פעולות (אופציונלי, שורה לכל תת-פעולה)</label><textarea name="subs" rows="2" placeholder="צעדים קטנים בתוך הפעולה">${esc((t.subs || []).map(x => x.title).join('\n'))}</textarea>
@@ -2145,7 +2148,6 @@ function taskForm(id, presetDate, presetProject, preset) {
    <label>משך (עד 15 דקות; ארוך יותר יוצע לפיצול)</label>
    <select name="mins">${mo.map(m => `<option value="${m}" ${m == (t.mins || 15) ? 'selected' : ''}>${m} דקות</option>`).join('')}</select>
    ${prioFields(t)}
-   <label>פרויקט (אופציונלי)</label><select name="owner">${ownerOpts(t.projectId ? 'p:' + t.projectId : '')}</select>
    <label class="row" style="color:var(--ink)"><input type="checkbox" name="brainless" style="width:auto" ${t.brainless ? 'checked' : ''}> ⚡ Brainless (פעולה פשוטה שאפשר להעיף ברגע)</label>
    ${featOn('dayextras') ? `<label class="row" style="color:var(--ink)"><input type="checkbox" name="print" style="width:auto" ${t.print ? 'checked' : ''}> סמן להדפסה</label>` : ''}
    </details>
@@ -2395,7 +2397,7 @@ function menuSheet(id) {
    <div class="meta" style="margin-bottom:10px">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${t.date ? `<span>${longDate(t.date)}</span>` : '<span>ללא תאריך</span>'}${projectChip(t)}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
    ${t.notes ? `<p class="sub" style="white-space:pre-wrap">${esc(t.notes)}</p>` : ''}
    ${(t.subs || []).length ? `<div class="sub" style="margin:8px 0 4px">☰ תתי-פעולות (${subProg(t)})</div><div class="subs">${t.subs.map(x => `<div class="row ${x.done ? 'done' : ''}"><button class="check ${x.done ? 'on' : ''}" data-act="subToggle" data-id="${t.id}" data-sid="${x.id}">${x.done ? '✓' : ''}</button><div class="t grow">${esc(x.title)}</div></div>`).join('')}</div>` : ''}
-   ${t.done ? '' : '<div class="sub" style="margin:8px 0 4px">🧭 עדיפות</div>' + quadChips(t.id, t.quad || '', '') + '<div class="sub" style="margin:8px 0 2px">⛰ רמת קושי</div>' + wantStars(t.id, t.diff || 0, '')}
+   ${t.done ? '' : (featOn('tasksMatrix') ? '<div class="sub" style="margin:8px 0 4px">🧭 עדיפות</div>' + quadChips(t.id, t.quad || '', '') : '') + '<div class="sub" style="margin:8px 0 2px">⛰ רמת קושי</div>' + wantStars(t.id, t.diff || 0, '')}
    <div class="grid2">
      ${t.done ? '' : `<button class="btn" data-act="runStart" data-id="${t.id}">◀ התחל עכשיו</button>`}
      <button class="btn ghost" data-act="menuDone" data-id="${t.id}">${t.done ? '↺ בטל ביצוע' : '✓ בוצע'}</button>
