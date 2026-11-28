@@ -1,9 +1,9 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.16-calm-map'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.17-knowledge'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
-const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
+const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], knowledge: [], kcols: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
 const TS_KEY = DEMO ? 'doit-demo-updated-v1' : 'doit-updated-v1';
 const SYNC_KEY = DEMO ? 'doit-demo-synced-v1' : 'doit-synced-v1';
 // v2 structure: a task that had subtasks becomes a "job" (task) and each subtask an action; every other old task is already an action.
@@ -29,7 +29,7 @@ function migrate2(d) {
   });
   d.tasks = keep; d.v = 2; return d;
 }
-const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm', 'dayRewards', 'breakIdeas', 'cheers', 'topics', 'sessions'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual', 'assist'];
+const COLS = ['visions', 'tasks', 'habits', 'lists', 'goals', 'projects', 'jobs', 'rhythm', 'dayRewards', 'breakIdeas', 'cheers', 'topics', 'sessions', 'knowledge', 'kcols'], MAPS = ['weeks', 'notes', 'journal', 'focus', 'org', 'rhythmLog', 'dayLog', 'review', 'visual', 'assist'];
 const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return h + ':' + str.length; };
 function itemHashes(d) { // one entry per collection item / per dated entry, so changes and deletions can be tracked
   const o = {};
@@ -158,7 +158,67 @@ function shrinkPhoto(file, cb) { // downscale so the data fits comfortably in lo
   }; im.src = r.result; };
   r.readAsDataURL(file);
 }
-const MORE_TABS = ['week', 'wins', 'journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
+/* ---------- Knowledge hub: things worth keeping, separate from the daily work ---------- */
+const K_MAX_FILE = 400 * 1024, K_MAX_TOTAL = 4.2e6;
+const kUrl = t => /^https?:\/\/\S+$/i.test((t || '').trim()) ? t.trim() : '';
+const kHost = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u; } };
+const kTitle = it => it.title || (it.url ? kHost(it.url) : (it.text || '').split('\n')[0].slice(0, 60)) || (it.file ? it.file.name : '') || 'ללא כותרת';
+const kColName = id => (D().kcols.find(c => c.id === id) || {}).name || '';
+const kType = it => it.file ? 'file' : it.img ? 'image' : it.url ? 'link' : 'note';
+const K_ICON = { link: '<path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/>', note: '<path d="M6 4h9l4 4v12H6zM14 4v5h5M9 13h7M9 17h5"/>', image: '<rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="10" r="1.500"/><path d="M5 17l5-4 3 2.500 3-3 3 3.500"/>', file: '<path d="M7 3h7l4 4v14H7zM14 3v4h4"/>' };
+const kSearch = (q, col) => {
+  const toks = (q || '').toLowerCase().split(/\s+/).filter(Boolean);
+  return D().knowledge.filter(it => (!col || (it.cols || []).includes(col)) && toks.every(t => ((it.title || '') + ' ' + (it.text || '') + ' ' + (it.url || '') + ' ' + (it.file ? it.file.name : '') + ' ' + (it.cols || []).map(kColName).join(' ')).toLowerCase().includes(t)))
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.at || '').localeCompare(a.at || ''));
+};
+const kRow = it => { const ty = kType(it), cn = (it.cols || []).map(kColName).filter(Boolean).join(' · '), sub = it.url ? kHost(it.url) : it.file ? it.file.name : (it.text || '').split('\n').slice(it.title ? 0 : 1).join(' ').slice(0, 70);
+  return '<div class="tdy-item" data-act="knowOpen" data-id="' + it.id + '"><span class="ico">' + (it.img ? '<img src="' + it.img + '" alt="" class="kthumb">' : lineSvg(K_ICON[ty])) + '</span><div class="grow"><div class="t">' + (it.pinned ? '📌 ' : '') + esc(kTitle(it)) + '</div><div class="meta">' + esc([sub, cn].filter(Boolean).join(' · ')) + '</div></div></div>'; };
+const kList = () => {
+  const q = (state.kq || '').trim(), col = state.kCol;
+  if (q || col) { const r = kSearch(q, col); return (col ? '<div class="tdy-cap tdy-next">' + esc(kColName(col)) + ' · <button class="tdy-link" data-act="knowCol" data-id="">הצג הכל</button>' + ' · <button class="tdy-link" data-act="knowColDel" data-id="' + col + '">מחק אוסף</button></div>' : '') + (r.length ? r.map(kRow).join('') : '<div class="empty">לא נמצא כלום. אפשר לשמור את זה עכשיו עם הכפתור למעלה.</div>'); }
+  const all = D().knowledge.slice().sort((a, b) => (b.at || '').localeCompare(a.at || '')), pins = all.filter(i => i.pinned).slice(0, 5), rest = all.filter(i => !i.pinned).slice(0, 10);
+  if (!all.length) return '<div class="empty">עדיין ריק. שמור את הדבר הראשון שחשוב לך: קישור, משפט, תמונה.</div><div class="kcols" style="justify-content:center"><button class="kcol add" data-act="knowColNew">＋ אוסף</button></div>';
+  return (pins.length ? '<div class="tdy-sect">מוצמדים</div>' + pins.map(kRow).join('') : '')
+    + '<div class="tdy-sect">אוספים</div><div class="kcols">' + D().kcols.map(c => '<button class="kcol" data-act="knowCol" data-id="' + c.id + '">' + esc(c.name) + ' <span>' + D().knowledge.filter(i => (i.cols || []).includes(c.id)).length + '</span></button>').join('') + '<button class="kcol add" data-act="knowColNew">＋ אוסף</button></div>'
+    + '<div class="tdy-sect">נשמר לאחרונה</div>' + rest.map(kRow).join('');
+};
+function knowCapture(id) {
+  const it = id ? D().knowledge.find(x => x.id === id) : { text: '', cols: state.kCol ? [state.kCol] : [] };
+  state.kDraft = { img: it.img || '', file: it.file || null };
+  sheet('<h1>' + (id ? 'עריכה' : 'שמור משהו') + '</h1><form id="f"><textarea name="text" rows="5" autofocus placeholder="הדבק קישור, כתוב משפט או פיסת מידע">' + esc(it.url || it.text || '') + '</textarea>'
+    + '<input name="title" placeholder="כותרת (אופציונלי)" value="' + esc(it.title || '') + '" autocomplete="off" style="margin-top:8px">'
+    + '<div class="opt" style="margin-top:10px"><button type="button" data-act="knowPickImg">📷 תמונה</button><button type="button" data-act="knowPickFile">📎 קובץ</button><span class="sub" id="kAttach">' + (it.img ? 'תמונה מצורפת' : it.file ? esc(it.file.name) : '') + '</span></div>'
+    + '<input type="file" id="kImg" accept="image/*" hidden><input type="file" id="kFile" hidden>'
+    + (D().kcols.length ? '<label>אוספים</label><div class="opt" id="kColPick">' + D().kcols.map(c => '<button type="button" class="' + ((it.cols || []).includes(c.id) ? 'on' : '') + '" data-act="knowColPick" data-id="' + c.id + '">' + esc(c.name) + '</button>').join('') + '</div>' : '')
+    + '<div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">שמור</button></div></form>');
+  const f = $('#f'); f.dataset.cols = (it.cols || []).join(',');
+  const att = $('#kAttach');
+  $('#kImg').onchange = e => { const file = e.target.files[0]; if (file) shrinkPhoto(file, url => { state.kDraft.img = url; state.kDraft.file = null; att.textContent = 'תמונה מצורפת'; }); };
+  $('#kFile').onchange = e => { const file = e.target.files[0]; if (!file) return;
+    if (file.size > K_MAX_FILE) { toast('<span>הקובץ גדול מדי לשמירה כאן (עד 400KB). אפשר לשמור קישור אליו במקום.</span><button data-act="toastClose" aria-label="סגור">✕</button>', 6000); return; }
+    const r = new FileReader(); r.onload = () => { state.kDraft.file = { name: file.name, type: file.type, size: file.size, data: r.result }; state.kDraft.img = ''; att.textContent = file.name; }; r.readAsDataURL(file); };
+  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f), text = (fd.get('text') || '').trim(), title = (fd.get('title') || '').trim(), cols = f.dataset.cols ? f.dataset.cols.split(',').filter(Boolean) : [], d = state.kDraft;
+    if (!text && !d.img && !d.file) return;
+    const url = kUrl(text), base = { title, text: url ? '' : text, url, img: d.img, file: d.file, cols };
+    if ((d.img || d.file) && JSON.stringify(D()).length > K_MAX_TOTAL) { toast('<span>המקום בזיכרון המקומי כמעט מלא. אפשר להסיר פריטים עם תמונות או קבצים, או לשמור קישור.</span><button data-act="toastClose" aria-label="סגור">✕</button>', 7000); return; }
+    if (id) Object.assign(it, base, { upd: new Date().toISOString() }); else D().knowledge.push({ id: uid(), at: new Date().toISOString(), pinned: false, ...base });
+    Store.save(); closeSheet(); render(); };
+}
+function knowOpen(id) {
+  const it = D().knowledge.find(x => x.id === id); if (!it) return;
+  sheet('<h1>' + esc(kTitle(it)) + '</h1>'
+    + (it.img ? '<img src="' + it.img + '" alt="" class="kimg">' : '')
+    + (it.url ? '<a class="btn" href="' + esc(it.url) + '" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin:8px 0">פתח את הקישור · ' + esc(kHost(it.url)) + '</a>' : '')
+    + (it.file ? '<a class="btn ghost" href="' + it.file.data + '" download="' + esc(it.file.name) + '" style="display:block;text-align:center;text-decoration:none;margin:8px 0">הורד · ' + esc(it.file.name) + '</a>' : '')
+    + (it.text ? '<div class="knote">' + esc(it.text) + '</div>' : '')
+    + (D().kcols.length ? '<div class="opt" style="margin:12px 0 4px">' + D().kcols.map(c => '<button type="button" class="' + ((it.cols || []).includes(c.id) ? 'on' : '') + '" data-act="knowColToggle" data-id="' + it.id + '" data-c="' + c.id + '">' + esc(c.name) + '</button>').join('') + '</div>' : '')
+    + '<div class="nmlist" style="margin-top:12px"><button class="nmitem" data-act="knowPin" data-id="' + it.id + '"><span class="nmic">📌</span>' + (it.pinned ? 'בטל הצמדה' : 'הצמד למעלה') + '</button>'
+    + '<button class="nmitem" data-act="knowToTask" data-id="' + it.id + '"><span class="nmic">←</span>הפוך לפעולה</button>'
+    + '<button class="nmitem" data-act="knowEdit" data-id="' + it.id + '"><span class="nmic">✏️</span>עריכה</button>'
+    + '<button class="nmitem danger" data-act="knowDel" data-id="' + it.id + '"><span class="nmic">🗑</span>מחיקה</button></div>'
+    + '<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>');
+}
+const MORE_TABS = ['week', 'know', 'wins', 'journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
 const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', upDay: TODAY(), up3: TODAY(), upWeek: TODAY(), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', allMode: 'list', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
 try { if (D().assist && D().assist.homeTab === 'map') state.tab = 'map'; } catch (e) {}
 state.mode = (() => { try { const m = localStorage.getItem('doit-mode'); if (m === 'plan' || m === 'do') return m; } catch (e) {} return window.matchMedia && matchMedia('(max-width: 700px)').matches ? 'do' : 'plan'; })();
@@ -865,6 +925,7 @@ const modeSwitch = () => '<div class="opt modesw"><button class="' + (state.mode
 const currentAction = () => { const t = state.doId ? findTask(state.doId) : null; return (t && !t.done && t.date === TODAY()) ? t : nextTask(''); };
 const lineSvg = p => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
 const LI = {
+  '📚': '<path d="M5 4h5a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H5zM19 4h-5a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h5z"/>',
   '🏆': '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a2 2 0 0 0 2 4M16 6h3a2 2 0 0 1-2 4M12 13v4M9 20h6M10 17h4"/>',
   '✅': '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
   '🧠': '<path d="M5 6.5A2.5 2.5 0 0 1 7.5 4H12v16H8.5A3.5 3.5 0 0 1 5 16.5zM19 6.5A2.5 2.5 0 0 0 16.5 4H12v16h3.5a3.5 3.5 0 0 0 3.5-3.5z"/>',
@@ -1719,6 +1780,7 @@ function hxWrap(html, d) {
   const i = html.indexOf('<details class="todaymore"');
   return i < 0 || !featOn('maplink') ? html : html.slice(0, i) + link + html.slice(i);
 }
+document.addEventListener('input', e => { if (e.target && e.target.id === 'kq') { state.kq = e.target.value; const r = $('#kres'); if (r) r.innerHTML = kList(); } });
 document.addEventListener('change', e => { if (e.target && e.target.id === 'dzName') { D().assist.userName = e.target.value.trim(); Store.save(); } });
 
 /* ---------- Feature visibility: a calmer app. Hidden features keep their data and come back with one tap. ---------- */
@@ -1961,6 +2023,7 @@ const views = {
     const item0 = (t, icon, title, sub) => `<div class="tdy-item" data-act="goTab" data-t="${t}"><span class="ico">${lineIcon(icon)}</span><div class="grow"><div class="t">${title}</div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
     const item = (t, ...a) => featOn(t) ? item0(t, ...a) : '';
     return `<div class="tdy tdyp"><header class="tdy-head"><div><div class="tdy-date">Do It</div><h1>עוד</h1></div></header>
+      ${item0('know', '📚', 'מרכז הידע', D().knowledge.length + ' פריטים שמורים')}
       ${item0('wins', '🏆', 'ההצלחות שלי', allWins().reduce((n, x) => n + x[1].length, 0) + ' הצלחות')}
       ${['journal', 'rhythm', 'week', 'dayrewards'].some(featOn) ? '<div class="tdy-sect">יומי</div>' : ''}
       ${item('journal', '📓', 'יומן', `${journalDays().length} ימים עם רישום`)}
@@ -1985,6 +2048,12 @@ const views = {
       <div class="card row"><div class="grow"><div class="t">גרסה ${APP_VERSION}</div><div class="sub">אם נראה שהאפליקציה לא מעודכנת, לחץ כדי לנקות את המטמון ולטעון מחדש</div></div><button class="iconbtn" data-act="refreshApp">🔄 רענון</button></div>
       </div>` : ''}
       <div class="tdy-item" data-act="account"><span class="ico">${lineIcon('☁️')}</span><div class="grow"><div class="t">כניסה וסנכרון</div><div class="meta">${Cloud.user ? esc(Cloud.user.email) : 'לא מחובר'}</div></div>${chev('l')}</div></div>`;
+  },
+  know() {
+    const n = D().knowledge.length;
+    return `<div class="tdy tdyp"><header class="tdy-head"><div><div class="tdy-date">${n ? n + ' פריטים שמורים' : 'מקום שקט למה שחשוב לך'}</div><h1>מרכז הידע</h1></div><button class="tdy-acct wide kadd" data-act="knowAdd">＋ שמור</button></header>
+      <input id="kq" type="search" placeholder="חפש בכל מה ששמרת" value="${esc(state.kq || '')}" autocomplete="off" style="margin-bottom:6px">
+      <div id="kres">${kList()}</div></div>`;
   },
   wins() {
     const all = allWins(), total = all.reduce((n, x) => n + x[1].length, 0), T = TODAY();
@@ -2686,6 +2755,18 @@ const A = {
   jOpen: e => { state.jDate = e.d; render(); window.scrollTo(0, 0); },
   jPhotoPick: () => $('#jphoto').click(),
   jPhotoDel: () => { jSet(state.jDate).photo = ''; Store.save(); render(); },
+  knowAdd: () => knowCapture(), knowEdit: e => knowCapture(e.id), knowOpen: e => knowOpen(e.id),
+  knowPickImg: () => $('#kImg').click(), knowPickFile: () => $('#kFile').click(),
+  knowColPick: e => { const f = $('#f'), ids = f.dataset.cols ? f.dataset.cols.split(',').filter(Boolean) : [], i = ids.indexOf(e.id); if (i < 0) ids.push(e.id); else ids.splice(i, 1); f.dataset.cols = ids.join(','); document.querySelectorAll('#kColPick button').forEach(b => b.classList.toggle('on', ids.includes(b.dataset.id))); },
+  knowColToggle: e => { const it = D().knowledge.find(x => x.id === e.id); if (!it) return; it.cols = it.cols || []; const i = it.cols.indexOf(e.c); if (i < 0) it.cols.push(e.c); else it.cols.splice(i, 1); Store.save(); knowOpen(e.id); render(); },
+  knowPin: e => { const it = D().knowledge.find(x => x.id === e.id); if (it) { it.pinned = !it.pinned; Store.save(); } closeSheet(); render(); },
+  knowToTask: e => { const it = D().knowledge.find(x => x.id === e.id); if (!it) return; closeSheet(); taskForm(null, TODAY(), '', { title: '', notes: kTitle(it) + (it.url ? '\n' + it.url : '') }); },
+  knowDel: e => { const it = D().knowledge.find(x => x.id === e.id); if (!it) return; sheet('<h1>למחוק את הפריט?</h1><div class="sub">' + esc(kTitle(it)) + '</div><div class="actions"><button class="btn ghost" data-act="close">לא</button><button class="btn danger" data-act="knowDelYes" data-id="' + it.id + '">כן, למחוק</button></div>'); },
+  knowDelYes: e => { D().knowledge = D().knowledge.filter(x => x.id !== e.id); Store.save(); closeSheet(); render(); },
+  knowCol: e => { state.kCol = e.id || ''; render(); },
+  knowColNew: () => { sheet('<h1>אוסף חדש</h1><form id="f"><input name="name" required maxlength="30" placeholder="למשל: בריאות" autocomplete="off" autofocus><div class="actions"><button type="button" class="btn ghost" data-act="close">ביטול</button><button class="btn">צור</button></div></form>'); $('#f').onsubmit = ev => { ev.preventDefault(); const nm = new FormData(ev.target).get('name').trim(); if (!nm) return; D().kcols.push({ id: uid(), name: nm }); Store.save(); closeSheet(); render(); }; },
+  knowColDel: e => { const c = D().kcols.find(x => x.id === e.id); if (!c) return; sheet('<h1>למחוק את האוסף "' + esc(c.name) + '"?</h1><div class="sub">הפריטים עצמם נשארים, רק האוסף נמחק.</div><div class="actions"><button class="btn ghost" data-act="close">לא</button><button class="btn danger" data-act="knowColDelYes" data-id="' + c.id + '">כן, למחוק</button></div>'); },
+  knowColDelYes: e => { D().kcols = D().kcols.filter(x => x.id !== e.id); D().knowledge.forEach(i => { i.cols = (i.cols || []).filter(c => c !== e.id); }); state.kCol = ''; Store.save(); closeSheet(); render(); },
   winDel: e => { const J = jSet(e.d); J.wins = J.wins.filter(w => w.id !== e.id); Store.save(); render(); },
   jWinDel: e => { const J = jSet(state.jDate); J.wins = J.wins.filter(w => w.id !== e.id); Store.save(); render(); },
   goTab: e => { closeSheet(); state.pmIsle = null; state.tab = e.t; state.openList = null; state.openProject = null; state.openJob = null; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
