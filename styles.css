@@ -446,3 +446,13 @@ body.miniRun{--dockb:154px}
 /* single-day view */
 .uboard.day{overflow-x:visible}
 .uboard.day .ucol{flex:1 0 100%;scroll-snap-align:none}
+
+.nowacts{display:flex;gap:10px;margin-top:10px}
+.nab{height:52px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:16px;border:1.5px solid var(--line,#d9e2e7);background:var(--card,#fff);color:var(--ink);font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+.nab.ok{flex:1;color:#1f7a5c;border-color:#1f7a5c}
+.nab.more{width:60px;font-size:26px;line-height:1;color:var(--muted,#5b6b73)}
+.nab:active{transform:scale(.97)}
+.nmlist{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.nmitem{display:flex;align-items:center;gap:12px;min-height:54px;padding:0 14px;border-radius:14px;border:1px solid var(--line,#d9e2e7);background:var(--card,#fff);color:var(--ink);font:inherit;font-size:17px;text-align:start;cursor:pointer}
+.nmitem.danger{color:#b4443a}
+.nmic{width:28px;text-align:center;font-size:22px}

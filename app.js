@@ -866,8 +866,7 @@ function nowCard(t) {
   return '<div class="card nowcard"><div class="sub">עכשיו</div><div class="t big">' + titleP(t) + '</div>' + (t.notes ? '<div class="sub" style="white-space:pre-wrap;margin-top:4px">' + esc(t.notes) + '</div>' : '')
     + '<div class="meta" style="margin:8px 0">' + quadChip(t) + (t.diff ? '<span class="chip">' + diffLabel(t.diff) + '</span>' : '') + projectChip(t) + '</div>'
     + '<button class="btn startnow" data-act="runStart" data-id="' + t.id + '">◀ התחל עכשיו</button>'
-    + '<div class="grid2"><button class="btn ghost" data-act="chooseOther">🔁 בחר פעולה אחרת</button><button class="btn ghost" data-act="runBreak">☕ אני צריך הפסקה</button></div>'
-    + '<button class="lnk" data-act="toggleTask" data-id="' + t.id + '" style="margin-top:8px">✓ כבר עשיתי את זה</button></div>';
+    + '<div class="nowacts"><button class="nab ok" data-act="askDone" data-id="' + t.id + '" aria-label="סימון כבוצע"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>בוצע</span></button><button class="nab more" data-act="nowMenu" data-id="' + t.id + '" aria-label="עוד פעולות">⋯</button></div></div>';
 }
 function doView() { // do mode: only the current action, nothing else to distract
   const d = TODAY(), ts = tasksOn(d), open = ts.filter(t => !t.done), done = ts.length - open.length, cur = currentAction(), L0 = D().dayLog[dayKey()] || {};
@@ -2817,6 +2816,23 @@ const A = {
     toast('<span>↩ הוחזרה לכל הפעולות</span><button class="btn ghost" data-act="undoPool" data-id="' + t.id + '" data-d="' + (prev || '') + '">בטל</button><button data-act="toastClose" aria-label="סגור">✕</button>', 6000);
   },
   undoPool: e => { const t = findTask(e.id); if (t) { t.date = e.d || null; t.parked = false; Store.save(); } $('#toast').hidden = true; render(); },
+  nowMenu: e => { const t = findTask(e.id); if (!t) return; const it = (w, ic, l, cls) => `<button class="nmitem ${cls || ''}" data-act="nmDo" data-w="${w}" data-id="${t.id}"><span class="nmic">${ic}</span>${l}</button>`; sheet(`<h1>${esc(t.title)}</h1><div class="nmlist">${it('askMove', '←', 'להעביר לתאריך אחר')}${it('chooseOther', '🔁', 'לבחור פעולה אחרת')}${it('runBreak', '☕', 'אני צריך הפסקה')}${it('askCancel', '🗑', 'לבטל את המשימה', 'danger')}</div><div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>`); },
+  nmDo: e => { closeSheet(); if (A[e.w]) A[e.w](e); },
+  askDone: e => { const t = findTask(e.id); if (!t) return; sheet(`<h1>כבר בוצע?</h1><div class="sub">${esc(t.title)}</div><div class="actions"><button class="btn ghost" data-act="close">לא</button><button class="btn" data-act="doneYes" data-id="${t.id}">כן, בוצע ✓</button></div>`); },
+  doneYes: e => { closeSheet(); const t = findTask(e.id); if (t && !t.done) A.toggleTask(e); },
+  askCancel: e => { const t = findTask(e.id); if (!t) return; sheet(`<h1>לבטל את המשימה?</h1><div class="sub">${esc(t.title)}</div><div class="actions"><button class="btn ghost" data-act="close">לא</button><button class="btn danger" data-act="cancelTask" data-id="${t.id}">כן, לבטל 🗑</button></div>`); },
+  askMove: e => { const t = findTask(e.id); if (!t) return; const T = TODAY(); sheet(`<h1>להעביר לתאריך אחר?</h1><div class="sub">${esc(t.title)}</div><div class="opt" style="margin:10px 0">${[['מחר', 1], ['בעוד יומיים', 2], ['בעוד שבוע', 7]].map(([l, n]) => `<button type="button" data-act="skipToday" data-id="${t.id}" data-d="${addDays(T, n)}">${l}</button>`).join('')}</div><label>תאריך אחר</label><input type="date" id="mvDate" min="${addDays(T, 1)}" value="${addDays(T, 1)}"><div class="actions"><button class="btn ghost" data-act="close">לא</button><button class="btn" data-act="moveDate" data-id="${t.id}">העבר</button></div>`); },
+  moveDate: e => { const v = ($('#mvDate') || {}).value; if (v) A.skipToday({ id: e.id, d: v }); },
+  skipToday: e => { // moves this action to another day (default: tomorrow), with an undo
+    closeSheet(); const t = findTask(e.id); if (!t) return; const nd = e.d || addDays(TODAY(), 1), od = t.date, odf = t.defers, oord = t.ord; deferTo(t, nd); state.doId = null; Store.save(); render();
+    toast(`<span>⏭ <b>${esc(t.title)}</b> עברה ל${nd === addDays(TODAY(), 1) ? 'מחר' : shortDate(nd)}</span><button class="btn" data-act="undoSkip" data-id="${t.id}" data-d="${od || ''}" data-f="${odf || 0}" data-o="${oord === undefined ? '' : oord}">בטל</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 9000);
+  },
+  cancelTask: e => { // the action is cancelled (removed); the toast keeps an undo
+    closeSheet(); const i = D().tasks.findIndex(x => x.id === e.id); if (i < 0) return; const t = D().tasks[i]; state.cancelUndo = { t, i }; D().tasks.splice(i, 1); state.doId = null; Store.save(); render();
+    toast(`<span>🗑 <b>${esc(t.title)}</b> בוטלה</span><button class="btn" data-act="undoCancel">בטל</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 9000);
+  },
+  undoCancel: () => { const u = state.cancelUndo; if (!u) return; D().tasks.splice(Math.min(u.i, D().tasks.length), 0, u.t); state.cancelUndo = null; Store.save(); $('#toast').hidden = true; render(); },
+  undoSkip: e => { const t = findTask(e.id); if (!t) return; t.date = e.d || null; t.defers = +e.f || undefined; if (e.o !== '') t.ord = +e.o; Store.save(); $('#toast').hidden = true; render(); },
   undoSweep: () => { (state.sweepUndo || []).forEach(([id, d]) => { const t = findTask(id); if (t && !t.date) { t.date = d; delete t.from; } }); state.sweepUndo = null; Store.save(); $('#toast').hidden = true; render(); },
   carryOver: () => { // move everything left undone from yesterday to today, on request only
     const T = TODAY(), list = yesterdayLeft(); if (!list.length) return;
