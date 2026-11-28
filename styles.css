@@ -456,3 +456,64 @@ body.miniRun{--dockb:154px}
 .nmitem{display:flex;align-items:center;gap:12px;min-height:54px;padding:0 14px;border-radius:14px;border:1px solid var(--line,#d9e2e7);background:var(--card,#fff);color:var(--ink);font:inherit;font-size:17px;text-align:start;cursor:pointer}
 .nmitem.danger{color:#b4443a}
 .nmic{width:28px;text-align:center;font-size:22px}
+.nowcard .startnow{padding:11px 14px;font-size:16px;border-radius:14px;min-height:0;margin-top:6px}
+.nowcard .nowacts{gap:8px;margin-top:8px}
+.nowcard .nab{height:38px;border-radius:12px;font-size:14px;gap:6px;border-width:1.3px}
+.nowcard .nab svg{width:18px;height:18px}
+.nowcard .nab.more{width:46px;font-size:20px}
+html[data-design="spatial"] .nowcard .startnow{padding:11px 14px;font-size:16px;border-radius:14px;box-shadow:0 4px 12px color-mix(in srgb,var(--brand) 28%,transparent)}
+html[data-design="spatial"] .nowcard{padding:18px 16px}
+
+/* ===== Day screen: one focus, one quiet list ===== */
+.tdy{padding:4px 2px 0}
+.tdy-head{display:flex;justify-content:space-between;align-items:flex-start;margin:6px 0 14px}
+.tdy-head h1{margin:2px 0 0;font-size:26px;font-weight:700;letter-spacing:-.01em}
+.tdy-date{font-size:14px;color:var(--muted)}
+.tdy-acct{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);font-size:17px;cursor:pointer}
+.tdy-prog{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.tdy-bar{flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.tdy-bar div{height:100%;background:var(--brand);border-radius:3px;transition:width .4s}
+.tdy-prog span{font-size:13px;color:var(--muted);white-space:nowrap}
+.tdy-anchor{display:flex;align-items:center;gap:12px;padding:11px 14px;margin-bottom:14px;border-radius:14px;background:var(--info-bg);color:var(--info-ink);cursor:pointer}
+.tdy-anchor .grow{display:flex;flex-direction:column;gap:1px}
+.tdy-anchor b{font-size:15px}.tdy-anchor span{font-size:13px;opacity:.9}
+.tdy-now{padding:20px 18px 18px;margin-bottom:22px;border-radius:20px;background:var(--card);border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.03),0 8px 24px rgba(0,0,0,.05)}
+.tdy-cap{font-size:13px;color:var(--muted);margin-bottom:6px}
+.tdy-title{font-size:24px;line-height:1.35;font-weight:700;letter-spacing:-.01em}
+.tdy-info{margin-top:8px;font-size:14px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.tdy-notes{margin-top:8px;font-size:14px;color:var(--muted);white-space:pre-wrap}
+.tdy-anch{display:inline-flex;align-items:center;gap:4px;color:var(--info-ink);font-weight:600;margin-inline-end:8px}
+.tdy-anch svg{width:15px;height:15px}
+.tdy-acts{display:flex;gap:10px;margin-top:20px}
+.tdy-go{flex:1;height:52px;border:0;border-radius:15px;background:var(--brand);color:var(--brand-ink);font:inherit;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer}
+.tdy-sq{width:52px;height:52px;border-radius:15px;border:1px solid var(--line);background:var(--card);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.tdy-sq.ok{color:var(--brand);border-color:var(--brand)}
+.tdy-go:active,.tdy-sq:active{transform:scale(.97)}
+.tdy-next{margin:0 4px 6px}
+.tdy-list{border-top:1px solid var(--line)}
+.tdy-row{display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid var(--line);font-size:17px}
+.tdy-chk{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);background:transparent;flex:none;cursor:pointer;padding:0}
+.tdy-min{font-size:13px;color:var(--muted)}
+.tdy-more{display:block;width:100%;padding:14px 4px;border:0;background:transparent;color:var(--info-ink);font:inherit;font-size:15px;text-align:start;cursor:pointer}
+.tdy-foot{display:flex;gap:18px;justify-content:center;margin:22px 0 6px}
+.tdy-link{border:0;background:transparent;color:var(--muted);font:inherit;font-size:14px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+html[data-design="spatial"] .tdy-now,html[data-design="spatial"] .tdy-acct,html[data-design="spatial"] .tdy-sq{background:color-mix(in srgb,var(--card) 92%,transparent)}
+
+/* ===== Planning screen: same calm language, task cards become list rows ===== */
+.tdy-nav{display:flex;gap:8px;align-items:center}
+.tdy-nav .tdy-acct{width:38px;height:38px;font-size:16px;display:flex;align-items:center;justify-content:center;padding:0;color:var(--ink)}
+.tdy-nav .tdy-acct.wide{width:auto;padding:0 14px;font-size:14px;border-radius:19px}
+.tdyp .tdy-hours{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-6px 0 14px}
+.tdyp .modesw{margin:0 0 14px;display:flex;gap:6px;padding:4px;border-radius:14px;background:var(--line)}
+.tdyp .modesw button{flex:1;border:0;background:transparent;padding:9px 6px;border-radius:11px;font:inherit;font-size:15px;color:var(--muted);cursor:pointer}
+.tdyp .modesw button.on{background:var(--card);color:var(--ink);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tdyp .card.focus{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:none;margin:0 0 16px;padding:12px 14px}
+.tdyp .tdy-next{margin:6px 4px 4px}
+.tdyp .grp{margin:0}
+.tdyp .grp>.card{background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;padding:13px 4px;margin:0}
+.tdyp .grp>.card .t{font-size:17px}
+.tdyp .grp>.card .meta{margin-top:4px;opacity:.9}
+.tdyp .playbtn{opacity:.55}
+.tdyp .more3{margin-top:10px}
+.tdyp .todaymore{margin-top:18px;border:0}
+.tdyp .todaymore>summary{color:var(--muted);font-size:14px;padding:8px 4px}

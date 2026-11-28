@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.11-anchor-alert'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.13-plan-screen'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -862,28 +862,48 @@ const quadChips = (id, cur, kind) => '<div class="opt quadopts">' + QUADS.map(q 
 /* ---------- Plan mode / do mode, the next-action suggestion, coming back from a break ---------- */
 const modeSwitch = () => '<div class="opt modesw"><button class="' + (state.mode === 'plan' ? 'on' : '') + '" data-act="setMode" data-m="plan">📋 תכנון</button><button class="' + (state.mode === 'do' ? 'on' : '') + '" data-act="setMode" data-m="do">🎯 ביצוע</button></div>';
 const currentAction = () => { const t = state.doId ? findTask(state.doId) : null; return (t && !t.done && t.date === TODAY()) ? t : nextTask(''); };
-function nowCard(t) {
-  return '<div class="card nowcard"><div class="sub">עכשיו</div><div class="t big">' + titleP(t) + '</div>' + (t.notes ? '<div class="sub" style="white-space:pre-wrap;margin-top:4px">' + esc(t.notes) + '</div>' : '')
-    + '<div class="meta" style="margin:8px 0">' + quadChip(t) + (t.diff ? '<span class="chip">' + diffLabel(t.diff) + '</span>' : '') + projectChip(t) + '</div>'
-    + '<button class="btn startnow" data-act="runStart" data-id="' + t.id + '">◀ התחל עכשיו</button>'
-    + '<div class="nowacts"><button class="nab ok" data-act="askDone" data-id="' + t.id + '" aria-label="סימון כבוצע"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>בוצע</span></button><button class="nab more" data-act="nowMenu" data-id="' + t.id + '" aria-label="עוד פעולות">⋯</button></div></div>';
+const IC = {
+  play: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M17 4.5v15L5 12z"/></svg>',
+  check: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  dots: '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+  anchor: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="2.2"/><path d="M12 7.5V21M5 13c0 4 3 8 7 8s7-4 7-8M8 11h8"/></svg>'
+};
+function nowCard(t) { // the single focus of the day: one big action, a quick "done", and everything else behind "..."
+  const info = [t.mins ? t.mins + ' ד׳' : '', t.diff ? diffLabel(t.diff).replace('קושי: ', 'קושי ') : ''].filter(Boolean).join(' · ');
+  return '<section class="tdy-now" aria-label="מה עכשיו"><div class="tdy-cap">עכשיו</div><div class="tdy-title">' + titleP(t) + '</div>'
+    + (info || t.start ? '<div class="tdy-info">' + (t.start ? '<span class="tdy-anch">' + IC.anchor + t.start + '</span>' : '') + esc(info) + '</div>' : '')
+    + (t.notes ? '<div class="tdy-notes">' + esc(t.notes) + '</div>' : '')
+    + '<div class="tdy-acts"><button class="tdy-go" data-act="runStart" data-id="' + t.id + '">' + IC.play + 'התחל</button>'
+    + '<button class="tdy-sq ok" data-act="askDone" data-id="' + t.id + '" aria-label="סימון כבוצע">' + IC.check + '</button>'
+    + '<button class="tdy-sq" data-act="nowMenu" data-id="' + t.id + '" aria-label="עוד פעולות">' + IC.dots + '</button></div></section>';
 }
-function doView() { // do mode: only the current action, nothing else to distract
+function nextAnchor(open, cur) { // the next fixed-time action of today, shown above the focus card
+  const now = nowHM(), a = open.filter(t => t.start && (!cur || t.id !== cur.id) && t.start >= now).sort((x, y) => x.start < y.start ? -1 : 1)[0];
+  if (!a) return '';
+  const m = toMin(a.start) - toMin(now), when = m < 1 ? 'עכשיו' : m < 60 ? 'בעוד ' + m + ' דקות' : 'בעוד ' + Math.floor(m / 60) + ' שע׳' + (m % 60 ? ' ו-' + (m % 60) + ' ד׳' : '');
+  return '<div class="tdy-anchor" data-act="taskMenu" data-id="' + a.id + '">' + IC.anchor + '<div class="grow"><b>' + esc(a.title) + '</b><span>' + when + ' · ' + a.start + '</span></div></div>';
+}
+function doView() { // the day screen: one focus, one quiet list, no clutter
   const d = TODAY(), ts = tasksOn(d), open = ts.filter(t => !t.done), done = ts.length - open.length, cur = currentAction(), L0 = D().dayLog[dayKey()] || {};
-  const rem = open.reduce((a, t) => a + (t.mins || 0), 0), est = rem ? estimateEnd(rem) : '', pct = ts.length ? Math.round(done / ts.length * 100) : 0;
-  const queue = open.filter(t => !cur || t.id !== cur.id).slice(0, 2);
-  const dayBtn = !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : (L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : '');
-  return '<div class="top"><div class="brand">' + logoMark(36) + '<div><h1>היום</h1><div class="sub">' + longDate(d) + '</div></div></div><div class="sw">' + (featOn('dayextras') ? '<button class="iconbtn" data-act="printDayAll" aria-label="הדפסת פעילות היום" title="הדפסת פעילות היום">🖨</button>' : '') + '<button class="iconbtn" data-act="account" title="סנכרון וחשבון">' + (Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤') + '</button></div></div>'
-    + modeSwitch()
-    + '<div class="card"><div class="row"><b class="grow">' + done + '/' + ts.length + ' הושלמו' + (rem ? ' · נותרו ' + rem + ' ד׳' : '') + '</b>' + (featOn('hours') ? '<button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' + dayBtn : '') + '</div><div class="bar"><div style="width:' + pct + '%"></div></div>' + (est ? '<div class="sub" style="margin-top:6px">סיום משוער ' + est + ' (כולל הפסקות)</div>' : '') + '</div>'
-    + (cur ? nowCard(cur) : ts.length === 0 ? '<div class="card"><div class="t">עוד אין פעולות להיום</div><div class="sub" style="margin-top:6px">הוסף את הפעולה הראשונה, או בחר מהמאגר במצב תכנון.</div><button class="btn startnow" data-act="addTask" style="margin-top:8px">＋ פעולה חדשה</button><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px;width:100%">📋 למצב תכנון</button></div>' : '<div class="card"><div class="t">🎉 אין עוד פעולות פתוחות להיום</div><div class="sub" style="margin-top:6px">במצב תכנון אפשר להוסיף פעולות מהמאגר, או לסיים את היום.</div><button class="btn ghost" data-act="setMode" data-m="plan" style="margin-top:8px">📋 למצב תכנון</button></div>')
-    + (queue.length ? '<h2>בתור</h2>' + queue.map(t => '<div class="card"><div class="t">' + esc(t.title) + '</div><div class="meta">' + '</div></div>').join('') : '')
+  const pct = ts.length ? Math.round(done / ts.length * 100) : 0, rest = open.filter(t => !cur || t.id !== cur.id), queue = rest.slice(0, 2), more = rest.length - queue.length;
+  const dayBtn = featOn('hours') ? (!L0.start && !L0.end ? '<button class="tdy-link" data-act="dayStart">◀ התחלתי יום</button>' : (L0.start && !L0.end ? '<button class="tdy-link" data-act="dayEnd">🌙 לילה טוב</button>' : '')) : '';
+  const acct = '<button class="tdy-acct" data-act="account" aria-label="סנכרון וחשבון">' + (Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤') + '</button>';
+  const empty = ts.length === 0
+    ? '<section class="tdy-now"><div class="tdy-title">היום פנוי</div><div class="tdy-info">הוסף את הפעולה הראשונה, או בחר מהמאגר בתכנון.</div><div class="tdy-acts"><button class="tdy-go" data-act="addTask">＋ פעולה חדשה</button></div></section>'
+    : '<section class="tdy-now"><div class="tdy-title">סיימת את כל הפעולות להיום</div><div class="tdy-info">אפשר לנוח, או להוסיף משהו מהמאגר בתכנון.</div></section>';
+  return '<div class="tdy"><header class="tdy-head"><div><div class="tdy-date">' + longDate(d) + '</div><h1>' + greet() + '</h1></div>' + acct + '</header>'
+    + '<div class="tdy-prog" aria-label="התקדמות היום"><div class="tdy-bar"><div style="width:' + pct + '%"></div></div><span>' + done + ' מתוך ' + ts.length + '</span></div>'
+    + nextAnchor(open, cur)
+    + (cur ? nowCard(cur) : empty)
+    + (queue.length ? '<div class="tdy-cap tdy-next">אחר כך</div><div class="tdy-list">' + queue.map(t => '<div class="tdy-row"><button class="tdy-chk" data-act="toggleTask" data-id="' + t.id + '" aria-label="סימון כבוצע"></button><div class="grow" data-act="taskMenu" data-id="' + t.id + '">' + (t.start ? '<span class="tdy-anch">' + IC.anchor + t.start + '</span>' : '') + esc(t.title) + '</div>' + (t.mins ? '<span class="tdy-min">' + t.mins + ' ד׳</span>' : '') + '</div>').join('')
+      + (more > 0 ? '<button class="tdy-more" data-act="setMode" data-m="plan">עוד ' + more + ' פעולות להיום</button>' : '') + '</div>' : '')
+    + '<div class="tdy-foot"><button class="tdy-link" data-act="setMode" data-m="plan">תכנון היום</button>' + dayBtn + '</div>'
     + energyBar(d)
-    + '<button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>';
+    + '</div><button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>';
 }
 function chooseOther() { // pick another action to do now (the user decides, the order is only a hint)
   $('#toast').hidden = true; const cur = currentAction(), list = tasksOn(TODAY()).filter(t => !t.done && (!cur || t.id !== cur.id)).slice(0, 6);
-  sheet('<h1>בחר פעולה אחרת</h1>' + (list.length ? '<div class="grid2" style="grid-template-columns:1fr">' + list.map(t => '<button class="btn ghost" data-act="pickNow" data-id="' + t.id + '">◀ ' + esc(t.title) +  + '</button>').join('') + '</div>' : '<p class="sub">אין עוד פעולות פתוחות להיום. אפשר להוסיף מהמאגר במצב תכנון.</p>') + '<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>');
+  sheet('<h1>בחר פעולה אחרת</h1>' + (list.length ? '<div class="grid2" style="grid-template-columns:1fr">' + list.map(t => '<button class="btn ghost" data-act="pickNow" data-id="' + t.id + '">◀ ' + esc(t.title) + '</button>').join('') + '</div>' : '<p class="sub">אין עוד פעולות פתוחות להיום. אפשר להוסיף מהמאגר במצב תכנון.</p>') + '<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>');
 }
 function returnToast() { // after a break: remind what I was doing, back to it with one tap
   if (notifyLevel() === 'quiet') return;
@@ -1243,7 +1263,7 @@ function taskRow(t, showDate) {
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${hxMark(t)}${titleP(t)}</div>
-      <div class="meta">${t.start ? `<span class="chip" style="background:var(--accent);color:#fff" title="עוגן: שעת התחלה קבועה">⚓ ${t.start}</span>` : ''}${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.diff ? '<span class="chip" title="רמת קושי">' + diffLabel(t.diff) + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.start ? `<span class="chip" style="background:var(--info-bg);color:var(--info-ink);font-weight:600" title="עוגן: שעת התחלה קבועה">⚓ ${t.start}</span>` : ''}${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.diff ? '<span class="chip" title="רמת קושי">' + diffLabel(t.diff) + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -1274,7 +1294,7 @@ function upCard(t, showDate) {
   return `<div class="ucard p${t.priority} ${t.done ? 'done' : ''}" data-task="${t.id}"><div class="urow">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${titleP(t)}</div>
-    <div class="meta">${t.start ? `<span class="chip" style="background:var(--accent);color:#fff" title="עוגן: שעת התחלה קבועה">⚓ ${t.start}</span>` : ''}${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
+    <div class="meta">${t.start ? `<span class="chip" style="background:var(--info-bg);color:var(--info-ink);font-weight:600" title="עוגן: שעת התחלה קבועה">⚓ ${t.start}</span>` : ''}${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
@@ -1746,10 +1766,9 @@ const views = {
     const L0 = isToday ? (D().dayLog[dayKey()] || {}) : {}, est = isToday && remaining ? estimateEnd(remaining) : '';
     const visTop = isToday && !D().visual[d] && new Date().getHours() < 11, rs = isToday ? rewardState(d) : {}, rewardTop = isToday && rs.rule && rs.achieved && !rs.claimed;
     const hAct = hs.filter(h => !habitDone(h, d)).length;
-    const html = `<div class="top"><div class="brand">${logoMark(36)}<div><h1>${d === TODAY() ? 'היום' : 'יום נבחר'}</h1><div class="sub">${longDate(d)}</div></div></div>
-      <div class="sw">${featOn('dayextras') ? '<button class="iconbtn" data-act="printDayAll" aria-label="הדפסת פעילות היום" title="הדפסת פעילות היום">🖨</button>' : ''}<button class="iconbtn" data-act="account" title="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button><button class="iconbtn" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button><button class="iconbtn" data-act="goToday">היום</button><button class="iconbtn" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button></div></div>
-      <div class="card" style="--pct:${pct}%"><div class="row"><b class="grow">${done}/${total} הושלמו${remaining ? ` · נותרו ${remaining} ד׳` : ''}</b>${isToday && featOn('hours') ? '<button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>' : ''}${isToday && featOn('hours') && !L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${isToday && featOn('hours') && L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : ''}${isToday && featOn('hours') && L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}</div><div class="bar"><div style="width:${pct}%"></div></div>
-       ${featOn('hours') && (L0.start || est) ? `<div class="sub" style="margin-top:6px">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est} (כולל הפסקות)` : ''}</div>` : ''}</div>
+    const html = `<div class="tdy tdyp"><header class="tdy-head"><div><div class="tdy-date">${longDate(d)}</div><h1>${isToday ? greet() : 'יום נבחר'}</h1></div><div class="tdy-nav">${featOn('dayextras') ? '<button class="tdy-acct" data-act="printDayAll" aria-label="הדפסת פעילות היום">🖨</button>' : ''}<button class="tdy-acct" data-act="shift" data-n="-1" aria-label="היום הקודם">${chev('r')}</button>${isToday ? '' : '<button class="tdy-acct wide" data-act="goToday">היום</button>'}<button class="tdy-acct" data-act="shift" data-n="1" aria-label="היום הבא">${chev('l')}</button><button class="tdy-acct" data-act="account" aria-label="סנכרון וחשבון">${Cloud.status === 'ok' ? '☁️' : Cloud.status === 'syncing' ? '🔄' : Cloud.status === 'error' ? '⚠️' : '👤'}</button></div></header>
+      <div class="tdy-prog" aria-label="התקדמות היום"><div class="tdy-bar"><div style="width:${pct}%"></div></div><span>${done} מתוך ${total}${remaining ? ` · ${remaining} ד׳` : ''}</span></div>
+      ${isToday && featOn('hours') ? `<div class="tdy-hours">${'<button class="iconbtn" data-act="dayEdit" aria-label="עריכת שעת התחלה וסיום">✏️ שעות</button>'}${!L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayStart">◀ התחלתי יום</button>' : ''}${L0.start && !L0.end ? '<button class="iconbtn endday" data-act="dayEnd">🌙 לילה טוב</button>' : ''}${L0.end ? '<button class="iconbtn" data-act="dayReopen" aria-label="פתח את היום מחדש">↺ פתח מחדש</button>' : ''}${(L0.start || est) ? `<div class="sub">${L0.start ? 'התחלת ב-' + L0.start : ''}${L0.end ? ` · סיימת ב-${L0.end} · משך ${fmtDur(dayDurMin(L0))}` : ''}${!L0.end && L0.start && est ? ' · ' : ''}${!L0.end && est ? `סיום משוער ${est}` : ''}</div>` : ''}</div>` : ''}
       ${isToday ? modeSwitch() : ''}
       ${isToday ? syncHint() : ''}
       ${isToday ? breathCard(d) : ''}
@@ -1758,7 +1777,7 @@ const views = {
       ${rewardTop ? rewardCard(d) : ''}
       ${energyBar(d)}
       ${hxOn() && d === TODAY() ? hxFocusNote(d) : focusCard(d)}
-      <h2>פעולות</h2>${isToday && featOn('carry') && yesterdayLeft().length ? '<button class="btn ghost more3" style="margin:0 0 8px" data-act="carryOver">⏩ העבר להיום את מה שלא בוצע אתמול (' + yesterdayLeft().length + ')</button>' : ''}${isToday && featOn('org') && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
+      <div class="tdy-cap tdy-next">פעולות להיום${ts.length ? ' · ' + ts.filter(t => !t.done).length : ''}</div>${isToday && featOn('carry') && yesterdayLeft().length ? '<button class="btn ghost more3" style="margin:0 0 8px" data-act="carryOver">⏩ העבר להיום את מה שלא בוצע אתמול (' + yesterdayLeft().length + ')</button>' : ''}${isToday && featOn('org') && !orgDone(d) ? orgCard() : ''}${tasksBlock(d, ts)}
       ${doneSection(d, ts, hs)}
       <details class="todaymore" id="todayMore" ${state.moreOpen ? 'open' : ''}><summary>עוד להיום${hAct ? ` · ${hAct} הרגלים` : ''}</summary>
        ${featOn('dayextras') ? `<div class="opt" style="margin:6px 0"><button data-act="asstToday">💬 מה מעסיק אותי היום?</button></div>` : ''}
@@ -1768,7 +1787,7 @@ const views = {
        ${hs.some(h => !habitDone(h, d)) ? `<h2>הרגלים</h2>${hs.filter(h => !habitDone(h, d)).map(h => habitRow(h, d)).join('')}` : ''}
        ${featOn('dayNote') ? `<h2>פתק יומי</h2><textarea id="note" placeholder="מחשבות, סיכום, דברים לזכור...">${esc(D().notes[d] || '')}</textarea>` : ''}
       </details>
-      <button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>`;
+      </div><button class="fab" data-act="fabMenu" data-a="addTask" aria-label="הוספה">+</button>`;
     return hxWrap(html, d);
   },
   upcoming() {
