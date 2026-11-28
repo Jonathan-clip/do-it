@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.23-no-clarity-check'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.25-undated'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], knowledge: [], kcols: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -259,7 +259,7 @@ const subProg = t => (t.subs && t.subs.length) ? `${t.subs.filter(s => s.done).l
 const overdue = () => D().tasks.filter(t => !t.done && t.date && t.date < TODAY());
 const habitsOn = d => D().habits.filter(h => h.days.includes(parse(d).getDay())).sort((a, b) => (b.energy || 0) - (a.energy || 0));
 const habitDone = (h, d) => !!h.log[d];
-function backTo() { const t = state.tab; if (['wins', 'habits', 'goals', 'cheer'].includes(t)) return { t: 'momentum', l: 'מומנטום' }; if (t === 'lists') return { t: 'know', l: 'מרכז הידע' }; return { t: 'more', l: 'עוד' }; }
+function backTo() { const t = state.tab; if (['wins', 'habits', 'goals', 'cheer'].includes(t)) return { t: 'momentum', l: 'מומנטום' }; if (t === 'lists') return { t: 'know', l: 'המוח השני' }; return { t: 'more', l: 'עוד' }; }
 function habitWeek(h) { const d = TODAY(); let sc = 0, dn = 0; for (let i = 0; i < 7; i++) { const x = addDays(d, -i); if (h.days.includes(parse(x).getDay())) { sc++; if (habitDone(h, x)) dn++; } } return '🌱 השבוע ' + dn + ' מתוך ' + sc; }
 function momWeek() {
   const from = addDays(TODAY(), -6);
@@ -1776,6 +1776,18 @@ function pmAssignSheet() {
     ${L.map(p => { const sg = pmSuggestArea(p); return `<div class="card"><div class="row"><span style="font-size:22px">${esc(pmIcon(p))}</span><b class="grow">${esc(p.title)}</b></div><select data-pmas="${p.id}" style="margin-top:8px"><option value="">— בלי תחום —</option>${pmAreas().map(a => `<option value="${a.id}" ${a.id === sg ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>${sg ? '' : '<div class="sub" style="margin-top:4px">לא מצאתי התאמה, אפשר לבחור ידנית</div>'}</div>`; }).join('')}
     <div class="actions"><button class="btn ghost" data-act="close">ביטול</button><button class="btn" data-act="pmAssignApply">החל</button></div>`);
 }
+const undated = () => D().tasks.filter(t => !t.date && !t.done);
+const undatedBanner = () => { const n = undated().length; return n ? '<div class="card pmassign"><div class="grow"><b>' + (n === 1 ? 'פעולה אחת בלי תאריך' : n + ' פעולות בלי תאריך') + '</b><div class="sub">תן להן יום כדי שיופיעו ב"היום". אני מציע, ואתה מאשר</div></div><button class="btn" data-act="undatedAssign">תזמון מהיר</button></div>' : ''; };
+function undatedSheet() {
+  const T = TODAY(), days = Array.from({ length: 14 }, (_, i) => addDays(T, i)), load = {};
+  days.forEach(d => load[d] = D().tasks.filter(t => t.date === d && !t.done).length);
+  const lbl = d => (d === T ? 'היום' : d === addDays(T, 1) ? 'מחר' : 'יום ' + DAYN[parse(d).getDay()]) + ' · ' + shortDate(d);
+  const L = undated();
+  const sug = {}; L.forEach(t => { const d = days.find(x => load[x] < 3) || days[days.length - 1]; sug[t.id] = d; load[d]++; });
+  sheet('<h1>תזמון פעולות בלי תאריך</h1><div class="sub" style="margin-bottom:8px">ההצעה מפזרת את הפעולות כך שלא יהיו יותר מ-3 ביום. שום דבר לא ישתנה עד שתלחץ "החל"</div>'
+    + L.map(t => '<div class="card"><b>' + esc(t.title) + '</b><select data-uds="' + t.id + '" style="margin-top:8px"><option value="">— בלי תאריך —</option>' + days.map(d => '<option value="' + d + '" ' + (d === sug[t.id] ? 'selected' : '') + '>' + lbl(d) + '</option>').join('') + '</select></div>').join('')
+    + '<div class="actions"><button class="btn ghost" data-act="close">ביטול</button><button class="btn" data-act="undatedApply">החל</button></div>');
+}
 const greet = () => { const h = new Date().getHours(), n = (D().assist.userName || '').trim(); return (h < 5 ? 'לילה טוב' : h < 12 ? 'בוקר טוב' : h < 17 ? 'צהריים טובים' : h < 21 ? 'ערב טוב' : 'לילה טוב') + (n ? ', ' + esc(n) : ''); };
 const hxOn = () => document.documentElement.dataset.design === 'spatial';
 function homeMap() {
@@ -1935,6 +1947,7 @@ const views = {
     }
     return `<div class="top"><h1>בקרוב</h1><div class="sw">${['week', 'three', 'day'].includes(mode) ? '' : monthSel}${featOn('upPrint') ? '<button class="iconbtn" data-act="printWeek">🖨 שבוע</button>' : ''}</div></div>
       <div class="seg"><button class="segtoday" data-act="upToday">היום</button>${[['day', 'יום'], ['three', '3 ימים'], ['week', 'שבוע'], ...(featOn('viewMonth') ? [['month', 'חודש']] : []), ...(featOn('viewAll') ? [['days', 'כל הימים']] : [])].map(([k, l]) => `<button class="${mode === k ? 'on' : ''}" data-act="upMode" data-m="${k}">${l}</button>`).join('')}</div>
+      ${undatedBanner()}
       ${featOn('upFilter') ? filterBar() : ''}
       ${mode === 'month' ? '' : '<div class="opt" style="margin:6px 0"><button data-act="upJump" data-c="none">📥 ללא תאריך (' + D().tasks.filter(t => !t.date && !t.done && filterOk(t)).length + ')</button></div>'}
       ${nav}${body}
@@ -2045,7 +2058,7 @@ const views = {
       ${item('week', '🧭', 'חזון שבועי', 'תוצאות השבוע, סיכום ותכנון')}
       ${item('dayrewards', '🎁', 'תגמולים יומיים', `${D().dayRewards.length} תגמולים ברשימה`)}
       ${item('tasks', '✅', 'פעולות ופרויקטים', [D().tasks.filter(t => !t.done).length ? D().tasks.filter(t => !t.done).length + ' פעולות פתוחות' : '', D().projects.length ? D().projects.length + ' פרויקטים' : ''].filter(Boolean).join(' · ') || 'כל הפעולות במקום אחד')}
-      ${item0('know', '📚', 'מרכז הידע', D().knowledge.length ? D().knowledge.length + ' פריטים שמורים' : 'מקום שקט למה שחשוב לך')}
+      ${item0('know', '📚', 'המוח השני', D().knowledge.length ? D().knowledge.length + ' פריטים שמורים' : 'כל מה שחשוב לי, במקום אחד')}
       ${item('assistant', '🧠', 'עוזר התכנון שלי', `${D().topics.length} נושאים בזיכרון`)}
       ${featOn('vision') ? '<div class="tdy-sect">אישי</div>' : ''}
       ${item('vision', '🌟', 'חזון', `${D().visions.length} פריטים`)}
@@ -2062,7 +2075,7 @@ const views = {
   },
   know() {
     const n = D().knowledge.length;
-    return `<div class="tdy tdyp"><header class="tdy-head"><div><div class="tdy-date">${n ? n + ' פריטים שמורים' : 'מקום שקט למה שחשוב לך'}</div><h1>מרכז הידע</h1></div><button class="tdy-acct wide kadd" data-act="knowAdd">＋ שמור</button></header>
+    return `<div class="tdy tdyp"><header class="tdy-head"><div><div class="tdy-date">${n ? n + ' פריטים שמורים' : 'כל מה שחשוב לי, במקום אחד'}</div><h1>המוח השני</h1></div><button class="tdy-acct wide kadd" data-act="knowAdd">＋ שמור</button></header>
       ${featOn('lists') ? '<div class="tdy-item" data-act="goTab" data-t="lists"><span class="ico">' + lineIcon('📝') + '</span><div class="grow"><div class="t">רשימות</div><div class="meta">' + D().lists.length + ' רשימות</div></div>' + chev('l') + '</div>' : ''}
       <input id="kq" type="search" placeholder="חפש בכל מה ששמרת" value="${esc(state.kq || '')}" autocomplete="off" style="margin-bottom:6px">
       <div id="kres">${kList()}</div></div>`;
@@ -2831,6 +2844,8 @@ const A = {
   },
   pmWorldBack: () => { state.pmIsle = null; state.pmZoom = 'out'; render(); window.scrollTo(0, 0); },
   pmAssign: () => pmAssignSheet(),
+  undatedAssign: () => undatedSheet(),
+  undatedApply: () => { let n = 0; document.querySelectorAll('#sheet [data-uds]').forEach(sel => { const t = findTask(sel.dataset.uds); if (t && sel.value) { t.date = sel.value; n++; } }); Store.save(); closeSheet(); render(); toast('<span>' + (n ? '📅 תוזמנו ' + n + ' פעולות' : 'לא תוזמנה פעולות') + '</span><button data-act="toastClose" aria-label="סגור">✕</button>', 4000); },
   pmAssignApply: () => { let n = 0; document.querySelectorAll('#sheet [data-pmas]').forEach(sel => { const p = D().projects.find(x => x.id === sel.dataset.pmas); if (p && sel.value) { p.area = sel.value; n++; } }); Store.save(); closeSheet(); render(); toast('<span>' + (n ? '✅ שויכו ' + n + ' פרויקטים לתחומי חיים' : 'לא שויך אף פרויקט') + '</span><button data-act="toastClose" aria-label="סגור">✕</button>', 3500); },
   homeIsle: e => { state.tab = 'map'; state.pmIsle = e.id; state.pmOpen = null; state.pmReview = null; render(); window.scrollTo(0, 0); },
   homeProj: e => { state.tab = 'map'; state.pmOpen = e.id; state.pmReview = null; render(); window.scrollTo(0, 0); },
