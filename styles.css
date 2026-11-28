@@ -570,3 +570,21 @@ label{font-size:14px;margin:16px 2px 6px}
 .kimg{width:100%;max-height:260px;object-fit:cover;border-radius:14px;margin:6px 0}
 .knote{white-space:pre-wrap;line-height:1.6;margin:10px 0;font-size:16px;word-break:break-word}
 .tdy-acct.kadd{width:auto;height:42px;padding:0 18px;border-radius:21px;font-size:15px;font-weight:600;white-space:nowrap}
+
+/* momentum */
+.momstats{display:flex;gap:8px;margin:6px 0 16px}
+.momstat{flex:1;background:var(--soft);border-radius:14px;padding:12px 8px;text-align:center}
+.momstat b{display:block;font-size:24px;color:var(--brand);font-weight:700}
+.momstat span{font-size:12px;color:var(--muted)}
+
+/* minimized timer: clearly "running" */
+#run.mini{background:linear-gradient(135deg,var(--brand),#17829f);border-color:transparent;color:#fff;overflow:hidden;box-shadow:0 8px 24px rgba(8,90,120,.35)}
+#run.mini .miniinfo .t,#run.mini .miniinfo .sub,#run.mini .minitime{color:#fff}
+#run.mini .miniinfo .sub{opacity:.85}
+#run.mini .minitime{font-size:26px}
+#run.mini .iconbtn{background:rgba(255,255,255,.18);color:#fff;border-color:transparent}
+#run.mini::after{content:"";position:absolute;inset:auto 0 0 0;height:4px;background:rgba(255,255,255,.9);transform-origin:right;transform:scaleX(var(--rp,0));transition:transform .3s}
+#run.mini{position:fixed}
+#run.mini.live .miniinfo .sub::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#7CFFB2;margin-inline-end:6px;animation:runpulse 1.2s infinite}
+@keyframes runpulse{50%{opacity:.25;transform:scale(.7)}}
+.tdy-go.live{background:#17829f;font-variant-numeric:tabular-nums}

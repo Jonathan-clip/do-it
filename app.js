@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.17-knowledge'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.23-no-clarity-check'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], knowledge: [], kcols: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -218,7 +218,7 @@ function knowOpen(id) {
     + '<button class="nmitem danger" data-act="knowDel" data-id="' + it.id + '"><span class="nmic">🗑</span>מחיקה</button></div>'
     + '<div class="actions"><button class="btn ghost" data-act="close">סגור</button></div>');
 }
-const MORE_TABS = ['week', 'know', 'wins', 'journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
+const MORE_TABS = ['week', 'know', 'momentum', 'wins', 'journal', 'rhythm', 'dayrewards', 'matrix', 'assistant', 'assistmem', 'tasks', 'projects', 'habits', 'goals', 'vision', 'lists'];
 const state = { tab: 'today', date: TODAY(), upStart: TODAY(), upDays: 14, upMode: 'three', upDay: TODAY(), up3: TODAY(), upWeek: TODAY(), upMonth: TODAY().slice(0, 7), upSel: TODAY(), taskFilter: 'open', allMode: 'list', jDate: TODAY(), openList: null, openProject: null, openJob: null, goalFilter: 'active', weekStart: weekStart(TODAY()) };
 try { if (D().assist && D().assist.homeTab === 'map') state.tab = 'map'; } catch (e) {}
 state.mode = (() => { try { const m = localStorage.getItem('doit-mode'); if (m === 'plan' || m === 'do') return m; } catch (e) {} return window.matchMedia && matchMedia('(max-width: 700px)').matches ? 'do' : 'plan'; })();
@@ -259,6 +259,17 @@ const subProg = t => (t.subs && t.subs.length) ? `${t.subs.filter(s => s.done).l
 const overdue = () => D().tasks.filter(t => !t.done && t.date && t.date < TODAY());
 const habitsOn = d => D().habits.filter(h => h.days.includes(parse(d).getDay())).sort((a, b) => (b.energy || 0) - (a.energy || 0));
 const habitDone = (h, d) => !!h.log[d];
+function backTo() { const t = state.tab; if (['wins', 'habits', 'goals', 'cheer'].includes(t)) return { t: 'momentum', l: 'מומנטום' }; if (t === 'lists') return { t: 'know', l: 'מרכז הידע' }; return { t: 'more', l: 'עוד' }; }
+function habitWeek(h) { const d = TODAY(); let sc = 0, dn = 0; for (let i = 0; i < 7; i++) { const x = addDays(d, -i); if (h.days.includes(parse(x).getDay())) { sc++; if (habitDone(h, x)) dn++; } } return '🌱 השבוע ' + dn + ' מתוך ' + sc; }
+function momWeek() {
+  const from = addDays(TODAY(), -6);
+  const tasks = D().tasks.filter(t => t.done && t.doneAt && t.doneAt >= from).length;
+  const wins = allWins().filter(x => x[0] >= from).reduce((n, x) => n + x[1].length, 0);
+  let habits = 0, sched = 0;
+  D().habits.forEach(h => { for (let i = 0; i < 7; i++) { const x = addDays(TODAY(), -i); if (h.days.includes(parse(x).getDay())) { sched++; if (habitDone(h, x)) habits++; } } });
+  return { tasks, wins, habits, sched };
+}
+function momSub() { const w = momWeek(); const n = w.tasks + w.wins + w.habits; return n ? (n === 1 ? 'צעד אחד קדימה' : n + ' צעדים קדימה') + ' ב-7 הימים האחרונים' : 'כל צעד קטן נחשב'; }
 function streak(h) {
   // consecutive scheduled days completed; unscheduled days are skipped; today doesn't break the streak
   let n = 0, d = TODAY();
@@ -405,7 +416,7 @@ const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 function runOpen(id, brk, bmins, blabel, rid) {
   clearInterval(Run.tick); closeSheet();
   if (!brk && id) Work.last = id;
-  Object.assign(Run, { mini: false, idea: brk ? pickIdea() : '', id: brk ? null : id, brk: !!brk, running: false, ended: false, label: blabel || '', rhythmId: rid || '', brkStarted: false, pomo: false });
+  Object.assign(Run, { mini: false, idea: brk ? pickIdea() : '', id: brk ? null : id, brk: !!brk, running: false, ended: false, label: blabel || '', rhythmId: rid || '', brkStarted: false, pomo: false, edit: false });
   const t = findTask(id);
   const pick = brk ? (bmins || 10) : [5, 15, 25].reduce((a, m) => Math.abs(m - ((t && t.mins) || 15)) < Math.abs(a - ((t && t.mins) || 15)) ? m : a, 15);
   Run.total = Run.left = pick * 60; runRender(); $('#run').hidden = false; document.body.classList.add('running');
@@ -415,14 +426,15 @@ function runRender() {
   const t = Run.brk ? null : findTask(Run.id), el = $('#run');
   if (!Run.brk && !t) return runClose();
   if (Run.mini) { // minimized: a compact bar above the navigation
-    el.classList.add('mini'); document.body.classList.remove('running'); document.body.classList.add('miniRun');
+    el.classList.add('mini'); el.classList.toggle('live', !!Run.running); el.style.setProperty('--rp', (runPct() / 100).toFixed(3)); document.body.classList.remove('running'); document.body.classList.add('miniRun');
     el.innerHTML = '<div class="miniinfo" data-act="runExpand"><div class="t">' + (Run.brk ? esc(Run.label || '☕ הפסקה') : esc(t.title)) + '</div><div class="sub">' + (Run.ended ? 'הזמן נגמר' : Run.running ? 'רץ ברקע' : 'מושהה') + '</div></div><div class="minitime" id="runTime">' + mmss(Run.left) + '</div><button class="iconbtn" data-act="runToggle" aria-label="השהה או המשך">' + (Run.running ? '⏸' : '◀') + '</button>' + (Run.brk ? '' : '<button class="iconbtn" data-act="runDone" aria-label="סיימתי">✓</button>') + '<button class="iconbtn" data-act="runExpand" aria-label="הרחב">⤢</button>';
     return;
   }
   el.classList.remove('mini'); document.body.classList.remove('miniRun'); document.body.classList.add('running');
   el.style.setProperty('--rp', (runPct() / 100).toFixed(3));
   const step = t ? ((t.subs || []).find(s => !s.done) || {}).title || t.first || '' : '';
-  const mins = Run.brk ? [...new Set([5, 10, Math.round(Run.total / 60)])].sort((a, b) => a - b) : [5, 15, 25];
+  const cur = Math.round(Run.total / 60);
+  const mins = Run.brk ? [...new Set([5, 10, 15, 30, cur])].sort((a, b) => a - b) : [...new Set([5, 15, 25, cur])].sort((a, b) => a - b);
   el.innerHTML = `<div class="runbox">
     <button class="iconbtn runx" data-act="runClose" aria-label="סגור">✕</button><button class="iconbtn runmin" data-act="runMinimize" aria-label="מזער, הטיימר ממשיך ברקע">▁ מזער</button>
     <div class="sub">${Run.brk ? 'הפסקה' : 'עכשיו עובדים על'}</div>
@@ -430,7 +442,8 @@ function runRender() {
     ${Run.brk && !Run.ended && Run.idea ? '<div class="remind" style="margin:6px 0">💡 ' + esc(Run.idea) + ' <button type="button" class="iconbtn" data-act="nextIdea" aria-label="רעיון אחר">↻</button></div>' : ''}
     ${!Run.brk && t && t.notes ? '<div class="sub" style="white-space:pre-wrap;margin:-6px 0 12px">' + esc(t.notes) + '</div>' : ''}
     ${Run.brk ? '' : `<label class="sub">הצעד הראשון</label><input id="runStep" value="${esc(step)}" placeholder="מה הדבר הראשון והקטן שעושים?" autocomplete="off" ${(t.subs || []).some(s => !s.done) ? 'readonly' : ''}>`}
-    <div class="opt runmins">${mins.map(m => `<button class="${Run.total === m * 60 ? 'on' : ''}" data-act="runMins" data-m="${m}" ${Run.running ? 'disabled' : ''}>${m} ד׳</button>`).join('')}</div>
+    ${Run.edit && !Run.running ? `<div class="opt runmins"><input id="runCustom" type="number" inputmode="numeric" min="1" max="600" value="${cur}" aria-label="דקות" style="width:84px;text-align:center"> <span class="sub">דקות</span> <button class="on" data-act="runMinsSet">אישור</button></div>`
+    : `<div class="opt runmins">${mins.map(m => `<button class="${Run.total === m * 60 ? 'on' : ''}" data-act="runMins" data-m="${m}" ${Run.running ? 'disabled' : ''}>${m} ד׳</button>`).join('')}<button data-act="runMinsEdit" aria-label="זמן אחר" ${Run.running ? 'disabled' : ''}>✎</button></div>`}
     <div class="remind runrem" style="margin-top:14px">💬 ${esc(reminder())}</div>
     <div class="runwrap ${Run.ended ? 'end' : ''}" id="runWrap" style="--pp:${runPct()}"><svg class="rr" viewBox="0 0 120 120" aria-hidden="true"><circle class="rrbg" cx="60" cy="60" r="54"/><circle class="rrfg" cx="60" cy="60" r="54" pathLength="100"/></svg><div class="runtime ${Run.ended ? 'end' : ''}" id="runTime">${mmss(Run.left)}</div></div>
     ${Run.ended ? `<div class="sub" style="text-align:center">${Run.brk ? 'ההפסקה נגמרה' : 'הזמן נגמר. איך הלך?'}</div>` : ''}
@@ -440,12 +453,13 @@ function runRender() {
       ${Run.brk ? '' : '<button class="btn ghost" data-act="stuck">🤝 נתקעתי</button>'}
     </div></div>`;
   const si = $('#runStep'); if (si) si.oninput = () => { t.first = si.value; Store.save(); };
+  const rc = $('#runCustom'); if (rc) { rc.focus(); rc.select(); rc.onkeydown = ev => { if (ev.key === 'Enter') A.runMinsSet(); }; }
 }
 const runPct = () => Run.total ? Math.max(0, Math.min(100, Math.round((1 - Run.left / Run.total) * 1000) / 10)) : 0;
 function runLight() { const w = $('#runWrap'), r = $('#run'); if (w) w.style.setProperty('--pp', runPct()); if (r) r.style.setProperty('--rp', (runPct() / 100).toFixed(3)); }
 function runTick() {
   Run.left = Math.max(0, Math.round((Run.endAt - Date.now()) / 1000));
-  const el = $('#runTime'); if (el) el.textContent = mmss(Run.left); runLight();
+  const el = $('#runTime'); if (el) el.textContent = mmss(Run.left); document.querySelectorAll('.nowtimer').forEach(n => n.textContent = mmss(Run.left)); runLight();
   if (Run.left <= 0) { clearInterval(Run.tick); Run.running = false; Run.ended = true; Run.mini = false; if (!Run.brk) { addWork(Run.total / 60); Work.skipId = Run.id; } runBeep(); runRender(); }
 }
 function runStartTimer() { Run.endAt = Date.now() + Run.left * 1000; Run.running = true; if (Run.brk) Run.brkStarted = true; clearInterval(Run.tick); Run.tick = setInterval(runTick, 250); runRender(); }
@@ -925,6 +939,7 @@ const modeSwitch = () => '<div class="opt modesw"><button class="' + (state.mode
 const currentAction = () => { const t = state.doId ? findTask(state.doId) : null; return (t && !t.done && t.date === TODAY()) ? t : nextTask(''); };
 const lineSvg = p => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
 const LI = {
+  '⚡': '<path d="M13 3 5 13h6l-1 8 8-10h-6z"/>',
   '📚': '<path d="M5 4h5a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H5zM19 4h-5a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h5z"/>',
   '🏆': '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a2 2 0 0 0 2 4M16 6h3a2 2 0 0 1-2 4M12 13v4M9 20h6M10 17h4"/>',
   '✅': '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
@@ -954,7 +969,7 @@ function nowCard(t) { // the single focus of the day: one big action, a quick "d
   return '<section class="tdy-now" aria-label="מה עכשיו"><div class="tdy-cap">עכשיו</div><div class="tdy-title">' + titleP(t) + '</div>'
     + (info || t.start ? '<div class="tdy-info">' + (t.start ? '<span class="tdy-anch">' + IC.anchor + t.start + '</span>' : '') + esc(info) + '</div>' : '')
     + (t.notes ? '<div class="tdy-notes">' + esc(t.notes) + '</div>' : '')
-    + '<div class="tdy-acts"><button class="tdy-go" data-act="runStart" data-id="' + t.id + '">' + IC.play + 'התחל</button>'
+    + '<div class="tdy-acts">' + (Run.id === t.id && !Run.brk && (Run.running || Run.mini) && !$('#run').hidden ? '<button class="tdy-go live" data-act="runBack">⏱ <span class="nowtimer">' + mmss(Run.left) + '</span> · חזרה לטיימר</button>' : '<button class="tdy-go" data-act="runStart" data-id="' + t.id + '">' + IC.play + 'התחל</button>')
     + '<button class="tdy-sq ok" data-act="askDone" data-id="' + t.id + '" aria-label="סימון כבוצע">' + IC.check + '</button>'
     + '<button class="tdy-sq" data-act="nowMenu" data-id="' + t.id + '" aria-label="עוד פעולות">' + IC.dots + '</button></div></section>';
 }
@@ -1950,7 +1965,7 @@ const views = {
       ${D().habits.map(h => {
         const v = h.visionId ? visionName(h.visionId) : '';
         return `<div class="card"><div class="row"><div class="grow" data-act="editHabit" data-id="${h.id}"><div class="t"><b>${esc(h.title)}</b></div>${h.task ? `<div class="sub">הפעולה: ${esc(h.task)}${h.mins ? ` · ${h.mins} ד׳` : ''}${h.energy ? ' ' + stars(h.energy) : ''}</div>` : ''}
-        <div class="meta"><span>🔥 ${streak(h)} ימים</span><span>${h.days.length === 7 ? 'כל יום' : h.days.map(x => DAYS[x]).join(' ')}</span>${v ? `<span class="chip">${esc(v)}</span>` : ''}</div></div></div>
+        <div class="meta"><span>${habitWeek(h)}</span><span>${h.days.length === 7 ? 'כל יום' : h.days.map(x => DAYS[x]).join(' ')}</span>${v ? `<span class="chip">${esc(v)}</span>` : ''}</div></div></div>
         <div class="dots" style="margin-top:8px;justify-content:flex-start">${last7.map(x => `<button class="dot7 ${habitDone(h, x) ? 'on' : ''}" style="${h.days.includes(parse(x).getDay()) ? '' : 'opacity:.35'}" data-act="toggleHabit" data-id="${h.id}" data-date="${x}">${parse(x).getDate()}</button>`).join('')}</div></div>`;
       }).join('') || '<div class="empty">עדיין אין הרגלים</div>'}
       <button class="fab" data-act="fabMenu" data-a="addHabit" aria-label="הוספה">+</button>`;
@@ -2023,22 +2038,18 @@ const views = {
     const item0 = (t, icon, title, sub) => `<div class="tdy-item" data-act="goTab" data-t="${t}"><span class="ico">${lineIcon(icon)}</span><div class="grow"><div class="t">${title}</div><div class="meta">${sub}</div></div>${chev('l')}</div>`;
     const item = (t, ...a) => featOn(t) ? item0(t, ...a) : '';
     return `<div class="tdy tdyp"><header class="tdy-head"><div><div class="tdy-date">Do It</div><h1>עוד</h1></div></header>
-      ${item0('know', '📚', 'מרכז הידע', D().knowledge.length + ' פריטים שמורים')}
-      ${item0('wins', '🏆', 'ההצלחות שלי', allWins().reduce((n, x) => n + x[1].length, 0) + ' הצלחות')}
+      ${item0('momentum', '⚡', 'מומנטום', momSub())}
       ${['journal', 'rhythm', 'week', 'dayrewards'].some(featOn) ? '<div class="tdy-sect">יומי</div>' : ''}
       ${item('journal', '📓', 'יומן', `${journalDays().length} ימים עם רישום`)}
       ${item('rhythm', '🕒', 'מקצב היום', `${D().rhythm.length} הפסקות · שעות התחלה וסיום`)}
       ${item('week', '🧭', 'חזון שבועי', 'תוצאות השבוע, סיכום ותכנון')}
       ${item('dayrewards', '🎁', 'תגמולים יומיים', `${D().dayRewards.length} תגמולים ברשימה`)}
-      <div class="tdy-sect">תכנון</div>
-      ${item('tasks', '✅', 'כל הפעולות והפרויקטים', `${D().tasks.filter(t => !t.done).length} פעולות פתוחות · ${D().projects.length} פרויקטים · ${D().tasks.filter(t => !t.done && !effQuad(t)).length} לא מסווגות`)}
+      ${item('tasks', '✅', 'פעולות ופרויקטים', [D().tasks.filter(t => !t.done).length ? D().tasks.filter(t => !t.done).length + ' פעולות פתוחות' : '', D().projects.length ? D().projects.length + ' פרויקטים' : ''].filter(Boolean).join(' · ') || 'כל הפעולות במקום אחד')}
+      ${item0('know', '📚', 'מרכז הידע', D().knowledge.length ? D().knowledge.length + ' פריטים שמורים' : 'מקום שקט למה שחשוב לך')}
       ${item('assistant', '🧠', 'עוזר התכנון שלי', `${D().topics.length} נושאים בזיכרון`)}
-      ${['habits', 'goals', 'vision', 'lists', 'cheer'].some(featOn) || !featOn('cheer') ? '<div class="tdy-sect">אישי</div>' : ''}
-      ${featOn('cheer') ? '' : item0('cheer', '💪', 'עידוד', 'משפטים שמחזקים')}
-      ${item('habits', '🔁', 'הרגלים', `${D().habits.length} הרגלים`)}
-      ${item('goals', '🎯', 'יעדים ותגמולים', `${activeG} פעילים${wait ? ` · 🎁 ${wait} ממתינים` : ''}`)}
+      ${featOn('vision') ? '<div class="tdy-sect">אישי</div>' : ''}
       ${item('vision', '🌟', 'חזון', `${D().visions.length} פריטים`)}
-      ${item('lists', '📝', 'רשימות', `${D().lists.length} רשימות`)}
+      <div class="tdy-sect">חשבון והגדרות</div>
       <div class="tdy-item" data-act="moreSettings"><span class="ico">${lineIcon('⚙️')}</span><div class="grow"><div class="t">הגדרות</div><div class="meta">הודעות, נשימות, עיצוב, תכונות וגרסה</div></div><span style="display:inline-block;transform:rotate(${state.moreSet ? -90 : 0}deg);transition:transform .2s">${chev('l')}</span></div>
       ${state.moreSet ? `<div class="moreset">
       <div class="card"><div class="t"><b>🔔 רמת הודעות</b></div><select id="notifySel" style="margin-top:6px">${NOTIFY.map(([v, l]) => '<option value="' + v + '" ' + (notifyLevel() === v ? 'selected' : '') + '>' + l + '</option>').join('')}</select><div class="sub" id="notifyDesc" style="margin-top:6px">${(NOTIFY.find(x => x[0] === notifyLevel()) || NOTIFY[1])[2]}</div></div>
@@ -2052,8 +2063,25 @@ const views = {
   know() {
     const n = D().knowledge.length;
     return `<div class="tdy tdyp"><header class="tdy-head"><div><div class="tdy-date">${n ? n + ' פריטים שמורים' : 'מקום שקט למה שחשוב לך'}</div><h1>מרכז הידע</h1></div><button class="tdy-acct wide kadd" data-act="knowAdd">＋ שמור</button></header>
+      ${featOn('lists') ? '<div class="tdy-item" data-act="goTab" data-t="lists"><span class="ico">' + lineIcon('📝') + '</span><div class="grow"><div class="t">רשימות</div><div class="meta">' + D().lists.length + ' רשימות</div></div>' + chev('l') + '</div>' : ''}
       <input id="kq" type="search" placeholder="חפש בכל מה ששמרת" value="${esc(state.kq || '')}" autocomplete="off" style="margin-bottom:6px">
       <div id="kres">${kList()}</div></div>`;
+  },
+  momentum() {
+    const w = momWeek(), gs = D().goals.map(goalState), activeG = gs.filter(x => !x.achieved && !x.missed).length;
+    const wait = D().goals.filter(g => g.reward && !g.claimed && goalState(g).achieved).length;
+    const total = allWins().reduce((n, x) => n + x[1].length, 0);
+    const stat = (n, l) => '<div class="momstat"><b>' + n + '</b><span>' + l + '</span></div>';
+    const item0 = (t, icon, title, sub) => '<div class="tdy-item" data-act="goTab" data-t="' + t + '"><span class="ico">' + lineIcon(icon) + '</span><div class="grow"><div class="t">' + title + '</div><div class="meta">' + sub + '</div></div>' + chev('l') + '</div>';
+    return `<div class="tdy tdyp"><header class="tdy-head"><div><div class="tdy-date">הצלחות, הרגלים, יעדים ותגמולים</div><h1>מומנטום</h1></div></header>
+      <div class="tdy-cap">ב-7 הימים האחרונים</div>
+      <div class="momstats">${stat(w.tasks, 'פעולות בוצעו')}${stat(w.wins, 'הצלחות נרשמו')}${w.sched ? stat(w.habits + '/' + w.sched, 'הרגלים') : ''}</div>
+      ${wait ? '<div class="tdy-item" data-act="goTab" data-t="goals"><span class="ico">' + lineIcon('🎁') + '</span><div class="grow"><div class="t">יש ' + wait + ' תגמולים שמחכים לך</div><div class="meta">מגיע לך, אפשר לממש</div></div>' + chev('l') + '</div>' : ''}
+      ${item0('wins', '🏆', 'הצלחות', total ? total + ' הצלחות עד היום · כתוב אחת חדשה' : 'כתוב את ההצלחה הראשונה')}
+      ${featOn('habits') ? item0('habits', '🔁', 'הרגלים', D().habits.length + ' הרגלים · בלי רצף שבור, רק התקדמות') : ''}
+      ${featOn('goals') ? item0('goals', '🎯', 'יעדים ותגמולים', activeG + ' יעדים פעילים') : ''}
+      ${featOn('cheer') ? '' : item0('cheer', '💪', 'עידוד', 'משפטים שמחזקים')}
+      <div class="sub" style="margin-top:14px;text-align:center">פספוס אחד הוא לא סיבה לעצור. ממשיכים מהצעד הבא.</div></div>`;
   },
   wins() {
     const all = allWins(), total = all.reduce((n, x) => n + x[1].length, 0), T = TODAY();
@@ -2176,7 +2204,7 @@ function render() {
   document.body.classList.toggle('hxwide', false); // the home stays a single calm column
   $('#view').innerHTML = views[state.tab]();
   if (MORE_TABS.includes(state.tab) && state.tab !== 'assistant' && !(state.tab === 'lists' && state.openList) && !(state.tab === 'projects' && (state.openProject || state.openJob))) // back to the "עוד" menu
-    $('#view').insertAdjacentHTML('afterbegin', `<button class="iconbtn backmore" data-act="goTab" data-t="more" aria-label="חזרה לעוד">${chev('r')}<span style="margin-inline-start:6px">עוד</span></button>`);
+    $('#view').insertAdjacentHTML('afterbegin', `<button class="iconbtn backmore" data-act="goTab" data-t="${backTo().t}" aria-label="חזרה">${chev('r')}<span style="margin-inline-start:6px">${backTo().l}</span></button>`);
   if (DEMO) $('#view').insertAdjacentHTML('afterbegin', '<div class="demobar">מצב דמו · נתונים בדויים <button class="lnk" data-act="demoReset">אפס דמו</button></div>');
   if (boardScroll === null && $('#uboard') && state.tab === 'upcoming' && state.upMode !== 'month') { const b = $('#uboard'), c = [...b.querySelectorAll('.ucol[data-drop]')].find(x => /^[0-9]{4}-/.test(x.dataset.drop)); if (c) b.scrollLeft += c.getBoundingClientRect().right - b.getBoundingClientRect().right + 16; }
   if (boardScroll !== null && $('#uboard')) $('#uboard').scrollLeft = boardScroll;
@@ -2480,6 +2508,7 @@ const VAGUE_WORDS = ['פרויקט', 'עניינים', 'דברים', 'משהו',
 const CONCRETE_VERBS = ['לכתוב', 'לשלוח', 'להתקשר', 'לפתוח', 'לשלם', 'לקנות', 'להזמין', 'לצלם', 'לערוך', 'להעלות', 'לחתום', 'לתאם', 'לקרוא', 'לצפות', 'לפרסם', 'להדפיס', 'לסרוק', 'למלא', 'להוריד', 'להעביר', 'לענות', 'להגיש', 'לבנות', 'לשרטט', 'להקליט', 'לקבוע', 'לרשום', 'לבדוק', 'לחפש', 'להכין', 'לנקות', 'לפנות', 'לשטוף', 'לקפל', 'להוציא', 'להכניס', 'לבחור', 'לסכם', 'לתרגל', 'לצלצל', 'להגדיר', 'ללכת', 'לרוץ', 'לצאת', 'לשתות', 'לאכול', 'לעשות', 'להתאמן', 'למתוח', 'לנשום', 'לשבת', 'לקום', 'לעלות', 'לרדת', 'לבשל', 'לכבס', 'לשטוף', 'לגהץ', 'להתקלח', 'לישון', 'לטעון', 'לחבר', 'לתלות'];
 // Advisory only: the user always decides by ticking "זה ברור". Returns a list of problems (empty = looks clear).
 function clarity(title) {
+  return []; // the wording check was switched off: it only got in the way
   const t = title.trim().replace(/\s+/g, ' '), words = t.split(' ').filter(Boolean), issues = [];
   if (!t) return issues;
   const hasNum = /\d/.test(t);
@@ -2495,6 +2524,7 @@ function clarity(title) {
 const ROUTINE = { 'מקלחת': 'להתקלח', 'מקלחת בוקר': 'להתקלח', 'הליכה': 'ללכת 15 דקות', 'ריצה': 'לרוץ 20 דקות', 'אימון': 'להתאמן 20 דקות', 'כושר': 'ללכת לחדר כושר', 'שינה': 'ללכת לישון', 'שנץ': 'לישון שנץ של 20 דקות', 'שנצ': 'לישון שנץ של 20 דקות', 'כביסה': 'לכבס', 'קניות': 'לקנות מצרכים', 'ניקיון': 'לנקות את הבית', 'בישול': 'לבשל ארוחת ערב', 'ארוחה': 'לאכול ארוחה', 'ארוחת צהריים': 'לאכול ארוחת צהריים', 'ארוחת בוקר': 'לאכול ארוחת בוקר', 'ארוחת ערב': 'לאכול ארוחת ערב', 'קפה': 'לשתות קפה', 'תפילה': 'להתפלל', 'מדיטציה': 'לעשות מדיטציה 10 דקות', 'קריאה': 'לקרוא 10 עמודים', 'כתיבה': 'לכתוב 10 דקות', 'מייל': 'לכתוב מייל אחד', 'מיילים': 'לענות על 5 מיילים', 'שיחה': 'להתקשר לשיחה אחת', 'פגישה': 'להגיע לפגישה', 'חשבונית': 'לשלוח חשבונית', 'חשבוניות': 'לשלוח חשבונית אחת', 'ספורט': 'לעשות ספורט 20 דקות', 'פושאפס': 'לעשות 20 שכיבות סמיכה' };
 const suggestFix = title => { const t = title.trim().replace(/[\s"'׳״.]+/g, ' ').trim(); return ROUTINE[t] || ROUTINE[t.replace(/"/g, '')] || ''; };
 function clarityHTML(title, withFix) {
+  return '<div class="sub">כתוב את הפעולה הבאה, בצורה שאפשר להתחיל מיד.</div>';
   const fix = withFix ? suggestFix(title) : '';
   if (fix) return '<div class="w">⚠ קצר מדי. פעולה צריכה להתחיל בפועל.</div><button type="button" class="lnk" data-act="useSuggest" data-s="' + esc(fix) + '">✏️ להחליף ל: "' + esc(fix) + '"</button>';
   if (!title.trim()) return '<div class="sub">כתוב את הפעולה הבאה, בצורה שאפשר להתחיל מיד.</div>';
@@ -2920,8 +2950,9 @@ const A = {
   memClear: () => { if (confirm('למחוק את כל הזיכרון של העוזר (נושאים, מיקוד ושיחות)? הפעולות והפרויקטים שנוצרו נשארים.')) { D().topics = []; D().sessions = []; D().assist = {}; Store.save(); render(); } },
 
   upJump: e => { const c = document.querySelector('#uboard .ucol[data-drop="' + e.c + '"]'); if (c) c.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); },
-  runMinimize: () => { Run.mini = true; runRender(); },
+  runMinimize: () => { Run.mini = true; runRender(); render(); },
   runExpand: () => { Run.mini = false; runRender(); },
+  runBack: () => { Run.mini = false; runRender(); },
   setMode: e => { state.mode = e.m; try { localStorage.setItem('doit-mode', e.m); } catch (x) {} render(); window.scrollTo(0, 0); },
   chooseOther: () => chooseOther(),
   pickNow: e => { state.doId = e.id; closeSheet(); $('#toast').hidden = true; runOpen(e.id); },
@@ -3045,7 +3076,9 @@ const A = {
   visDone: () => { D().visual[TODAY()] = new Date().toISOString(); Store.save(); visStop(); render(); celebrate(); setTimeout(askMorning, 600); },
 
   runClose: () => runClose(),
-  runMins: e => { if (Run.running) return; Run.total = Run.left = +e.m * 60; runRender(); },
+  runMins: e => { if (Run.running) return; Run.edit = false; Run.total = Run.left = +e.m * 60; runRender(); },
+  runMinsEdit: () => { if (Run.running) return; Run.edit = true; runRender(); },
+  runMinsSet: () => { const v = Math.max(1, Math.min(600, Math.round(+($('#runCustom') || {}).value || 0))); Run.edit = false; if (v) Run.total = Run.left = v * 60; runRender(); },
   runToggle: () => {
     if (Run.running) { Run.left = Math.max(0, Math.round((Run.endAt - Date.now()) / 1000)); clearInterval(Run.tick); Run.running = false; runRender(); }
     else runStartTimer();

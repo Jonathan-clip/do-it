@@ -345,3 +345,5 @@ body.miniRun #edock{bottom:calc(220px + env(safe-area-inset-bottom))}
 
 /* quiet home: one column, a single small link to the map */
 .hxlink{display:block;margin:14px 2px 6px;color:var(--muted);font-size:14.5px;padding:8px 4px}
+
+html[data-design="spatial"] #run.mini{background:linear-gradient(135deg,var(--brand),#17829f);color:#fff;backdrop-filter:none}
