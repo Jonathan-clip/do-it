@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.3-upcoming'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.4-map'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -1380,8 +1380,8 @@ function pmMap() {
     ${pmWorldOn() ? '' : `<div class="pmfilters">${sel('pmArea', state.pmArea || '', pmAreas().map(a => [a.id, a.icon + ' ' + a.name]), 'כל התחומים')}${sel('pmRange', state.pmRange || '', PM_RANGES, 'כל טווח זמן')}<button class="iconbtn" data-act="pmAreasSheet" aria-label="עריכת תחומי חיים" title="תחומי חיים">⚙️</button></div>
     <div class="pmfilters">${sel('pmValue', state.pmValue || '', pmValues().map(v => [v, v]), 'כל הערכים')}${sel('pmPrio', state.pmPrio || '', PM_PRIO, 'כל העדיפויות')}</div>
 `}
-    <div class="seg pmrevs"><button data-act="pmWeekRev">📋 סקירה שבועית</button><button data-act="pmMonthRev">🗓️ סקירה חודשית</button><button data-act="pmLoad">⏱️ עומס</button></div>
-    ${live.length ? `<button class="btn ghost pmweek" data-act="pmWalk">🧭 כוונון שבוע: מה אני מקדם בכל פרויקט</button>` : ''}
+    ${featOn('mapTools') ? `<div class="seg pmrevs"><button data-act="pmWeekRev">📋 סקירה שבועית</button><button data-act="pmMonthRev">🗓️ סקירה חודשית</button><button data-act="pmLoad">⏱️ עומס</button></div>` : ''}
+    ${featOn('mapTools') && live.length ? `<button class="btn ghost pmweek" data-act="pmWalk">🧭 כוונון שבוע: מה אני מקדם בכל פרויקט</button>` : ''}
     ${pmWorldOn() ? pmWorld() : list.length ? `<div id="pmcards">${list.map(pmCard).join('')}</div>` : `<div class="empty">${D().projects.length ? 'אין פרויקטים שמתאימים לסינון הזה' : 'עוד אין פרויקטים. אפשר להתחיל מאחד שחשוב לך'}</div>`}`;
 }
 function pmDetail(p) {
@@ -1688,6 +1688,7 @@ const FEATURES = [ // key, icon, title, what it is
   ['assistant', '🧠', 'עוזר התכנון שלי', 'שיחה שעוזרת לסדר את היום'],
   ['vision', '🌟', 'חזון', 'תמונות ומשפטים על העתיד']
 ];
+const MAPF = [['mapTools', '🧭', 'כלי סקירה', 'סקירה שבועית וחודשית, עומס וכוונון שבוע']]; // the map screen
 const UPF = [ // the "upcoming" screen
   ['viewMonth', '🗓', 'תצוגת חודש', 'לוח חודש מלא'],
   ['viewAll', '📜', 'תצוגת כל הימים', 'רשימה ארוכה של ימים קדימה']
@@ -1699,7 +1700,7 @@ const DAYF = [ // the Today screen
   ['org', '🗂', 'ארגון יומי', 'כרטיס "ארגון" ברשימת היום'],
   ['dayextras', '🧰', 'כלים נוספים', 'הדפסה, "מה מעסיק אותי", תזכורת ו"הזנה מרוכזת"']
 ];
-const FEAT_DEF = { viewMonth: 0, viewAll: 0, carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
+const FEAT_DEF = { mapTools: 0, viewMonth: 0, viewAll: 0, carry: 0, maplink: 0, hours: 0, org: 0, dayextras: 0, habits: 1, goals: 1, lists: 1, cheer: 0, journal: 0, rhythm: 0, week: 0, dayrewards: 0, assistant: 0, vision: 0 };
 const featOn = k => { const f = (D().assist || {}).features; return k in FEAT_DEF ? (f && k in f ? !!f[k] : !!FEAT_DEF[k]) : true; }; // tasks, projects, map, upcoming: always on
 const featCount = k => ({ habits: () => D().habits.length, goals: () => D().goals.length, lists: () => D().lists.length, journal: () => journalDays().length, rhythm: () => D().rhythm.length, dayrewards: () => D().dayRewards.length, assistant: () => D().topics.length, vision: () => D().visions.length }[k] || (() => 0))();
 function applyFeatures() {
@@ -1709,6 +1710,7 @@ function applyFeatures() {
 function featSheet() {
   sheet('<h1>🎛 ניהול תכונות</h1><div class="sub" style="margin-bottom:8px">מה שכבוי מוסתר מהתפריטים ומהמסכים, ושום נתון לא נמחק. אפשר להדליק בכל רגע.</div>'
     + FEATURES.map(([k, ic, t, d]) => { const on = featOn(k), n = featCount(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + (n ? ' · ' + n + ' פריטים' : '') + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
+    + '<h2>במפה</h2>' + MAPF.map(([k, ic, t, d]) => { const on = featOn(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
     + '<h2>ב"בקרוב"</h2>' + UPF.map(([k, ic, t, d]) => { const on = featOn(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
     + '<h2>במסך "היום"</h2>' + DAYF.map(([k, ic, t, d]) => { const on = featOn(k); return '<div class="card row"><span style="font-size:22px">' + ic + '</span><div class="grow"><div class="t"><b>' + t + '</b></div><div class="meta">' + d + '</div></div><button class="featsw ' + (on ? 'on' : '') + '" data-act="featToggle" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + t + '">' + (on ? 'פעיל' : 'כבוי') + '</button></div>'; }).join('')
     + '<div class="actions"><button class="btn" data-act="close">סגור</button></div>');
