@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- Storage (local now; cloud adapter plugs in here later) ---------- */
-const APP_VERSION = '2026-11-28.9-no-note'; // shown in the "עוד" menu, to check which version a device is running
+const APP_VERSION = '2026-11-28.11-anchor-alert'; // shown in the "עוד" menu, to check which version a device is running
 const DEMO = /(^|[?&#])demo(\b|=)/.test(location.search + location.hash); // ?demo => fictional data, separate storage, no cloud
 const KEY = DEMO ? 'doit-demo-v1' : 'doit-data-v1';
 const empty = () => ({ visions: [], tasks: [], habits: [], lists: [], goals: [], projects: [], jobs: [], rhythm: [], dayRewards: [], breakIdeas: [], cheers: [], topics: [], sessions: [], assist: {}, rhythmLog: {}, dayLog: {}, review: {}, visual: {}, weeks: {}, notes: {}, journal: {}, focus: {}, org: {} });
@@ -174,7 +174,7 @@ const taskOrder = (d, a, b) => { // a manual drag order wins; otherwise today's 
   if (m === 'midlow' || m === 'tired' || m === 'flood' || m === 'focus') return e(a) - e(b) || p(b) - p(a); // gentler states: easy actions first
   return (b.energy || 0) - (a.energy || 0) || p(b) - p(a);
 };
-const tasksOn = d => D().tasks.filter(t => t.date === d).sort((a, b) => taskOrder(d, a, b) || (a.diff || 3) - (b.diff || 3));
+const tasksOn = d => D().tasks.filter(t => t.date === d).sort((a, b) => (a.start ? 0 : 1) - (b.start ? 0 : 1) || (a.start && b.start ? (a.start < b.start ? -1 : a.start > b.start ? 1 : 0) : 0) || taskOrder(d, a, b) || (a.diff || 3) - (b.diff || 3)); // anchors (a fixed start time) come first, by time
 const stars = n => '★'.repeat(n || 0);
 const logoMark = (s = 32) => `<svg class="logo" width="${s}" height="${s}" viewBox="0 0 512 512" role="img" aria-label="Do It"><rect width="512" height="512" rx="112" fill="#1f6f5c"/><path d="M130 270l90 90 170-190" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/><circle cx="390" cy="170" r="36" fill="#e8a33d"/></svg>`;
 /* Projects: a project groups several tasks (task.projectId). Deleting a project keeps its tasks. */
@@ -295,7 +295,8 @@ function tasksBlock(d, ts) {
   const rows = list => list.map(t => taskRow(t)).join('');
   if (!ts.length) return d === TODAY() ? '' : '<div class="empty">אין פעולות ליום הזה</div>';
   if (state.showAll) return rows(open) + (open.length > 3 ? '<button class="btn ghost more3" data-act="toggleShowAll">הצג רק שלוש</button>' : '') + (ts.some(t => t.ord !== undefined) ? '<button class="lnk" data-act="resetOrder">↺ חזרה לסדר אוטומטי</button>' : '');
-  const manual = ts.some(t => t.ord !== undefined), first = open.filter(t => t.id === f.mitId), pick = (manual ? open : [...first, ...open.filter(t => t.id !== f.mitId)]).slice(0, f.energy === 'flood' ? 1 : 3);
+  const anch = open.filter(t => t.start), rest = open.filter(t => !t.start);
+  const manual = ts.some(t => t.ord !== undefined), first = rest.filter(t => t.id === f.mitId), pk = (manual ? rest : [...first, ...rest.filter(t => t.id !== f.mitId)]).slice(0, f.energy === 'flood' ? 1 : 3), pick = [...anch, ...pk];
   const hidden = open.length - pick.length;
   return (pick.length ? rows(pick) : '<div class="empty">🎉 סיימת את כל הפעולות להיום</div>')
     + (manual ? '<button class="lnk" data-act="resetOrder">↺ חזרה לסדר אוטומטי</button>' : '')
@@ -571,6 +572,10 @@ function tick() {
   try {
     const T = TODAY(); ensureDayStart();
     { const f0 = D().focus[T] || {}, fx = focusOn(T); if (new Date().getHours() >= 12 && f0.askedAt && !f0.askedNoon && !(fx.mit && fx.fun) && D().tasks.length && notifyLevel() !== 'quiet') { askFocus(); return; } }
+    if ($('#toast').hidden && $('#sheet').hidden && $('#run').hidden) { // anchor tasks: an alert at the lead time the user chose (any notification level)
+      const nm = toMin(nowHM()), a = D().tasks.find(x => x.date === T && x.start && !x.done && (x.lead || 0) > 0 && nm >= toMin(x.start) - x.lead && nm < toMin(x.start) && !tick.shown['a' + T + x.id]);
+      if (a) { tick.shown['a' + T + a.id] = 1; toast(`<span>⚓ בעוד ${toMin(a.start) - nm} דקות (${a.start}): <b>${esc(a.title)}</b></span><button class="btn" data-act="runStart" data-id="${a.id}">◀ התחל</button><button data-act="toastClose" aria-label="סגור">✕</button>`, 30000); return; }
+    }
     if (!$('#toast').hidden || !$('#sheet').hidden || !$('#run').hidden || notifyLevel() !== 'full') return; // meal / rest / hourly-break reminders only in the "full" level
     const now = toMin(nowHM()), log = D().rhythmLog[T] || {}, f = D().focus[T] || {};
     const r = rhythmSorted().find(x => !log[x.id] && toMin(x.time) <= now && now < toMin(x.time) + 180 && !tick.shown[T + x.id]);
@@ -1239,7 +1244,7 @@ function taskRow(t, showDate) {
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}">
       <div class="t">${hxMark(t)}${titleP(t)}</div>
-      <div class="meta">${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.diff ? '<span class="chip" title="רמת קושי">' + diffLabel(t.diff) + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
+      <div class="meta">${t.start ? `<span class="chip" style="background:var(--accent);color:#fff" title="עוגן: שעת התחלה קבועה">⚓ ${t.start}</span>` : ''}${t.brainless ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⚡ Brainless</span>' : ''}${showDate && t.date ? `<span>${shortDate(t.date)}</span>` : ''}${subToggle(t)}${t.print ? '<span>🖨</span>' : ''}${t.diff ? '<span class="chip" title="רמת קושי">' + diffLabel(t.diff) + '</span>' : ''}${t.inbox ? '<span>📥 נקלט</span>' : ''}${t.parked ? '<span>📦 מאגר</span>' : ''}${focusOn(t.date || '').mitId === t.id ? '<span class="chip" style="background:var(--warn-bg);color:var(--warn-ink)">⭐ החשובה</span>' : ''}${t.repeat ? `<span title="${repeatLabel(t.repeat)}">🔁 ${repeatLabel(t.repeat)}</span>` : ''}${v ? `<span class="chip">${esc(v)}</span>` : ''}</div>
     </div>${t.done ? '' : `<button class="playbtn" data-act="runStart" data-id="${t.id}" aria-label="התחל עכשיו">◀</button>`}</div>${subsHtml}</div>`;
 }
 function habitRow(h, d) {
@@ -1270,7 +1275,7 @@ function upCard(t, showDate) {
   return `<div class="ucard p${t.priority} ${t.done ? 'done' : ''}" data-task="${t.id}"><div class="urow">
     <button class="check ${t.done ? 'on' : ''}" data-act="toggleTask" data-id="${t.id}">${t.done ? '✓' : ''}</button>
     <div class="grow" data-act="taskMenu" data-id="${t.id}"><div class="t">${titleP(t)}</div>
-    <div class="meta">${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
+    <div class="meta">${t.start ? `<span class="chip" style="background:var(--accent);color:#fff" title="עוגן: שעת התחלה קבועה">⚓ ${t.start}</span>` : ''}${v}${showDate && t.date ? `<span style="color:var(--danger)">${shortDate(t.date)}</span>` : ''}${subToggle(t)}</div></div></div>${subs}</div>`;
 }
 const upCol = (drop, head, count, body, extra = '') => `<section class="ucol" data-drop="${drop}"><div class="uhead"><b>${head}</b><span class="sub">${count}</span>${extra}</div>${body}</section>`;
 
@@ -1798,7 +1803,7 @@ const views = {
       for (let i = 0; i < 42; i++) {
         const c = new Date(st); c.setDate(st.getDate() + i);
         const s = fmt(c), ts = tasksOn(s).filter(t => !t.done).filter(filterOk);
-        cells += `<div class="mcell ${c.getMonth() !== m - 1 ? 'out' : ''} ${s === T ? 'today' : ''} ${s === state.upSel ? 'sel' : ''}" data-drop="${s}" data-act="upPick" data-date="${s}"><span class="mnum">${c.getDate()}</span>${ts.slice(0, 3).map(t => `<div class="ucard mini ${t.done ? 'done' : ''}" data-task="${t.id}" data-act="taskMenu" data-id="${t.id}"><span class="t">${esc(t.title)}</span></div>`).join('')}${ts.length > 3 ? `<span class="mmore">+${ts.length - 3}</span>` : ''}</div>`;
+        cells += `<div class="mcell ${c.getMonth() !== m - 1 ? 'out' : ''} ${s === T ? 'today' : ''} ${s === state.upSel ? 'sel' : ''}" data-drop="${s}" data-act="upPick" data-date="${s}"><span class="mnum">${c.getDate()}</span>${ts.slice(0, 3).map(t => `<div class="ucard mini ${t.done ? 'done' : ''}" data-task="${t.id}" data-act="taskMenu" data-id="${t.id}"><span class="t">${t.start ? '⚓' + t.start + ' ' : ''}${esc(t.title)}</span></div>`).join('')}${ts.length > 3 ? `<span class="mmore">+${ts.length - 3}</span>` : ''}</div>`;
       }
       const sel = state.upSel, sts = tasksOn(sel).filter(t => !t.done);
       nav = navRow(`${MONTHS[m - 1]} ${y}`);
@@ -2137,6 +2142,8 @@ function taskForm(id, presetDate, presetProject, preset) {
    <div id="clHint" class="clarity">${id ? '' : clarityHTML('', true)}</div>
    <label>מתי?</label>
    <div class="opt" id="dateChips" style="margin-bottom:6px">${[['היום', TODAY()], ['מחר', addDays(TODAY(), 1)], ['ללא תאריך', '']].map(([l, v]) => `<button type="button" class="${(t.date || '') === v ? 'on' : ''}" onclick="const f=this.closest('form');f.elements.date.value='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div>
+   <label>שעת התחלה קבועה (עוגן, אופציונלי)</label><input type="time" name="start" value="${t.start || ''}">
+   <label>התראה לפני העוגן</label><select name="lead">${[[0, 'ללא התראה'], [15, 'רבע שעה לפני'], [30, 'חצי שעה לפני'], [60, 'שעה לפני'], [120, 'שעתיים לפני']].map(([v, l]) => `<option value="${v}" ${(t.lead === undefined ? 15 : t.lead) === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
    <label>פרויקט (אופציונלי)</label><select name="owner">${ownerOpts(t.projectId ? 'p:' + t.projectId : '')}</select>
    <details class="moreopts" ${id || t.repeat || t.notes || (t.subs || []).length ? 'open' : ''}><summary>אפשרויות נוספות</summary>
    <label>תיאור הפעולה (אופציונלי, באריכות)</label><textarea name="notes" rows="2" placeholder="פרטים: מה בדיוק, איפה, למי, מה צריך להיות מוכן">${esc(t.notes || '')}</textarea>
@@ -2170,7 +2177,7 @@ function taskForm(id, presetDate, presetProject, preset) {
     e.preventDefault();
     if (blocked()) { const why = clarity(form.title.value)[0]; $('#clHint').innerHTML = clarityHTML(form.title.value, true); form.title.focus(); alert('לא ניתן לשמור: הפעולה לא כתובה בצורה ברורה.\n' + why); return; }
     const f = new FormData(e.target), own = f.get('owner') || '', jobId = '', projectId = own.startsWith('p:') ? own.slice(2) : '', prevS = t.subs || [], subs = (f.get('subs') || '').split('\n').map(x => x.trim()).filter(Boolean).map(l => prevS.find(x => x.title === l) || { id: uid(), title: l, done: false });
-    const obj = { title: f.get('title').trim(), date: f.get('date') || null, priority: f.get('quad') ? quadPri[f.get('quad')] : (t.priority || 0), quad: f.get('quad') || '', diff: +f.get('diff') || 0, visionId: t.visionId || '', jobId, projectId, subs, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
+    const obj = { title: f.get('title').trim(), date: f.get('date') || null, start: f.get('start') || '', lead: +f.get('lead') || 0, priority: f.get('quad') ? quadPri[f.get('quad')] : (t.priority || 0), quad: f.get('quad') || '', diff: +f.get('diff') || 0, visionId: t.visionId || '', jobId, projectId, subs, notes: f.get('notes'), repeat: f.get('repeat') || '', print: f.get('print') === 'on', brainless: f.get('brainless') === 'on', energy: +f.get('energy'), mins: +f.get('mins') };
     let saved = t;
     if (id) Object.assign(t, obj); else { saved = { id: uid(), done: false, subs: [], ...obj }; D().tasks.push(saved); }
     resolveLong([saved]);
